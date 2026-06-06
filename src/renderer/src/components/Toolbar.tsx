@@ -1,5 +1,5 @@
-import { SearchOutlined, PlusOutlined, CameraOutlined, SettingOutlined, ThunderboltOutlined } from '@ant-design/icons'
-import { Input, Button, Dropdown, message } from 'antd'
+import { SearchOutlined, PlusCircleFilled, CameraFilled, SettingFilled, ThunderboltFilled } from '@ant-design/icons'
+import { Input, Button, Dropdown, Tooltip, message } from 'antd'
 import type { MenuProps } from 'antd'
 import { useAppStore } from '../store'
 
@@ -39,13 +39,13 @@ export default function Toolbar({ onNewSession, onOpenPresets }: ToolbarProps) {
   const items: MenuProps['items'] = [
     {
       key: 'presets',
-      icon: <SettingOutlined />,
+      icon: <SettingFilled style={{ fontSize: 12 }} />,
       label: '预设管理',
       onClick: onOpenPresets
     },
     {
       key: 'snapshot',
-      icon: <CameraOutlined />,
+      icon: <CameraFilled style={{ fontSize: 12 }} />,
       label: '保存快照',
       onClick: handleSnapshot
     }
@@ -61,16 +61,19 @@ export default function Toolbar({ onNewSession, onOpenPresets }: ToolbarProps) {
     >
       <div className="flex items-center gap-2.5">
         <div 
-          className="w-7 h-7 rounded-md flex items-center justify-center"
-          style={{ background: 'var(--accent-dim)' }}
+          className="w-8 h-8 rounded-lg flex items-center justify-center"
+          style={{ 
+            background: 'linear-gradient(135deg, #38bdf8 0%, #818cf8 100%)',
+            boxShadow: '0 2px 8px rgba(56, 189, 248, 0.3)'
+          }}
         >
-          <ThunderboltOutlined style={{ color: 'var(--accent)', fontSize: 14 }} />
+          <ThunderboltFilled style={{ color: '#fff', fontSize: 15 }} />
         </div>
         <span 
           style={{ 
             fontFamily: "'JetBrains Mono', monospace",
-            fontSize: 13,
-            fontWeight: 600,
+            fontSize: 14,
+            fontWeight: 700,
             color: 'var(--text-primary)',
             letterSpacing: '-0.02em'
           }}
@@ -86,21 +89,21 @@ export default function Toolbar({ onNewSession, onOpenPresets }: ToolbarProps) {
           onChange={(e) => setSearchQuery(e.target.value)}
           prefix={<SearchOutlined style={{ color: 'var(--text-muted)', fontSize: 12 }} />}
           allowClear
-          className="w-52"
+          className="w-56"
           size="small"
         />
 
         <Button 
           type="primary" 
-          icon={<PlusOutlined />}
+          icon={<PlusCircleFilled />}
           onClick={onNewSession}
           size="small"
         >
-          新建
+          新建会话
         </Button>
         
         <Dropdown menu={{ items }} placement="bottomRight">
-          <Button icon={<SettingOutlined />} size="small" />
+          <Button icon={<SettingFilled />} size="small" />
         </Dropdown>
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Button } from 'antd'
-import { CompressOutlined, CodeOutlined } from '@ant-design/icons'
+import { CompressOutlined, CodeFilled } from '@ant-design/icons'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
@@ -111,7 +111,7 @@ export default function FullscreenTerminal() {
         }}
       >
         <div className="flex items-center gap-2">
-          <CodeOutlined style={{ color: 'var(--accent)', fontSize: 13 }} />
+          <CodeFilled style={{ color: 'var(--accent)', fontSize: 14 }} />
           <span 
             style={{ 
               fontFamily: "'JetBrains Mono', monospace",

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ConfigProvider, theme, Button } from 'antd'
-import { PlusOutlined, CodeOutlined } from '@ant-design/icons'
+import { PlusCircleFilled, CodeFilled } from '@ant-design/icons'
 import { useAppStore } from './store'
 import Sidebar from './components/Sidebar'
 import Toolbar from './components/Toolbar'
@@ -53,11 +53,11 @@ function App() {
                 <div 
                   className="w-20 h-20 rounded-2xl flex items-center justify-center"
                   style={{ 
-                    background: 'var(--accent-dim)',
+                    background: 'linear-gradient(135deg, rgba(56,189,248,0.15) 0%, rgba(129,140,248,0.15) 100%)',
                     border: '1px solid var(--border-color)'
                   }}
                 >
-                  <CodeOutlined style={{ fontSize: 36, color: 'var(--accent)' }} />
+                  <CodeFilled style={{ fontSize: 36, color: 'var(--accent)' }} />
                 </div>
                 <div className="text-center">
                   <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 4 }}>
@@ -69,7 +69,7 @@ function App() {
                 </div>
                 <Button 
                   type="primary" 
-                  icon={<PlusOutlined />}
+                  icon={<PlusCircleFilled />}
                   onClick={() => setShowNewSession(true)}
                 >
                   新建会话

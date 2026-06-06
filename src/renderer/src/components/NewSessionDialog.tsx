@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Modal, Form, Input, Select, Button, Space } from 'antd'
-import { CodeOutlined } from '@ant-design/icons'
+import { Modal, Form, Input, Select, Button, Space, Checkbox, Divider, message } from 'antd'
+import { CodeFilled, SaveFilled } from '@ant-design/icons'
 import { useAppStore } from '../store'
 
 interface NewSessionDialogProps {
@@ -9,9 +9,11 @@ interface NewSessionDialogProps {
 }
 
 export default function NewSessionDialog({ open, onClose }: NewSessionDialogProps) {
-  const { addSession, presets } = useAppStore()
+  const { addSession, addPreset, presets } = useAppStore()
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
+  const [saveAsPreset, setSaveAsPreset] = useState(false)
+  const [presetName, setPresetName] = useState('')
 
   const handleCreate = async () => {
     try {
@@ -37,6 +39,21 @@ export default function NewSessionDialog({ open, onClose }: NewSessionDialogProp
 
       addSession(session)
 
+      // 如果勾选了保存为预设
+      if (saveAsPreset) {
+        const name = presetName.trim() || values.name
+        const preset = {
+          id: `preset-${Date.now()}`,
+          name,
+          terminalType: values.terminalType,
+          cwd: values.cwd || '~',
+          initialCommand: values.initialCommand || ''
+        }
+        addPreset(preset)
+        await window.electronAPI.storageSet('presets', useAppStore.getState().presets)
+        message.success(`预设"${name}"已保存`)
+      }
+
       if (values.initialCommand) {
         setTimeout(async () => {
           await window.electronAPI.sendInput(sessionId, values.initialCommand + '\r')
@@ -44,6 +61,8 @@ export default function NewSessionDialog({ open, onClose }: NewSessionDialogProp
       }
 
       form.resetFields()
+      setSaveAsPreset(false)
+      setPresetName('')
       onClose()
     } catch (error) {
       console.error('创建会话失败:', error)
@@ -68,7 +87,7 @@ export default function NewSessionDialog({ open, onClose }: NewSessionDialogProp
     <Modal
       title={
         <Space>
-          <CodeOutlined style={{ color: 'var(--accent)' }} />
+          <CodeFilled style={{ color: 'var(--accent)', fontSize: 16 }} />
           <span>新建会话</span>
         </Space>
       }
@@ -82,7 +101,7 @@ export default function NewSessionDialog({ open, onClose }: NewSessionDialogProp
           </Button>
         </Space>
       }
-      width={460}
+      width={480}
     >
       {presets.length > 0 && (
         <div className="mb-4">
@@ -134,6 +153,31 @@ export default function NewSessionDialog({ open, onClose }: NewSessionDialogProp
           <Input placeholder="创建会话后自动执行的命令" />
         </Form.Item>
       </Form>
+
+      <Divider style={{ borderColor: 'var(--border-color)', margin: '12px 0' }} />
+
+      <div>
+        <Checkbox 
+          checked={saveAsPreset} 
+          onChange={(e) => setSaveAsPreset(e.target.checked)}
+          style={{ color: 'var(--text-secondary)' }}
+        >
+          <Space>
+            <SaveFilled style={{ color: 'var(--accent)', fontSize: 12 }} />
+            保存为预设
+          </Space>
+        </Checkbox>
+        
+        {saveAsPreset && (
+          <Input
+            value={presetName}
+            onChange={(e) => setPresetName(e.target.value)}
+            placeholder="预设名称（留空则使用会话名称）"
+            className="mt-2"
+            size="small"
+          />
+        )}
+      </div>
     </Modal>
   )
 }

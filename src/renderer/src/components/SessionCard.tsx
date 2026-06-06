@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Tag, Button, Input, Space } from 'antd'
-import { FullscreenOutlined, DeleteOutlined, SendOutlined, CheckOutlined, CloseOutlined, CodeOutlined } from '@ant-design/icons'
+import { ExpandOutlined, DeleteFilled, SendOutlined, CheckCircleFilled, CloseCircleFilled, CodeFilled, PlayCircleFilled } from '@ant-design/icons'
 import { Session } from '../types'
 import { useAppStore } from '../store'
 import { stripAnsi } from '../utils/statusDetector'
@@ -9,12 +9,12 @@ interface SessionCardProps {
   session: Session
 }
 
-const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string; glow: boolean }> = {
-  'needs-confirm': { color: '#fbbf24', bg: 'rgba(251, 191, 36, 0.1)', label: '需确认', glow: true },
-  'needs-input':   { color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.1)', label: '待输入', glow: true },
-  'error':         { color: '#f87171', bg: 'rgba(248, 113, 113, 0.1)', label: '错误', glow: true },
-  'running':       { color: '#34d399', bg: 'rgba(52, 211, 153, 0.1)', label: '运行中', glow: false },
-  'idle':          { color: '#64748b', bg: 'rgba(100, 116, 139, 0.08)', label: '空闲', glow: false },
+const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string; glow: boolean; icon: React.ReactNode }> = {
+  'needs-confirm': { color: '#fbbf24', bg: 'rgba(251, 191, 36, 0.1)', label: '需确认', glow: true, icon: <CheckCircleFilled /> },
+  'needs-input':   { color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.1)', label: '待输入', glow: true, icon: <PlayCircleFilled /> },
+  'error':         { color: '#f87171', bg: 'rgba(248, 113, 113, 0.1)', label: '错误', glow: true, icon: <CloseCircleFilled /> },
+  'running':       { color: '#34d399', bg: 'rgba(52, 211, 153, 0.1)', label: '运行中', glow: false, icon: <PlayCircleFilled /> },
+  'idle':          { color: '#64748b', bg: 'rgba(100, 116, 139, 0.08)', label: '空闲', glow: false, icon: <CodeFilled /> },
 }
 
 export default function SessionCard({ session }: SessionCardProps) {
@@ -82,28 +82,37 @@ export default function SessionCard({ session }: SessionCardProps) {
 
   return (
     <div
-      className="rounded-lg overflow-hidden flex flex-col"
+      className="rounded-xl overflow-hidden flex flex-col"
       style={{
         background: 'var(--bg-card)',
         border: '1px solid var(--border-color)',
         backdropFilter: 'blur(12px)',
-        transition: 'border-color 0.2s, box-shadow 0.2s',
-        ...(statusCfg.glow ? { boxShadow: `0 0 20px ${statusCfg.bg}`, borderColor: `${statusCfg.color}30` } : {})
+        transition: 'all 0.25s ease',
+        ...(statusCfg.glow ? { boxShadow: `0 0 24px ${statusCfg.bg}, inset 0 1px 0 ${statusCfg.color}15`, borderColor: `${statusCfg.color}25` } : {})
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.borderColor = 'var(--border-hover)'
+        e.currentTarget.style.transform = 'translateY(-2px)'
+        e.currentTarget.style.boxShadow = `0 8px 24px rgba(0,0,0,0.3)${statusCfg.glow ? `, 0 0 20px ${statusCfg.bg}` : ''}`
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = statusCfg.glow ? `${statusCfg.color}30` : 'var(--border-color)'
+        e.currentTarget.style.borderColor = statusCfg.glow ? `${statusCfg.color}25` : 'var(--border-color)'
+        e.currentTarget.style.transform = 'translateY(0)'
+        e.currentTarget.style.boxShadow = statusCfg.glow ? `0 0 24px ${statusCfg.bg}` : 'none'
       }}
     >
       {/* 头部 */}
       <div 
-        className="flex items-center justify-between px-3 py-2"
+        className="flex items-center justify-between px-3 py-2.5"
         style={{ borderBottom: '1px solid var(--border-color)' }}
       >
         <div className="flex items-center gap-2">
-          <CodeOutlined style={{ color: statusCfg.color, fontSize: 12 }} />
+          <div
+            className="w-6 h-6 rounded-md flex items-center justify-center"
+            style={{ background: statusCfg.bg }}
+          >
+            <span style={{ color: statusCfg.color, fontSize: 12 }}>{statusCfg.icon}</span>
+          </div>
           <span 
             style={{ 
               fontSize: 12, 
@@ -121,15 +130,16 @@ export default function SessionCard({ session }: SessionCardProps) {
               fontSize: 10, 
               lineHeight: '18px',
               background: statusCfg.bg,
-              border: 'none'
+              border: 'none',
+              fontFamily: "'JetBrains Mono', monospace"
             }}
           >
             {statusCfg.label}
           </Tag>
         </div>
         <Space size={2}>
-          <Button type="text" icon={<FullscreenOutlined />} onClick={handleFullscreen} size="small" style={{ fontSize: 11 }} />
-          <Button type="text" danger icon={<DeleteOutlined />} onClick={handleClose} size="small" style={{ fontSize: 11 }} />
+          <Button type="text" icon={<ExpandOutlined style={{ fontSize: 12 }} />} onClick={handleFullscreen} size="small" />
+          <Button type="text" danger icon={<DeleteFilled style={{ fontSize: 12 }} />} onClick={handleClose} size="small" />
         </Space>
       </div>
 
@@ -151,10 +161,10 @@ export default function SessionCard({ session }: SessionCardProps) {
       <div className="px-3 py-2" style={{ borderTop: '1px solid var(--border-color)' }}>
         {session.status === 'needs-confirm' && (
           <Space size={4} className="mb-1.5">
-            <Button size="small" type="primary" icon={<CheckOutlined />} onClick={handleQuickConfirm}>
+            <Button size="small" type="primary" icon={<CheckCircleFilled />} onClick={handleQuickConfirm}>
               Y
             </Button>
-            <Button size="small" danger icon={<CloseOutlined />} onClick={handleQuickDeny}>
+            <Button size="small" danger icon={<CloseCircleFilled />} onClick={handleQuickDeny}>
               N
             </Button>
           </Space>
