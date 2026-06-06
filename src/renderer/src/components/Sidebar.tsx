@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Menu, Popover } from 'antd'
+import { Menu, Popover, Tooltip } from 'antd'
 import type { MenuProps } from 'antd'
-import { AppstoreFilled, PlusCircleFilled, FolderFilled } from '@ant-design/icons'
+import { AppstoreFilled, PlusCircleFilled, FolderFilled, MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons'
 import { useAppStore } from '../store'
 
 const PRESET_COLORS = [
@@ -31,7 +31,12 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (c: string)
   )
 }
 
-export default function Sidebar() {
+interface SidebarProps {
+  collapsed: boolean
+  onToggleCollapse: () => void
+}
+
+export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   const { groups, selectedGroupId, setSelectedGroupId, addGroup } = useAppStore()
   const [newGroupName, setNewGroupName] = useState('')
   const [newGroupColor, setNewGroupColor] = useState(PRESET_COLORS[0])
@@ -55,7 +60,7 @@ export default function Sidebar() {
     {
       key: 'all',
       icon: <AppstoreFilled style={{ fontSize: 13 }} />,
-      label: '全部会话',
+      label: collapsed ? '' : '全部会话',
     },
     ...groups.map(group => ({
       key: group.id,
@@ -68,7 +73,7 @@ export default function Sidebar() {
           }} 
         />
       ),
-      label: group.name,
+      label: collapsed ? '' : group.name,
     }))
   ]
 
@@ -82,25 +87,46 @@ export default function Sidebar() {
 
   return (
     <div 
-      className="w-52 flex flex-col"
+      className="flex flex-col transition-all duration-200"
       style={{ 
+        width: collapsed ? 52 : 208,
         borderRight: '1px solid var(--border-color)',
         background: 'var(--bg-secondary)'
       }}
     >
-      <div className="px-3 pt-4 pb-2">
-        <span 
-          style={{ 
-            fontSize: 10, 
-            fontWeight: 700, 
-            textTransform: 'uppercase',
-            letterSpacing: '0.1em',
+      {/* 折叠/展开按钮 */}
+      <div 
+        className="flex items-center justify-between px-3 h-9"
+        style={{ borderBottom: '1px solid var(--border-color)' }}
+      >
+        {!collapsed && (
+          <span 
+            style={{ 
+              fontSize: 10, 
+              fontWeight: 700, 
+              textTransform: 'uppercase',
+              letterSpacing: '0.1em',
+              color: 'var(--text-muted)',
+              fontFamily: "'JetBrains Mono', monospace"
+            }}
+          >
+            分组
+          </span>
+        )}
+        <button
+          onClick={onToggleCollapse}
+          className="flex items-center justify-center w-6 h-6 rounded-md transition-colors"
+          style={{
+            background: 'transparent',
+            border: 'none',
             color: 'var(--text-muted)',
-            fontFamily: "'JetBrains Mono', monospace"
+            cursor: 'pointer',
+            marginLeft: collapsed ? 'auto' : undefined,
+            marginRight: collapsed ? 'auto' : undefined,
           }}
         >
-          分组
-        </span>
+          {collapsed ? <MenuUnfoldOutlined style={{ fontSize: 13 }} /> : <MenuFoldOutlined style={{ fontSize: 13 }} />}
+        </button>
       </div>
 
       <Menu
@@ -109,84 +135,88 @@ export default function Sidebar() {
         onClick={handleMenuClick}
         className="border-r-0 bg-transparent flex-1"
         items={menuItems}
+        inlineCollapsed={collapsed}
       />
       
-      <div className="p-3" style={{ borderTop: '1px solid var(--border-color)' }}>
-        {showAddGroup ? (
-          <div className="space-y-2">
-            <input
-              type="text"
-              value={newGroupName}
-              onChange={(e) => setNewGroupName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAddGroup()}
-              placeholder="分组名称"
-              autoFocus
-              className="w-full px-2.5 py-1.5 text-xs rounded-md"
-              style={{
-                background: 'var(--bg-primary)',
-                border: '1px solid var(--border-color)',
-                color: 'var(--text-primary)',
-                outline: 'none',
-                fontFamily: "'DM Sans', sans-serif"
-              }}
-            />
-            <div className="flex items-center gap-2">
-              <Popover 
-                content={<ColorPicker value={newGroupColor} onChange={setNewGroupColor} />}
-                trigger="click"
-                placement="rightTop"
-              >
-                <button
-                  className="w-6 h-6 rounded-full flex-shrink-0"
-                  style={{ 
-                    backgroundColor: newGroupColor,
-                    border: '2px solid rgba(255,255,255,0.15)',
-                    boxShadow: `0 0 8px ${newGroupColor}40`
-                  }}
-                />
-              </Popover>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>选择颜色</span>
-            </div>
-            <div className="flex gap-1.5">
-              <button
-                onClick={() => setShowAddGroup(false)}
-                className="flex-1 px-2 py-1.5 text-xs rounded-md"
+      {/* 添加分组区域 - 折叠时隐藏 */}
+      {!collapsed && (
+        <div className="p-3" style={{ borderTop: '1px solid var(--border-color)' }}>
+          {showAddGroup ? (
+            <div className="space-y-2">
+              <input
+                type="text"
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddGroup()}
+                placeholder="分组名称"
+                autoFocus
+                className="w-full px-2.5 py-1.5 text-xs rounded-md"
                 style={{
-                  background: 'transparent',
+                  background: 'var(--bg-primary)',
                   border: '1px solid var(--border-color)',
-                  color: 'var(--text-secondary)',
+                  color: 'var(--text-primary)',
+                  outline: 'none',
+                  fontFamily: "'DM Sans', sans-serif"
                 }}
-              >
-                取消
-              </button>
-              <button
-                onClick={handleAddGroup}
-                className="flex-1 px-2 py-1.5 text-xs rounded-md font-medium"
-                style={{
-                  background: 'var(--accent)',
-                  border: 'none',
-                  color: '#0a0e17',
-                }}
-              >
-                添加
-              </button>
+              />
+              <div className="flex items-center gap-2">
+                <Popover 
+                  content={<ColorPicker value={newGroupColor} onChange={setNewGroupColor} />}
+                  trigger="click"
+                  placement="rightTop"
+                >
+                  <button
+                    className="w-6 h-6 rounded-full flex-shrink-0"
+                    style={{ 
+                      backgroundColor: newGroupColor,
+                      border: '2px solid rgba(255,255,255,0.15)',
+                      boxShadow: `0 0 8px ${newGroupColor}40`
+                    }}
+                  />
+                </Popover>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>选择颜色</span>
+              </div>
+              <div className="flex gap-1.5">
+                <button
+                  onClick={() => setShowAddGroup(false)}
+                  className="flex-1 px-2 py-1.5 text-xs rounded-md"
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid var(--border-color)',
+                    color: 'var(--text-secondary)',
+                  }}
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleAddGroup}
+                  className="flex-1 px-2 py-1.5 text-xs rounded-md font-medium"
+                  style={{
+                    background: 'var(--accent)',
+                    border: 'none',
+                    color: '#0a0e17',
+                  }}
+                >
+                  添加
+                </button>
+              </div>
             </div>
-          </div>
-        ) : (
-          <button
-            onClick={() => setShowAddGroup(true)}
-            className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors"
-            style={{
-              background: 'transparent',
-              border: '1px dashed var(--border-color)',
-              color: 'var(--text-muted)',
-            }}
-          >
-            <PlusCircleFilled style={{ fontSize: 12, color: 'var(--accent)' }} />
-            添加分组
-          </button>
-        )}
-      </div>
+          ) : (
+            <button
+              onClick={() => setShowAddGroup(true)}
+              className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors"
+              style={{
+                background: 'transparent',
+                border: '1px dashed var(--border-color)',
+                color: 'var(--text-muted)',
+              }}
+            >
+              <PlusCircleFilled style={{ fontSize: 12, color: 'var(--accent)' }} />
+              添加分组
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

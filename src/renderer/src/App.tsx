@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { ConfigProvider, theme, Button } from 'antd'
 import { PlusCircleFilled, CodeFilled } from '@ant-design/icons'
 import { useAppStore } from './store'
@@ -10,9 +10,32 @@ import NewSessionDialog from './components/NewSessionDialog'
 import PresetsDialog from './components/PresetsDialog'
 
 function App() {
-  const { sessions, isFullscreen, filteredSessions } = useAppStore()
+  const sessions = useAppStore((s) => s.sessions)
+  const searchQuery = useAppStore((s) => s.searchQuery)
+  const selectedGroupId = useAppStore((s) => s.selectedGroupId)
+  const isFullscreen = useAppStore((s) => s.isFullscreen)
+
   const [showNewSession, setShowNewSession] = useState(false)
   const [showPresets, setShowPresets] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+
+  // 用 useMemo 派生 filteredSessions，确保 sessions/searchQuery/selectedGroupId 变化时重渲染
+  const filteredSessions = useMemo(() => {
+    let filtered = sessions
+
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(s =>
+        s.name.toLowerCase().includes(query)
+      )
+    }
+
+    if (selectedGroupId) {
+      filtered = filtered.filter(s => s.groupId === selectedGroupId)
+    }
+
+    return filtered.sort((a, b) => a.createdAt - b.createdAt)
+  }, [sessions, searchQuery, selectedGroupId])
 
   if (isFullscreen) {
     return <FullscreenTerminal />
@@ -37,7 +60,10 @@ function App() {
         />
         
         <div className="flex flex-1 overflow-hidden">
-          <Sidebar />
+          <Sidebar 
+            collapsed={sidebarCollapsed} 
+            onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)} 
+          />
           
           <main className="flex-1 overflow-auto p-5">
             {filteredSessions.length > 0 ? (

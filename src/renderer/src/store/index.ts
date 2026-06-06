@@ -1,6 +1,5 @@
 import { create } from 'zustand'
 import { Session, Group, Preset, Snapshot, SessionStatus } from '../types'
-import { detectStatus, truncateHistory, stripAnsi } from '../utils/statusDetector'
 
 interface AppState {
   sessions: Session[]
@@ -34,8 +33,6 @@ interface AppState {
   setSelectedGroupId: (id: string | null) => void
   setIsFullscreen: (fullscreen: boolean) => void
   toggleDarkMode: () => void
-  
-  filteredSessions: Session[]
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -107,22 +104,4 @@ export const useAppStore = create<AppState>((set, get) => ({
   setIsFullscreen: (fullscreen) => set({ isFullscreen: fullscreen }),
   
   toggleDarkMode: () => set((state) => ({ darkMode: !state.darkMode })),
-  
-  get filteredSessions() {
-    const state = get()
-    let filtered = state.sessions
-    
-    if (state.searchQuery) {
-      const query = state.searchQuery.toLowerCase()
-      filtered = filtered.filter(s => 
-        s.name.toLowerCase().includes(query)
-      )
-    }
-    
-    if (state.selectedGroupId) {
-      filtered = filtered.filter(s => s.groupId === state.selectedGroupId)
-    }
-    
-    return filtered.sort((a, b) => a.createdAt - b.createdAt)
-  }
 }))
