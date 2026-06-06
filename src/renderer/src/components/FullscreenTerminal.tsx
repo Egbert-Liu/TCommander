@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react'
-import { Button } from 'antd'
-import { CompressOutlined, CodeFilled } from '@ant-design/icons'
+import { Button, message } from 'antd'
+import { CompressOutlined, CodeFilled, CopyOutlined } from '@ant-design/icons'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
+import { ClipboardAddon } from '@xterm/addon-clipboard'
 import '@xterm/xterm/css/xterm.css'
 import { useAppStore } from '../store'
 
@@ -21,24 +22,46 @@ export default function FullscreenTerminal() {
 
     const terminal = new Terminal({
       cursorBlink: true,
-      fontSize: 13,
+      fontSize: 14,
+      lineHeight: 1.2,
       fontFamily: "'JetBrains Mono', Menlo, Monaco, monospace",
+      scrollback: 5000,
       theme: {
         background: '#0d1117',
-        foreground: '#e2e8f0',
-        cursor: '#38bdf8',
+        foreground: '#c9d1d9',
+        cursor: '#58a6ff',
         cursorAccent: '#0d1117',
-        selectionBackground: 'rgba(56, 189, 248, 0.25)',
+        selectionBackground: 'rgba(56, 189, 248, 0.3)',
+        selectionForeground: '#ffffff',
         black: '#0d1117',
-        green: '#4ade80',
-        yellow: '#fbbf24',
-        red: '#f87171',
-        cyan: '#38bdf8',
+        red: '#ff7b72',
+        green: '#3fb950',
+        yellow: '#d29922',
+        blue: '#58a6ff',
+        magenta: '#bc8cff',
+        cyan: '#39c5cf',
+        white: '#b1bac4',
+        brightBlack: '#6e7681',
+        brightRed: '#ffa198',
+        brightGreen: '#56d364',
+        brightYellow: '#e3b341',
+        brightBlue: '#79c0ff',
+        brightMagenta: '#d2a8ff',
+        brightCyan: '#56d4dd',
+        brightWhite: '#f0f6fc',
       }
     })
 
     const fit = new FitAddon()
     terminal.loadAddon(fit)
+
+    try {
+      const clipboard = new ClipboardAddon()
+      terminal.loadAddon(clipboard)
+    } catch (e) {
+      console.warn('ClipboardAddon not available:', e)
+    }
+
     terminal.open(terminalRef.current)
     fit.fit()
 
@@ -55,6 +78,18 @@ export default function FullscreenTerminal() {
         window.electronAPI.sendInput(activeSessionId, data)
       }
     })
+
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault()
+      const selection = terminal.getSelection()
+      if (selection) {
+        navigator.clipboard.writeText(selection).then(() => {
+          message.success('已复制到剪贴板')
+        }).catch(() => {})
+      }
+    }
+
+    terminalRef.current.addEventListener('contextmenu', handleContextMenu)
 
     const handleResize = () => {
       fit.fit()
@@ -80,6 +115,7 @@ export default function FullscreenTerminal() {
     return () => {
       window.removeEventListener('resize', handleResize)
       window.removeEventListener('keydown', handleKeyDown)
+      terminalRef.current?.removeEventListener('contextmenu', handleContextMenu)
       terminal.dispose()
     }
   }, [activeSessionId])
@@ -95,8 +131,8 @@ export default function FullscreenTerminal() {
 
     const handleExit = (sessionId: string, exitCode: number) => {
       if (sessionId === activeSessionId) {
-        terminalInstance.current?.write(`\r\n[进程已退出，退出码: ${exitCode}]\r\n`)
-        setTimeout(() => setIsFullscreen(false), 2000)
+        terminalInstance.current?.write(`\r\n\x1b[33m[进程已退出，退出码: ${exitCode}]\x1b[0m\r\n`)
+        setTimeout(() => setIsFullscreen(false), 3000)
       }
     }
 
@@ -108,13 +144,26 @@ export default function FullscreenTerminal() {
     }
   }, [activeSessionId])
 
+  const handleCopySelection = () => {
+    if (terminalInstance.current) {
+      const selection = terminalInstance.current.getSelection()
+      if (selection) {
+        navigator.clipboard.writeText(selection).then(() => {
+          message.success('已复制到剪贴板')
+        })
+      } else {
+        message.info('请先选中要复制的文本')
+      }
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#0d1117' }}>
       <div 
         className="flex items-center justify-between px-4 h-10"
         style={{ 
-          background: 'var(--bg-secondary)',
-          borderBottom: '1px solid var(--border-color)'
+          background: '#161b22',
+          borderBottom: '1px solid rgba(56, 189, 248, 0.1)'
         }}
       >
         <div className="flex items-center gap-2">
@@ -124,24 +173,35 @@ export default function FullscreenTerminal() {
               fontFamily: "'JetBrains Mono', monospace",
               fontSize: 12,
               fontWeight: 600,
-              color: 'var(--text-primary)'
+              color: '#f0f6fc'
             }}
           >
             {activeSession?.name || '终端'}
           </span>
-          <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
-            ESC 退出全屏
+          <span style={{ color: '#6e7681', fontSize: 11 }}>
+            ESC 退出全屏 · 右键复制选中内容
           </span>
         </div>
-        <Button
-          type="text"
-          icon={<CompressOutlined />}
-          onClick={() => setIsFullscreen(false)}
-          size="small"
-        />
+        <div className="flex items-center gap-1">
+          <Button
+            type="text"
+            icon={<CopyOutlined />}
+            onClick={handleCopySelection}
+            size="small"
+            style={{ color: '#8b949e' }}
+            title="复制选中内容"
+          />
+          <Button
+            type="text"
+            icon={<CompressOutlined />}
+            onClick={() => setIsFullscreen(false)}
+            size="small"
+            style={{ color: '#8b949e' }}
+          />
+        </div>
       </div>
       
-      <div ref={terminalRef} className="flex-1 overflow-hidden" />
+      <div ref={terminalRef} className="flex-1 overflow-hidden" style={{ padding: '4px 0' }} />
     </div>
   )
 }

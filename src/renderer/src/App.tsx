@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { ConfigProvider, theme, Button } from 'antd'
 import { PlusCircleFilled, CodeFilled } from '@ant-design/icons'
 import { useAppStore } from './store'
@@ -14,10 +14,15 @@ function App() {
   const searchQuery = useAppStore((s) => s.searchQuery)
   const selectedGroupId = useAppStore((s) => s.selectedGroupId)
   const isFullscreen = useAppStore((s) => s.isFullscreen)
+  const darkMode = useAppStore((s) => s.darkMode)
 
   const [showNewSession, setShowNewSession] = useState(false)
   const [showPresets, setShowPresets] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light')
+  }, [darkMode])
 
   // 用 useMemo 派生 filteredSessions，确保 sessions/searchQuery/selectedGroupId 变化时重渲染
   const filteredSessions = useMemo(() => {
@@ -44,7 +49,7 @@ function App() {
   return (
     <ConfigProvider
       theme={{
-        algorithm: theme.darkAlgorithm,
+        algorithm: darkMode ? theme.darkAlgorithm : theme.defaultAlgorithm,
         token: {
           colorPrimary: '#38bdf8',
           borderRadius: 6,

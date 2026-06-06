@@ -25,6 +25,7 @@ export interface Preset {
   terminalType: 'powershell' | 'cmd' | 'bash'
   cwd: string
   initialCommand?: string
+  groupId?: string
 }
 
 export interface Snapshot {

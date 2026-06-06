@@ -9,7 +9,10 @@ interface NewSessionDialogProps {
 }
 
 export default function NewSessionDialog({ open, onClose }: NewSessionDialogProps) {
-  const { addSession, addPreset, presets, groups } = useAppStore()
+  const addSession = useAppStore((s) => s.addSession)
+  const addPreset = useAppStore((s) => s.addPreset)
+  const presets = useAppStore((s) => s.presets)
+  const groups = useAppStore((s) => s.groups)
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [saveAsPreset, setSaveAsPreset] = useState(false)
@@ -47,7 +50,8 @@ export default function NewSessionDialog({ open, onClose }: NewSessionDialogProp
           name,
           terminalType: values.terminalType,
           cwd: values.cwd || '~',
-          initialCommand: values.initialCommand || ''
+          initialCommand: values.initialCommand || '',
+          groupId: values.groupId || undefined
         }
         addPreset(preset)
         await window.electronAPI.storageSet('presets', useAppStore.getState().presets)
@@ -78,7 +82,8 @@ export default function NewSessionDialog({ open, onClose }: NewSessionDialogProp
         name: preset.name,
         terminalType: preset.terminalType,
         cwd: preset.cwd,
-        initialCommand: preset.initialCommand || ''
+        initialCommand: preset.initialCommand || '',
+        groupId: preset.groupId || undefined
       })
     }
   }

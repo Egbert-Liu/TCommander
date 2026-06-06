@@ -24,6 +24,26 @@
   --terminal-green: #4ade80;
 }
 
+[data-theme="light"] {
+  --bg-primary: #f5f7fa;
+  --bg-secondary: #ffffff;
+  --bg-card: rgba(255, 255, 255, 0.85);
+  --bg-glass: rgba(255, 255, 255, 0.6);
+  --border-color: rgba(0, 0, 0, 0.08);
+  --border-hover: rgba(56, 189, 248, 0.4);
+  --accent: #0ea5e9;
+  --accent-dim: rgba(14, 165, 233, 0.1);
+  --accent-glow: rgba(14, 165, 233, 0.2);
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --terminal-bg: #1e1e2e;
+  --terminal-green: #a6e3a1;
+}
+
 * {
   margin: 0;
   padding: 0;

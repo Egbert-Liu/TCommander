@@ -1,4 +1,4 @@
-import { SearchOutlined, PlusCircleFilled, CameraFilled, SettingFilled, ThunderboltFilled } from '@ant-design/icons'
+import { SearchOutlined, PlusCircleFilled, CameraFilled, SettingFilled, ThunderboltFilled, SunFilled, MoonFilled } from '@ant-design/icons'
 import { Input, Button, Dropdown, Tooltip, Select } from 'antd'
 import type { MenuProps } from 'antd'
 import { useAppStore } from '../store'
@@ -14,6 +14,8 @@ export default function Toolbar({ onNewSession, onOpenPresets }: ToolbarProps) {
   const previewLineCount = useAppStore((s) => s.previewLineCount)
   const setPreviewLineCount = useAppStore((s) => s.setPreviewLineCount)
   const addSnapshot = useAppStore((s) => s.addSnapshot)
+  const darkMode = useAppStore((s) => s.darkMode)
+  const toggleDarkMode = useAppStore((s) => s.toggleDarkMode)
 
   const handleSnapshot = async () => {
     const sessions = useAppStore.getState().sessions
@@ -125,6 +127,14 @@ export default function Toolbar({ onNewSession, onOpenPresets }: ToolbarProps) {
         <Dropdown menu={{ items }} placement="bottomRight">
           <Button icon={<SettingFilled />} size="small" />
         </Dropdown>
+
+        <Tooltip title={darkMode ? '切换到亮色模式' : '切换到暗色模式'}>
+          <Button
+            icon={darkMode ? <SunFilled /> : <MoonFilled />}
+            onClick={toggleDarkMode}
+            size="small"
+          />
+        </Tooltip>
       </div>
     </div>
   )

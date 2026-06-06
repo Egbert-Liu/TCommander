@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
-import { Tag, Button, Input, Space, Popconfirm, Select } from 'antd'
-import { ExpandOutlined, DeleteFilled, SendOutlined, CheckCircleFilled, CloseCircleFilled, CodeFilled, PlayCircleFilled, EditFilled, StopFilled, EnterOutlined } from '@ant-design/icons'
+import { Tag, Button, Input, Space, Popconfirm, Select, Popover, Checkbox } from 'antd'
+import { ExpandOutlined, DeleteFilled, SendOutlined, CheckCircleFilled, CloseCircleFilled, CodeFilled, PlayCircleFilled, EditFilled, StopFilled, EnterOutlined, ArrowUpOutlined, ArrowDownOutlined, SettingOutlined } from '@ant-design/icons'
 import { Session } from '../types'
 import { useAppStore } from '../store'
 import { stripAnsi } from '../utils/statusDetector'
@@ -17,6 +17,19 @@ const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string; 
   'idle':          { color: '#64748b', bg: 'rgba(100, 116, 139, 0.08)', label: '空闲', glow: false, icon: <CodeFilled /> },
 }
 
+const ALL_QUICK_ACTIONS = ['Y', 'N', 'CtrlC', 'Up', 'Down', 'Input', 'Send', 'Enter']
+
+const ACTION_LABELS: Record<string, string> = {
+  'Y': 'Y',
+  'N': 'N',
+  'CtrlC': 'Ctrl+C',
+  'Up': '↑ 上箭头',
+  'Down': '↓ 下箭头',
+  'Input': '输入框',
+  'Send': '发送',
+  'Enter': 'Enter',
+}
+
 export default function SessionCard({ session }: SessionCardProps) {
   const removeSession = useAppStore((s) => s.removeSession)
   const updateSession = useAppStore((s) => s.updateSession)
@@ -24,11 +37,14 @@ export default function SessionCard({ session }: SessionCardProps) {
   const setIsFullscreen = useAppStore((s) => s.setIsFullscreen)
   const groups = useAppStore((s) => s.groups)
   const previewLineCount = useAppStore((s) => s.previewLineCount)
+  const quickActions = useAppStore((s) => s.quickActions)
+  const setQuickActions = useAppStore((s) => s.setQuickActions)
 
   const [preview, setPreview] = useState('')
   const [input, setInput] = useState('')
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState(session.name)
+  const [previewHover, setPreviewHover] = useState(false)
   const nameInputRef = useRef<any>(null)
 
   useEffect(() => {
@@ -87,6 +103,14 @@ export default function SessionCard({ session }: SessionCardProps) {
     await window.electronAPI.sendInput(session.id, '\x03')
   }
 
+  const handleArrowUp = async () => {
+    await window.electronAPI.sendInput(session.id, '\x1b[A')
+  }
+
+  const handleArrowDown = async () => {
+    await window.electronAPI.sendInput(session.id, '\x1b[B')
+  }
+
   const handleEnter = async () => {
     await window.electronAPI.sendInput(session.id, '\r')
   }
@@ -114,8 +138,31 @@ export default function SessionCard({ session }: SessionCardProps) {
     updateSession(session.id, { groupId })
   }
 
+  const handleToggleQuickAction = (key: string) => {
+    if (quickActions.includes(key)) {
+      setQuickActions(quickActions.filter(a => a !== key))
+    } else {
+      setQuickActions([...quickActions, key])
+    }
+  }
+
   const statusCfg = STATUS_CONFIG[session.status] || STATUS_CONFIG.idle
   const sessionGroup = groups.find(g => g.id === session.groupId)
+
+  const settingsContent = (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 120 }}>
+      {ALL_QUICK_ACTIONS.map(key => (
+        <Checkbox
+          key={key}
+          checked={quickActions.includes(key)}
+          onChange={() => handleToggleQuickAction(key)}
+          style={{ fontSize: 11 }}
+        >
+          {ACTION_LABELS[key]}
+        </Checkbox>
+      ))}
+    </div>
+  )
 
   return (
     <div
@@ -138,7 +185,7 @@ export default function SessionCard({ session }: SessionCardProps) {
         e.currentTarget.style.boxShadow = statusCfg.glow ? `0 0 24px ${statusCfg.bg}` : 'none'
       }}
     >
-      <div 
+      <div
         className="flex items-center justify-between px-3 py-2"
         style={{ borderBottom: '1px solid var(--border-color)' }}
       >
@@ -149,7 +196,7 @@ export default function SessionCard({ session }: SessionCardProps) {
           >
             <span style={{ color: statusCfg.color, fontSize: 10 }}>{statusCfg.icon}</span>
           </div>
-          
+
           {editingName ? (
             <Input
               ref={nameInputRef}
@@ -161,11 +208,11 @@ export default function SessionCard({ session }: SessionCardProps) {
               style={{ fontSize: 11, height: 22, flex: 1 }}
             />
           ) : (
-            <span 
+            <span
               onClick={() => setEditingName(true)}
-              style={{ 
-                fontSize: 11, 
-                fontWeight: 600, 
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
                 color: 'var(--text-primary)',
                 fontFamily: "'JetBrains Mono', monospace",
                 cursor: 'text',
@@ -180,10 +227,10 @@ export default function SessionCard({ session }: SessionCardProps) {
           )}
 
           {sessionGroup && (
-            <Tag 
-              style={{ 
-                margin: 0, 
-                fontSize: 9, 
+            <Tag
+              style={{
+                margin: 0,
+                fontSize: 9,
                 lineHeight: '16px',
                 background: `${sessionGroup.color}20`,
                 border: `1px solid ${sessionGroup.color}40`,
@@ -198,11 +245,11 @@ export default function SessionCard({ session }: SessionCardProps) {
             </Tag>
           )}
 
-          <Tag 
-            color={statusCfg.color} 
-            style={{ 
-              margin: 0, 
-              fontSize: 9, 
+          <Tag
+            color={statusCfg.color}
+            style={{
+              margin: 0,
+              fontSize: 9,
               lineHeight: '16px',
               background: statusCfg.bg,
               border: 'none',
@@ -214,6 +261,25 @@ export default function SessionCard({ session }: SessionCardProps) {
           >
             {statusCfg.label}
           </Tag>
+
+          <Select
+            value={session.groupId || undefined}
+            onChange={handleGroupChange}
+            placeholder="组"
+            allowClear
+            size="small"
+            style={{ minWidth: 70, maxWidth: 70, fontSize: 10 }}
+            dropdownStyle={{ fontSize: 11 }}
+          >
+            {groups.map(g => (
+              <Select.Option key={g.id} value={g.id}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: g.color, display: 'inline-block' }} />
+                  {g.name}
+                </span>
+              </Select.Option>
+            ))}
+          </Select>
         </div>
 
         <Space size={1} className="flex-shrink-0 ml-1">
@@ -233,91 +299,119 @@ export default function SessionCard({ session }: SessionCardProps) {
         </Space>
       </div>
 
-      <div 
+      <div
         className="overflow-auto px-2.5 py-1.5"
-        style={{ 
+        style={{
           height: previewLineCount * 16,
           minHeight: 48,
-          background: 'var(--terminal-bg)',
+          background: previewHover ? 'var(--terminal-bg-hover, rgba(13,17,23,0.95))' : 'var(--terminal-bg)',
           fontFamily: "'JetBrains Mono', monospace",
           fontSize: 10,
           lineHeight: 1.6,
-          color: 'var(--terminal-green)'
+          color: 'var(--terminal-green)',
+          cursor: 'pointer',
+          transition: 'background 0.2s ease',
         }}
+        onClick={handleFullscreen}
+        onMouseEnter={() => setPreviewHover(true)}
+        onMouseLeave={() => setPreviewHover(false)}
       >
         <pre className="whitespace-pre-wrap m-0">{stripAnsi(preview) || '等待输出...'}</pre>
       </div>
 
-      <div className="px-2.5 py-1.5 flex items-center gap-1.5" style={{ borderTop: '1px solid var(--border-color)' }}>
-        <Select
-          value={session.groupId || undefined}
-          onChange={handleGroupChange}
-          placeholder="选择组"
-          allowClear
-          size="small"
-          style={{ minWidth: 70, fontSize: 10 }}
-          dropdownStyle={{ fontSize: 11 }}
-        >
-          {groups.map(g => (
-            <Select.Option key={g.id} value={g.id}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: g.color, display: 'inline-block' }} />
-                {g.name}
-              </span>
-            </Select.Option>
-          ))}
-        </Select>
-      </div>
-
       <div className="px-2.5 py-1.5 flex items-center gap-1" style={{ borderTop: '1px solid var(--border-color)' }}>
-        <Button 
-          size="small" 
-          type="primary"
-          onClick={handleQuickConfirm}
-          style={{ fontSize: 10, minWidth: 28, height: 22, padding: '0 6px' }}
+        {quickActions.includes('Y') && (
+          <Button
+            size="small"
+            type="primary"
+            onClick={handleQuickConfirm}
+            style={{ fontSize: 10, minWidth: 28, height: 22, padding: '0 6px' }}
+          >
+            Y
+          </Button>
+        )}
+        {quickActions.includes('N') && (
+          <Button
+            size="small"
+            danger
+            onClick={handleQuickDeny}
+            style={{ fontSize: 10, minWidth: 28, height: 22, padding: '0 6px' }}
+          >
+            N
+          </Button>
+        )}
+        {quickActions.includes('CtrlC') && (
+          <Button
+            size="small"
+            onClick={handleCtrlC}
+            icon={<StopFilled style={{ fontSize: 9 }} />}
+            style={{ fontSize: 10, minWidth: 28, height: 22, padding: '0 6px' }}
+            title="Ctrl+C"
+          >
+            C-c
+          </Button>
+        )}
+        {quickActions.includes('Up') && (
+          <Button
+            size="small"
+            onClick={handleArrowUp}
+            icon={<ArrowUpOutlined style={{ fontSize: 9 }} />}
+            style={{ fontSize: 10, minWidth: 28, height: 22, padding: '0 6px' }}
+            title="上箭头"
+          />
+        )}
+        {quickActions.includes('Down') && (
+          <Button
+            size="small"
+            onClick={handleArrowDown}
+            icon={<ArrowDownOutlined style={{ fontSize: 9 }} />}
+            style={{ fontSize: 10, minWidth: 28, height: 22, padding: '0 6px' }}
+            title="下箭头"
+          />
+        )}
+        {quickActions.includes('Input') && (
+          <Input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onPressEnter={handleSendInput}
+            placeholder="输入..."
+            size="small"
+            style={{ flex: 1, fontSize: 10, height: 22 }}
+          />
+        )}
+        {quickActions.includes('Send') && (
+          <Button
+            type="primary"
+            icon={<SendOutlined style={{ fontSize: 9 }} />}
+            onClick={handleSendInput}
+            size="small"
+            style={{ minWidth: 24, width: 24, height: 22 }}
+            title="发送"
+          />
+        )}
+        {quickActions.includes('Enter') && (
+          <Button
+            size="small"
+            icon={<EnterOutlined style={{ fontSize: 9 }} />}
+            onClick={handleEnter}
+            style={{ minWidth: 24, width: 24, height: 22 }}
+            title="Enter"
+          />
+        )}
+        <Popover
+          content={settingsContent}
+          title="快捷操作显示设置"
+          trigger="click"
+          placement="topRight"
         >
-          Y
-        </Button>
-        <Button 
-          size="small" 
-          danger
-          onClick={handleQuickDeny}
-          style={{ fontSize: 10, minWidth: 28, height: 22, padding: '0 6px' }}
-        >
-          N
-        </Button>
-        <Button 
-          size="small"
-          onClick={handleCtrlC}
-          icon={<StopFilled style={{ fontSize: 9 }} />}
-          style={{ fontSize: 10, minWidth: 28, height: 22, padding: '0 6px' }}
-          title="Ctrl+C"
-        >
-          C-c
-        </Button>
-        <Input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onPressEnter={handleSendInput}
-          placeholder="输入..."
-          size="small"
-          style={{ flex: 1, fontSize: 10, height: 22 }}
-        />
-        <Button 
-          type="primary" 
-          icon={<SendOutlined style={{ fontSize: 9 }} />} 
-          onClick={handleSendInput} 
-          size="small"
-          style={{ minWidth: 24, width: 24, height: 22 }}
-          title="发送"
-        />
-        <Button 
-          size="small"
-          icon={<EnterOutlined style={{ fontSize: 9 }} />}
-          onClick={handleEnter}
-          style={{ minWidth: 24, width: 24, height: 22 }}
-          title="Enter"
-        />
+          <Button
+            type="text"
+            icon={<SettingOutlined style={{ fontSize: 10 }} />}
+            size="small"
+            style={{ minWidth: 20, width: 20, height: 22, flexShrink: 0 }}
+            title="快捷操作设置"
+          />
+        </Popover>
       </div>
     </div>
   )

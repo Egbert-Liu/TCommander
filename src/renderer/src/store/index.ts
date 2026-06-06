@@ -12,6 +12,7 @@ interface AppState {
   isFullscreen: boolean
   darkMode: boolean
   previewLineCount: number
+  quickActions: string[]
   
   addSession: (session: Session) => void
   updateSession: (id: string, updates: Partial<Session>) => void
@@ -34,6 +35,7 @@ interface AppState {
   setSelectedGroupId: (id: string | null) => void
   setIsFullscreen: (fullscreen: boolean) => void
   setPreviewLineCount: (count: number) => void
+  setQuickActions: (actions: string[]) => void
   toggleDarkMode: () => void
 }
 
@@ -48,6 +50,7 @@ export const useAppStore = create<AppState>((set) => ({
   isFullscreen: false,
   darkMode: true,
   previewLineCount: 20,
+  quickActions: ['Y', 'N', 'CtrlC', 'Up', 'Down', 'Input', 'Send', 'Enter'],
   
   addSession: (session) => set((state) => ({
     sessions: [...state.sessions, session]
@@ -107,6 +110,8 @@ export const useAppStore = create<AppState>((set) => ({
   setIsFullscreen: (fullscreen) => set({ isFullscreen: fullscreen }),
   
   setPreviewLineCount: (count) => set({ previewLineCount: count }),
+  
+  setQuickActions: (actions) => set({ quickActions: actions }),
   
   toggleDarkMode: () => set((state) => ({ darkMode: !state.darkMode })),
 }))
