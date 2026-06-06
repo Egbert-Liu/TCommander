@@ -1,6 +1,5 @@
 import * as pty from 'node-pty'
 import os from 'os'
-import path from 'path'
 
 interface SessionConfig {
   terminalType: 'powershell' | 'cmd' | 'bash'

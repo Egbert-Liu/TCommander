@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { Session, Group, Preset, Snapshot, SessionStatus } from '../types'
+import { Session, Group, Preset, Snapshot } from '../types'
 
 interface AppState {
   sessions: Session[]
@@ -11,6 +11,7 @@ interface AppState {
   selectedGroupId: string | null
   isFullscreen: boolean
   darkMode: boolean
+  previewLineCount: number
   
   addSession: (session: Session) => void
   updateSession: (id: string, updates: Partial<Session>) => void
@@ -32,10 +33,11 @@ interface AppState {
   setSearchQuery: (query: string) => void
   setSelectedGroupId: (id: string | null) => void
   setIsFullscreen: (fullscreen: boolean) => void
+  setPreviewLineCount: (count: number) => void
   toggleDarkMode: () => void
 }
 
-export const useAppStore = create<AppState>((set, get) => ({
+export const useAppStore = create<AppState>((set) => ({
   sessions: [],
   groups: [],
   presets: [],
@@ -45,6 +47,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedGroupId: null,
   isFullscreen: false,
   darkMode: true,
+  previewLineCount: 20,
   
   addSession: (session) => set((state) => ({
     sessions: [...state.sessions, session]
@@ -102,6 +105,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSelectedGroupId: (id) => set({ selectedGroupId: id }),
   
   setIsFullscreen: (fullscreen) => set({ isFullscreen: fullscreen }),
+  
+  setPreviewLineCount: (count) => set({ previewLineCount: count }),
   
   toggleDarkMode: () => set((state) => ({ darkMode: !state.darkMode })),
 }))

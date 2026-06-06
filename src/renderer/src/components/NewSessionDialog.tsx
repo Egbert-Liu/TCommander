@@ -9,7 +9,7 @@ interface NewSessionDialogProps {
 }
 
 export default function NewSessionDialog({ open, onClose }: NewSessionDialogProps) {
-  const { addSession, addPreset, presets } = useAppStore()
+  const { addSession, addPreset, presets, groups } = useAppStore()
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [saveAsPreset, setSaveAsPreset] = useState(false)
@@ -130,6 +130,19 @@ export default function NewSessionDialog({ open, onClose }: NewSessionDialogProp
           rules={[{ required: true, message: '请输入会话名称' }]}
         >
           <Input placeholder="输入会话名称" />
+        </Form.Item>
+
+        <Form.Item name="groupId" label="所属分组">
+          <Select placeholder="选择分组（可选）" allowClear>
+            {groups.map(g => (
+              <Select.Option key={g.id} value={g.id}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: g.color, display: 'inline-block' }} />
+                  {g.name}
+                </span>
+              </Select.Option>
+            ))}
+          </Select>
         </Form.Item>
 
         <Form.Item

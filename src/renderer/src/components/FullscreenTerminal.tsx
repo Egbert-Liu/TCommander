@@ -7,7 +7,9 @@ import '@xterm/xterm/css/xterm.css'
 import { useAppStore } from '../store'
 
 export default function FullscreenTerminal() {
-  const { activeSessionId, sessions, setIsFullscreen } = useAppStore()
+  const activeSessionId = useAppStore((s) => s.activeSessionId)
+  const sessions = useAppStore((s) => s.sessions)
+  const setIsFullscreen = useAppStore((s) => s.setIsFullscreen)
   const terminalRef = useRef<HTMLDivElement>(null)
   const terminalInstance = useRef<Terminal | null>(null)
   const fitAddon = useRef<FitAddon | null>(null)
@@ -15,7 +17,7 @@ export default function FullscreenTerminal() {
   const activeSession = sessions.find(s => s.id === activeSessionId)
 
   useEffect(() => {
-    if (!terminalRef.current) return
+    if (!terminalRef.current || !activeSessionId) return
 
     const terminal = new Terminal({
       cursorBlink: true,
@@ -42,6 +44,11 @@ export default function FullscreenTerminal() {
 
     terminalInstance.current = terminal
     fitAddon.current = fit
+
+    const currentSession = useAppStore.getState().sessions.find(s => s.id === activeSessionId)
+    if (currentSession?.history?.length) {
+      terminal.write(currentSession.history.join(''))
+    }
 
     terminal.onData((data) => {
       if (activeSessionId) {

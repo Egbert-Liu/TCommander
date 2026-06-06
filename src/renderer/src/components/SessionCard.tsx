@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
-import { Tag, Button, Input, Space } from 'antd'
-import { ExpandOutlined, DeleteFilled, SendOutlined, CheckCircleFilled, CloseCircleFilled, CodeFilled, PlayCircleFilled } from '@ant-design/icons'
+import { useEffect, useState, useRef } from 'react'
+import { Tag, Button, Input, Space, Popconfirm, Select } from 'antd'
+import { ExpandOutlined, DeleteFilled, SendOutlined, CheckCircleFilled, CloseCircleFilled, CodeFilled, PlayCircleFilled, EditFilled, StopFilled, EnterOutlined } from '@ant-design/icons'
 import { Session } from '../types'
 import { useAppStore } from '../store'
 import { stripAnsi } from '../utils/statusDetector'
@@ -18,10 +18,18 @@ const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string; 
 }
 
 export default function SessionCard({ session }: SessionCardProps) {
-  const { removeSession, setActiveSession, setIsFullscreen } = useAppStore()
+  const removeSession = useAppStore((s) => s.removeSession)
+  const updateSession = useAppStore((s) => s.updateSession)
+  const setActiveSession = useAppStore((s) => s.setActiveSession)
+  const setIsFullscreen = useAppStore((s) => s.setIsFullscreen)
+  const groups = useAppStore((s) => s.groups)
+  const previewLineCount = useAppStore((s) => s.previewLineCount)
+
   const [preview, setPreview] = useState('')
   const [input, setInput] = useState('')
-  const [showInput, setShowInput] = useState(false)
+  const [editingName, setEditingName] = useState(false)
+  const [nameValue, setNameValue] = useState(session.name)
+  const nameInputRef = useRef<any>(null)
 
   useEffect(() => {
     const handleOutput = (sessionId: string, data: string) => {
@@ -29,16 +37,18 @@ export default function SessionCard({ session }: SessionCardProps) {
         setPreview(prev => {
           const newPreview = prev + data
           const lines = newPreview.split('\n')
-          return lines.slice(-20).join('\n')
+          return lines.slice(-previewLineCount).join('\n')
         })
-        useAppStore.getState().updateSession(session.id, {
-          history: [...session.history, data],
+        const currentState = useAppStore.getState()
+        const currentSession = currentState.sessions.find(s => s.id === session.id)
+        currentState.updateSession(session.id, {
+          history: [...(currentSession?.history || []), data],
           lastActivityAt: Date.now()
         })
       }
     }
 
-    const handleExit = (sessionId: string, exitCode: number) => {
+    const handleExit = (sessionId: string, _exitCode: number) => {
       if (sessionId === session.id) {
         useAppStore.getState().updateSession(session.id, { status: 'error' })
       }
@@ -52,11 +62,16 @@ export default function SessionCard({ session }: SessionCardProps) {
     }
   }, [session.id])
 
+  useEffect(() => {
+    if (editingName && nameInputRef.current) {
+      nameInputRef.current.focus()
+    }
+  }, [editingName])
+
   const handleSendInput = async () => {
     if (input.trim()) {
       await window.electronAPI.sendInput(session.id, input + '\r')
       setInput('')
-      setShowInput(false)
     }
   }
 
@@ -66,6 +81,14 @@ export default function SessionCard({ session }: SessionCardProps) {
 
   const handleQuickDeny = async () => {
     await window.electronAPI.sendInput(session.id, 'n\r')
+  }
+
+  const handleCtrlC = async () => {
+    await window.electronAPI.sendInput(session.id, '\x03')
+  }
+
+  const handleEnter = async () => {
+    await window.electronAPI.sendInput(session.id, '\r')
   }
 
   const handleClose = async () => {
@@ -78,7 +101,21 @@ export default function SessionCard({ session }: SessionCardProps) {
     setIsFullscreen(true)
   }
 
+  const handleSaveName = () => {
+    if (nameValue.trim()) {
+      updateSession(session.id, { name: nameValue.trim() })
+    } else {
+      setNameValue(session.name)
+    }
+    setEditingName(false)
+  }
+
+  const handleGroupChange = (groupId: string | undefined) => {
+    updateSession(session.id, { groupId })
+  }
+
   const statusCfg = STATUS_CONFIG[session.status] || STATUS_CONFIG.idle
+  const sessionGroup = groups.find(g => g.id === session.groupId)
 
   return (
     <div
@@ -101,103 +138,186 @@ export default function SessionCard({ session }: SessionCardProps) {
         e.currentTarget.style.boxShadow = statusCfg.glow ? `0 0 24px ${statusCfg.bg}` : 'none'
       }}
     >
-      {/* 头部 */}
       <div 
-        className="flex items-center justify-between px-3 py-2.5"
+        className="flex items-center justify-between px-3 py-2"
         style={{ borderBottom: '1px solid var(--border-color)' }}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           <div
-            className="w-6 h-6 rounded-md flex items-center justify-center"
+            className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
             style={{ background: statusCfg.bg }}
           >
-            <span style={{ color: statusCfg.color, fontSize: 12 }}>{statusCfg.icon}</span>
+            <span style={{ color: statusCfg.color, fontSize: 10 }}>{statusCfg.icon}</span>
           </div>
-          <span 
-            style={{ 
-              fontSize: 12, 
-              fontWeight: 600, 
-              color: 'var(--text-primary)',
-              fontFamily: "'JetBrains Mono', monospace"
-            }}
-          >
-            {session.name}
-          </span>
+          
+          {editingName ? (
+            <Input
+              ref={nameInputRef}
+              value={nameValue}
+              onChange={(e) => setNameValue(e.target.value)}
+              onPressEnter={handleSaveName}
+              onBlur={handleSaveName}
+              size="small"
+              style={{ fontSize: 11, height: 22, flex: 1 }}
+            />
+          ) : (
+            <span 
+              onClick={() => setEditingName(true)}
+              style={{ 
+                fontSize: 11, 
+                fontWeight: 600, 
+                color: 'var(--text-primary)',
+                fontFamily: "'JetBrains Mono', monospace",
+                cursor: 'text',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+              title="点击编辑名称"
+            >
+              {session.name}
+            </span>
+          )}
+
+          {sessionGroup && (
+            <Tag 
+              style={{ 
+                margin: 0, 
+                fontSize: 9, 
+                lineHeight: '16px',
+                background: `${sessionGroup.color}20`,
+                border: `1px solid ${sessionGroup.color}40`,
+                color: sessionGroup.color,
+                fontFamily: "'JetBrains Mono', monospace",
+                padding: '0 4px',
+                borderRadius: 3,
+                flexShrink: 0,
+              }}
+            >
+              {sessionGroup.name}
+            </Tag>
+          )}
+
           <Tag 
             color={statusCfg.color} 
             style={{ 
               margin: 0, 
-              fontSize: 10, 
-              lineHeight: '18px',
+              fontSize: 9, 
+              lineHeight: '16px',
               background: statusCfg.bg,
               border: 'none',
-              fontFamily: "'JetBrains Mono', monospace"
+              fontFamily: "'JetBrains Mono', monospace",
+              padding: '0 4px',
+              borderRadius: 3,
+              flexShrink: 0,
             }}
           >
             {statusCfg.label}
           </Tag>
         </div>
-        <Space size={2}>
-          <Button type="text" icon={<ExpandOutlined style={{ fontSize: 12 }} />} onClick={handleFullscreen} size="small" />
-          <Button type="text" danger icon={<DeleteFilled style={{ fontSize: 12 }} />} onClick={handleClose} size="small" />
+
+        <Space size={1} className="flex-shrink-0 ml-1">
+          <Button type="text" icon={<EditFilled style={{ fontSize: 10 }} />} onClick={() => setEditingName(true)} size="small" style={{ minWidth: 20, width: 20, height: 20 }} />
+          <Button type="text" icon={<ExpandOutlined style={{ fontSize: 10 }} />} onClick={handleFullscreen} size="small" style={{ minWidth: 20, width: 20, height: 20 }} />
+          <Popconfirm
+            title="确认删除"
+            description="确定要删除此会话吗？终端进程将被关闭。"
+            onConfirm={handleClose}
+            okText="删除"
+            cancelText="取消"
+            okButtonProps={{ danger: true, size: 'small' }}
+            cancelButtonProps={{ size: 'small' }}
+          >
+            <Button type="text" danger icon={<DeleteFilled style={{ fontSize: 10 }} />} size="small" style={{ minWidth: 20, width: 20, height: 20 }} />
+          </Popconfirm>
         </Space>
       </div>
 
-      {/* 终端预览 */}
       <div 
-        className="h-28 overflow-auto px-2.5 py-2"
+        className="overflow-auto px-2.5 py-1.5"
         style={{ 
+          height: previewLineCount * 16,
+          minHeight: 48,
           background: 'var(--terminal-bg)',
           fontFamily: "'JetBrains Mono', monospace",
-          fontSize: 11,
-          lineHeight: 1.5,
+          fontSize: 10,
+          lineHeight: 1.6,
           color: 'var(--terminal-green)'
         }}
       >
         <pre className="whitespace-pre-wrap m-0">{stripAnsi(preview) || '等待输出...'}</pre>
       </div>
 
-      {/* 操作栏 */}
-      <div className="px-3 py-2" style={{ borderTop: '1px solid var(--border-color)' }}>
-        {session.status === 'needs-confirm' && (
-          <Space size={4} className="mb-1.5">
-            <Button size="small" type="primary" icon={<CheckCircleFilled />} onClick={handleQuickConfirm}>
-              Y
-            </Button>
-            <Button size="small" danger icon={<CloseCircleFilled />} onClick={handleQuickDeny}>
-              N
-            </Button>
-          </Space>
-        )}
+      <div className="px-2.5 py-1.5 flex items-center gap-1.5" style={{ borderTop: '1px solid var(--border-color)' }}>
+        <Select
+          value={session.groupId || undefined}
+          onChange={handleGroupChange}
+          placeholder="选择组"
+          allowClear
+          size="small"
+          style={{ minWidth: 70, fontSize: 10 }}
+          dropdownStyle={{ fontSize: 11 }}
+        >
+          {groups.map(g => (
+            <Select.Option key={g.id} value={g.id}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: g.color, display: 'inline-block' }} />
+                {g.name}
+              </span>
+            </Select.Option>
+          ))}
+        </Select>
+      </div>
 
-        {(session.status === 'needs-input' || showInput) ? (
-          <div className="flex gap-1.5">
-            <Input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onPressEnter={handleSendInput}
-              placeholder="输入命令..."
-              className="flex-1"
-              size="small"
-            />
-            <Button type="primary" icon={<SendOutlined />} onClick={handleSendInput} size="small" />
-          </div>
-        ) : (
-          <button
-            onClick={() => setShowInput(true)}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--text-muted)',
-              fontSize: 11,
-              cursor: 'pointer',
-              padding: 0,
-              fontFamily: "'JetBrains Mono', monospace"
-            }}
-          >
-            &gt; 点击输入...
-          </button>
-        )}
+      <div className="px-2.5 py-1.5 flex items-center gap-1" style={{ borderTop: '1px solid var(--border-color)' }}>
+        <Button 
+          size="small" 
+          type="primary"
+          onClick={handleQuickConfirm}
+          style={{ fontSize: 10, minWidth: 28, height: 22, padding: '0 6px' }}
+        >
+          Y
+        </Button>
+        <Button 
+          size="small" 
+          danger
+          onClick={handleQuickDeny}
+          style={{ fontSize: 10, minWidth: 28, height: 22, padding: '0 6px' }}
+        >
+          N
+        </Button>
+        <Button 
+          size="small"
+          onClick={handleCtrlC}
+          icon={<StopFilled style={{ fontSize: 9 }} />}
+          style={{ fontSize: 10, minWidth: 28, height: 22, padding: '0 6px' }}
+          title="Ctrl+C"
+        >
+          C-c
+        </Button>
+        <Input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onPressEnter={handleSendInput}
+          placeholder="输入..."
+          size="small"
+          style={{ flex: 1, fontSize: 10, height: 22 }}
+        />
+        <Button 
+          type="primary" 
+          icon={<SendOutlined style={{ fontSize: 9 }} />} 
+          onClick={handleSendInput} 
+          size="small"
+          style={{ minWidth: 24, width: 24, height: 22 }}
+          title="发送"
+        />
+        <Button 
+          size="small"
+          icon={<EnterOutlined style={{ fontSize: 9 }} />}
+          onClick={handleEnter}
+          style={{ minWidth: 24, width: 24, height: 22 }}
+          title="Enter"
+        />
       </div>
     </div>
   )

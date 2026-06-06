@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Menu, Popover, Tooltip } from 'antd'
+import { Menu, Popover } from 'antd'
 import type { MenuProps } from 'antd'
 import { AppstoreFilled, PlusCircleFilled, FolderFilled, MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons'
 import { useAppStore } from '../store'
@@ -87,9 +87,11 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
 
   return (
     <div 
-      className="flex flex-col transition-all duration-200"
+      className="flex flex-col transition-all duration-200 overflow-hidden"
       style={{ 
         width: collapsed ? 52 : 208,
+        minWidth: collapsed ? 52 : 208,
+        maxWidth: collapsed ? 52 : 208,
         borderRight: '1px solid var(--border-color)',
         background: 'var(--bg-secondary)'
       }}
@@ -129,14 +131,17 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
         </button>
       </div>
 
-      <Menu
-        mode="inline"
-        selectedKeys={selectedGroupId ? [selectedGroupId] : ['all']}
-        onClick={handleMenuClick}
-        className="border-r-0 bg-transparent flex-1"
-        items={menuItems}
-        inlineCollapsed={collapsed}
-      />
+      <div className="flex-1 overflow-hidden">
+        <Menu
+          mode="inline"
+          selectedKeys={selectedGroupId ? [selectedGroupId] : ['all']}
+          onClick={handleMenuClick}
+          className="border-r-0 bg-transparent"
+          items={menuItems}
+          inlineCollapsed={collapsed}
+          style={{ overflow: 'hidden' }}
+        />
+      </div>
       
       {/* 添加分组区域 - 折叠时隐藏 */}
       {!collapsed && (

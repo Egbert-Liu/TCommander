@@ -1,5 +1,5 @@
 import { SearchOutlined, PlusCircleFilled, CameraFilled, SettingFilled, ThunderboltFilled } from '@ant-design/icons'
-import { Input, Button, Dropdown, Tooltip, message } from 'antd'
+import { Input, Button, Dropdown, Tooltip, Select } from 'antd'
 import type { MenuProps } from 'antd'
 import { useAppStore } from '../store'
 
@@ -9,7 +9,11 @@ interface ToolbarProps {
 }
 
 export default function Toolbar({ onNewSession, onOpenPresets }: ToolbarProps) {
-  const { searchQuery, setSearchQuery, addSnapshot } = useAppStore()
+  const searchQuery = useAppStore((s) => s.searchQuery)
+  const setSearchQuery = useAppStore((s) => s.setSearchQuery)
+  const previewLineCount = useAppStore((s) => s.previewLineCount)
+  const setPreviewLineCount = useAppStore((s) => s.setPreviewLineCount)
+  const addSnapshot = useAppStore((s) => s.addSnapshot)
 
   const handleSnapshot = async () => {
     const sessions = useAppStore.getState().sessions
@@ -33,7 +37,6 @@ export default function Toolbar({ onNewSession, onOpenPresets }: ToolbarProps) {
     
     addSnapshot(snapshot)
     await window.electronAPI.storageSet('snapshots', [...useAppStore.getState().snapshots, snapshot])
-    message.success('快照已保存')
   }
 
   const items: MenuProps['items'] = [
@@ -92,6 +95,23 @@ export default function Toolbar({ onNewSession, onOpenPresets }: ToolbarProps) {
           className="w-56"
           size="small"
         />
+
+        <Tooltip title="预览行数">
+          <Select
+            value={previewLineCount}
+            onChange={setPreviewLineCount}
+            size="small"
+            style={{ width: 80 }}
+            options={[
+              { value: 5, label: '5 行' },
+              { value: 10, label: '10 行' },
+              { value: 15, label: '15 行' },
+              { value: 20, label: '20 行' },
+              { value: 30, label: '30 行' },
+              { value: 50, label: '50 行' },
+            ]}
+          />
+        </Tooltip>
 
         <Button 
           type="primary" 
