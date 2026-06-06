@@ -1,8 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
 
 :root {
   --bg-primary: #0a0e17;
@@ -163,7 +163,7 @@ body {
 
 .ant-table-tbody > tr > td {
   border-bottom: 1px solid var(--border-color) !important;
-  color: var(--text-primary) !important;
+  color: 'var(--text-primary)' !important;
 }
 
 .ant-table-tbody > tr:hover > td {
@@ -235,6 +235,24 @@ body {
   border: 1px solid var(--border-color);
   border-radius: 8px;
   color: var(--text-primary) !important;
+}
+
+.ant-checkbox-wrapper {
+  color: var(--text-secondary) !important;
+}
+
+.ant-checkbox-inner {
+  background: var(--bg-primary) !important;
+  border-color: var(--border-color) !important;
+}
+
+.ant-checkbox-checked .ant-checkbox-inner {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+}
+
+.ant-divider {
+  border-color: var(--border-color) !important;
 }
 
 /* xterm 终端样式 */

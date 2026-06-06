@@ -11,7 +11,7 @@ interface SessionConfig {
 
 interface PtySession {
   id: string
-  process: pty.IPty
+  ptyProcess: pty.IPty
   config: SessionConfig
 }
 
@@ -45,7 +45,7 @@ export function createPtyManager() {
     const shell = getShellPath(config.terminalType)
     const cwd = config.cwd || os.homedir()
     
-    const process = pty.spawn(shell, [], {
+    const ptyProcess = pty.spawn(shell, [], {
       name: 'xterm-256color',
       cols: config.cols || 80,
       rows: config.rows || 24,
@@ -57,23 +57,23 @@ export function createPtyManager() {
       }
     })
 
-    process.onData((data) => {
+    ptyProcess.onData((data) => {
       outputListeners.forEach((listener) => listener(id, data))
     })
 
-    process.onExit(({ exitCode }) => {
+    ptyProcess.onExit(({ exitCode }) => {
       sessions.delete(id)
       exitListeners.forEach((listener) => listener(id, exitCode || 0))
     })
 
-    sessions.set(id, { id, process, config })
+    sessions.set(id, { id, ptyProcess, config })
     return id
   }
 
   function sendInput(sessionId: string, data: string): void {
     const session = sessions.get(sessionId)
     if (session) {
-      session.process.write(data)
+      session.ptyProcess.write(data)
     }
   }
 
@@ -81,7 +81,7 @@ export function createPtyManager() {
     const session = sessions.get(sessionId)
     if (session) {
       try {
-        session.process.kill()
+        session.ptyProcess.kill()
       } catch (e) {
         console.error('Error killing session:', e)
       }
@@ -92,14 +92,14 @@ export function createPtyManager() {
   function resizeSession(sessionId: string, cols: number, rows: number): void {
     const session = sessions.get(sessionId)
     if (session) {
-      session.process.resize(cols, rows)
+      session.ptyProcess.resize(cols, rows)
     }
   }
 
   function closeAllSessions(): void {
     sessions.forEach((session) => {
       try {
-        session.process.kill()
+        session.ptyProcess.kill()
       } catch (e) {
         console.error('Error killing session:', e)
       }
