@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
-import { Terminal, X, Maximize2, Send, ArrowRight } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Card, Tag, Button, Input, Space } from 'antd'
+import { FullscreenOutlined, DeleteOutlined, SendOutlined, CheckOutlined, CloseOutlined } from '@ant-design/icons'
 import { Session } from '../types'
 import { useAppStore } from '../store'
 import { stripAnsi } from '../utils/statusDetector'
@@ -9,11 +10,10 @@ interface SessionCardProps {
 }
 
 export default function SessionCard({ session }: SessionCardProps) {
-  const { removeSession, setActiveSession, setIsFullscreen, darkMode } = useAppStore()
+  const { removeSession, setActiveSession, setIsFullscreen } = useAppStore()
   const [preview, setPreview] = useState('')
   const [input, setInput] = useState('')
   const [showInput, setShowInput] = useState(false)
-  const previewRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const handleOutput = (sessionId: string, data: string) => {
@@ -24,7 +24,6 @@ export default function SessionCard({ session }: SessionCardProps) {
           return lines.slice(-20).join('\n')
         })
         
-        // 更新会话历史
         useAppStore.getState().updateSession(session.id, {
           history: [...session.history, data],
           lastActivityAt: Date.now()
@@ -76,128 +75,85 @@ export default function SessionCard({ session }: SessionCardProps) {
 
   const getStatusColor = () => {
     switch (session.status) {
-      case 'needs-confirm':
-        return 'border-yellow-500'
-      case 'needs-input':
-        return 'border-blue-500'
-      case 'error':
-        return 'border-red-500'
-      case 'running':
-        return 'border-green-500'
-      default:
-        return 'border-gray-500'
+      case 'needs-confirm': return 'gold'
+      case 'needs-input': return 'blue'
+      case 'error': return 'red'
+      case 'running': return 'green'
+      default: return 'default'
     }
   }
 
   const getStatusLabel = () => {
     switch (session.status) {
-      case 'needs-confirm':
-        return '需确认'
-      case 'needs-input':
-        return '待输入'
-      case 'error':
-        return '错误'
-      case 'running':
-        return '运行中'
-      default:
-        return '空闲'
+      case 'needs-confirm': return '需确认'
+      case 'needs-input': return '待输入'
+      case 'error': return '错误'
+      case 'running': return '运行中'
+      default: return '空闲'
     }
   }
 
+  const actions = [
+    <Button key="fullscreen" type="text" icon={<FullscreenOutlined />} onClick={handleFullscreen} />,
+    <Button key="delete" type="text" danger icon={<DeleteOutlined />} onClick={handleClose} />
+  ]
+
   return (
-    <div className={`rounded-lg border-2 overflow-hidden ${getStatusColor()} ${
-      darkMode ? 'bg-gray-800' : 'bg-white'
-    }`}>
-      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700">
-        <div className="flex items-center gap-2">
-          <Terminal className="w-4 h-4 text-primary" />
+    <Card 
+      size="small" 
+      title={
+        <Space>
           <span className="font-medium">{session.name}</span>
-          <span className={`text-xs px-2 py-0.5 rounded ${
-            session.status === 'needs-confirm' ? 'bg-yellow-500/20 text-yellow-500' :
-            session.status === 'needs-input' ? 'bg-blue-500/20 text-blue-500' :
-            session.status === 'error' ? 'bg-red-500/20 text-red-500' :
-            session.status === 'running' ? 'bg-green-500/20 text-green-500' :
-            'bg-gray-500/20 text-gray-500'
-          }`}>
-            {getStatusLabel()}
-          </span>
-        </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={handleFullscreen}
-            className={`p-1.5 rounded hover:bg-gray-700 transition`}
-            title="全屏"
-          >
-            <Maximize2 className="w-4 h-4" />
-          </button>
-          <button
-            onClick={handleClose}
-            className="p-1.5 rounded hover:bg-red-500/20 hover:text-red-500 transition"
-            title="关闭"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+          <Tag color={getStatusColor()}>{getStatusLabel()}</Tag>
+        </Space>
+      }
+      extra={
+        <Space>
+          <Button type="text" icon={<FullscreenOutlined />} onClick={handleFullscreen} size="small" />
+          <Button type="text" danger icon={<DeleteOutlined />} onClick={handleClose} size="small" />
+        </Space>
+      }
+      className="h-full flex flex-col"
+    >
+      <div className="h-32 overflow-auto p-2 bg-gray-900 text-green-400 font-mono text-xs rounded mb-3">
+        <pre className="whitespace-pre-wrap m-0">{stripAnsi(preview) || '等待输出...'}</pre>
       </div>
 
-      <div
-        ref={previewRef}
-        className="h-40 overflow-auto p-2 bg-black text-green-400 font-mono text-xs"
-      >
-        <pre className="whitespace-pre-wrap">{stripAnsi(preview) || '等待输出...'}</pre>
-      </div>
-
-      <div className="flex items-center gap-2 px-3 py-2 border-t border-gray-700">
+      <div className="flex-shrink-0">
         {session.status === 'needs-confirm' && (
-          <>
-            <button
-              onClick={handleQuickConfirm}
-              className="flex items-center gap-1 px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600"
-            >
-              <ArrowRight className="w-3 h-3" />
+          <Space className="mb-2">
+            <Button size="small" type="primary" icon={<CheckOutlined />} onClick={handleQuickConfirm}>
               确认 (Y)
-            </button>
-            <button
-              onClick={handleQuickDeny}
-              className="flex items-center gap-1 px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600"
-            >
+            </Button>
+            <Button size="small" danger icon={<CloseOutlined />} onClick={handleQuickDeny}>
               拒绝 (N)
-            </button>
-          </>
+            </Button>
+          </Space>
         )}
 
-        {session.status === 'needs-input' || showInput ? (
-          <div className="flex-1 flex gap-2">
-            <input
-              type="text"
+        {(session.status === 'needs-input' || showInput) ? (
+          <Input.Group compact className="flex gap-2">
+            <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  handleSendInput()
-                }
-              }}
+              onPressEnter={handleSendInput}
               placeholder="输入命令..."
-              className="flex-1 px-2 py-1 text-sm bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:ring-1 focus:ring-primary"
-              autoFocus
+              className="flex-1"
+              size="small"
             />
-            <button
-              onClick={handleSendInput}
-              className="p-1.5 bg-primary text-white rounded hover:bg-blue-700"
-            >
-              <Send className="w-4 h-4" />
-            </button>
-          </div>
+            <Button type="primary" icon={<SendOutlined />} onClick={handleSendInput} size="small" />
+          </Input.Group>
         ) : (
-          <button
+          <Button 
+            type="link" 
+            size="small" 
             onClick={() => setShowInput(true)}
-            className={`text-xs ${darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'}`}
+            block
           >
             点击输入...
-          </button>
+          </Button>
         )}
       </div>
-    </div>
+    </Card>
   )
 }
