@@ -1,12 +1,13 @@
 import { useEffect, useRef } from 'react'
-import { X, Minimize2 } from 'lucide-react'
+import { Button } from 'antd'
+import { CompressOutlined, CodeOutlined } from '@ant-design/icons'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import { useAppStore } from '../store'
 
 export default function FullscreenTerminal() {
-  const { activeSessionId, sessions, setIsFullscreen, darkMode } = useAppStore()
+  const { activeSessionId, sessions, setIsFullscreen } = useAppStore()
   const terminalRef = useRef<HTMLDivElement>(null)
   const terminalInstance = useRef<Terminal | null>(null)
   const fitAddon = useRef<FitAddon | null>(null)
@@ -18,20 +19,19 @@ export default function FullscreenTerminal() {
 
     const terminal = new Terminal({
       cursorBlink: true,
-      fontSize: 14,
-      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-      theme: darkMode ? {
-        background: '#000000',
-        foreground: '#ffffff',
-        cursor: '#ffffff',
-        cursorAccent: '#000000',
-        selectionBackground: '#334155'
-      } : {
-        background: '#ffffff',
-        foreground: '#000000',
-        cursor: '#000000',
-        cursorAccent: '#ffffff',
-        selectionBackground: '#93c5fd'
+      fontSize: 13,
+      fontFamily: "'JetBrains Mono', Menlo, Monaco, monospace",
+      theme: {
+        background: '#0d1117',
+        foreground: '#e2e8f0',
+        cursor: '#38bdf8',
+        cursorAccent: '#0d1117',
+        selectionBackground: 'rgba(56, 189, 248, 0.25)',
+        black: '#0d1117',
+        green: '#4ade80',
+        yellow: '#fbbf24',
+        red: '#f87171',
+        cyan: '#38bdf8',
       }
     })
 
@@ -43,14 +43,12 @@ export default function FullscreenTerminal() {
     terminalInstance.current = terminal
     fitAddon.current = fit
 
-    // 监听终端输入
     terminal.onData((data) => {
       if (activeSessionId) {
         window.electronAPI.sendInput(activeSessionId, data)
       }
     })
 
-    // 监听窗口大小变化
     const handleResize = () => {
       fit.fit()
       if (activeSessionId) {
@@ -60,7 +58,6 @@ export default function FullscreenTerminal() {
 
     window.addEventListener('resize', handleResize)
 
-    // 监听键盘快捷键
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault()
@@ -105,19 +102,36 @@ export default function FullscreenTerminal() {
   }, [activeSessionId])
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col">
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-900 text-white">
+    <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#0d1117' }}>
+      <div 
+        className="flex items-center justify-between px-4 h-10"
+        style={{ 
+          background: 'var(--bg-secondary)',
+          borderBottom: '1px solid var(--border-color)'
+        }}
+      >
         <div className="flex items-center gap-2">
-          <Terminal className="w-5 h-5 text-primary" />
-          <span className="font-medium">{activeSession?.name || '终端'}</span>
-          <span className="text-xs text-gray-400">按 ESC 或 S 退出全屏</span>
+          <CodeOutlined style={{ color: 'var(--accent)', fontSize: 13 }} />
+          <span 
+            style={{ 
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: 12,
+              fontWeight: 600,
+              color: 'var(--text-primary)'
+            }}
+          >
+            {activeSession?.name || '终端'}
+          </span>
+          <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+            ESC 退出全屏
+          </span>
         </div>
-        <button
+        <Button
+          type="text"
+          icon={<CompressOutlined />}
           onClick={() => setIsFullscreen(false)}
-          className="p-2 rounded hover:bg-gray-700 transition"
-        >
-          <Minimize2 className="w-5 h-5" />
-        </button>
+          size="small"
+        />
       </div>
       
       <div ref={terminalRef} className="flex-1 overflow-hidden" />

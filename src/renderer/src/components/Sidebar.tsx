@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Menu } from 'antd'
 import type { MenuProps } from 'antd'
-import { FolderOutlined, PlusOutlined } from '@ant-design/icons'
+import { FolderOutlined, PlusOutlined, AppstoreOutlined } from '@ant-design/icons'
 import { useAppStore } from '../store'
 
 export default function Sidebar() {
@@ -10,7 +10,7 @@ export default function Sidebar() {
 
   const handleAddGroup = () => {
     if (newGroupName.trim()) {
-      const colors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899']
+      const colors = ['#38bdf8', '#f87171', '#fbbf24', '#34d399', '#a78bfa', '#fb923c', '#f472b6']
       addGroup({
         id: `group-${Date.now()}`,
         name: newGroupName,
@@ -24,7 +24,7 @@ export default function Sidebar() {
   const menuItems: MenuProps['items'] = [
     {
       key: 'all',
-      icon: <FolderOutlined />,
+      icon: <AppstoreOutlined />,
       label: '全部会话',
     },
     ...groups.map(group => ({
@@ -33,10 +33,11 @@ export default function Sidebar() {
         <span 
           style={{ 
             display: 'inline-block', 
-            width: 8, 
-            height: 8, 
+            width: 7, 
+            height: 7, 
             borderRadius: '50%', 
-            backgroundColor: group.color 
+            backgroundColor: group.color,
+            boxShadow: `0 0 6px ${group.color}40`
           }} 
         />
       ),
@@ -53,36 +54,64 @@ export default function Sidebar() {
   }
 
   return (
-    <div className="w-56 border-r bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-      <div className="p-3">
-        <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 px-3">
+    <div 
+      className="w-48 flex flex-col"
+      style={{ 
+        borderRight: '1px solid var(--border-color)',
+        background: 'var(--bg-secondary)'
+      }}
+    >
+      <div className="px-3 pt-4 pb-2">
+        <span 
+          style={{ 
+            fontSize: 10, 
+            fontWeight: 600, 
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            color: 'var(--text-muted)',
+            fontFamily: "'JetBrains Mono', monospace"
+          }}
+        >
           分组
-        </div>
-        <Menu
-          mode="inline"
-          selectedKeys={selectedGroupId ? [selectedGroupId] : ['all']}
-          onClick={handleMenuClick}
-          className="border-r-0 bg-transparent dark:bg-transparent"
-          items={menuItems}
-        />
-        
-        <div className="mt-3 px-3">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newGroupName}
-              onChange={(e) => setNewGroupName(e.target.value)}
-              onPressEnter={handleAddGroup}
-              placeholder="新分组名"
-              className="flex-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
-            />
-            <button
-              onClick={handleAddGroup}
-              className="px-2 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
-            >
-              <PlusOutlined />
-            </button>
-          </div>
+        </span>
+      </div>
+
+      <Menu
+        mode="inline"
+        selectedKeys={selectedGroupId ? [selectedGroupId] : ['all']}
+        onClick={handleMenuClick}
+        className="border-r-0 bg-transparent flex-1"
+        items={menuItems}
+      />
+      
+      <div className="p-3" style={{ borderTop: '1px solid var(--border-color)' }}>
+        <div className="flex gap-1.5">
+          <input
+            type="text"
+            value={newGroupName}
+            onChange={(e) => setNewGroupName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleAddGroup()}
+            placeholder="新分组"
+            className="flex-1 px-2 py-1 text-xs rounded"
+            style={{
+              background: 'var(--bg-primary)',
+              border: '1px solid var(--border-color)',
+              color: 'var(--text-primary)',
+              outline: 'none',
+              fontFamily: "'DM Sans', sans-serif"
+            }}
+          />
+          <button
+            onClick={handleAddGroup}
+            className="w-7 h-7 flex items-center justify-center rounded text-xs"
+            style={{
+              background: 'var(--accent-dim)',
+              color: 'var(--accent)',
+              border: '1px solid var(--border-color)'
+            }}
+          >
+            <PlusOutlined style={{ fontSize: 11 }} />
+          </button>
         </div>
       </div>
     </div>

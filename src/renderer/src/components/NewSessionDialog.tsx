@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Modal, Form, Input, Select, Button, Space } from 'antd'
-import { TerminalPlatform } from '@ant-design/icons'
+import { CodeOutlined } from '@ant-design/icons'
 import { useAppStore } from '../store'
 
 interface NewSessionDialogProps {
@@ -66,7 +66,12 @@ export default function NewSessionDialog({ open, onClose }: NewSessionDialogProp
 
   return (
     <Modal
-      title={<Space><TerminalPlatform /> 新建会话</Space>}
+      title={
+        <Space>
+          <CodeOutlined style={{ color: 'var(--accent)' }} />
+          <span>新建会话</span>
+        </Space>
+      }
       open={open}
       onCancel={onClose}
       footer={
@@ -77,14 +82,18 @@ export default function NewSessionDialog({ open, onClose }: NewSessionDialogProp
           </Button>
         </Space>
       }
-      width={500}
+      width={460}
     >
       {presets.length > 0 && (
-        <Form.Item label="从预设选择">
+        <div className="mb-4">
+          <div style={{ color: 'var(--text-secondary)', fontSize: 12, marginBottom: 6, fontWeight: 500 }}>
+            从预设选择
+          </div>
           <Select
             placeholder="选择预设自动填充"
             onChange={handleSelectPreset}
             allowClear
+            className="w-full"
           >
             {presets.map(preset => (
               <Select.Option key={preset.id} value={preset.id}>
@@ -92,10 +101,10 @@ export default function NewSessionDialog({ open, onClose }: NewSessionDialogProp
               </Select.Option>
             ))}
           </Select>
-        </Form.Item>
+        </div>
       )}
       
-      <Form form={form} layout="vertical">
+      <Form form={form} layout="vertical" size="small">
         <Form.Item
           name="name"
           label="会话名称"
@@ -117,17 +126,11 @@ export default function NewSessionDialog({ open, onClose }: NewSessionDialogProp
           </Select>
         </Form.Item>
 
-        <Form.Item
-          name="cwd"
-          label="工作目录"
-        >
+        <Form.Item name="cwd" label="工作目录">
           <Input placeholder="留空使用默认目录" />
         </Form.Item>
 
-        <Form.Item
-          name="initialCommand"
-          label="初始命令"
-        >
+        <Form.Item name="initialCommand" label="初始命令">
           <Input placeholder="创建会话后自动执行的命令" />
         </Form.Item>
       </Form>

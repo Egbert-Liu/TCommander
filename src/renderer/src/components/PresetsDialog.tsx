@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Modal, Table, Button, Space, Popconfirm, message } from 'antd'
-import { PlusOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons'
+import { PlusOutlined, DeleteOutlined, EditOutlined, SettingOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useAppStore } from '../store'
 import PresetForm from './PresetForm'
@@ -42,36 +42,49 @@ export default function PresetsDialog({ open, onClose }: PresetsDialogProps) {
       title: '名称',
       dataIndex: 'name',
       key: 'name',
+      render: (name: string) => (
+        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>{name}</span>
+      )
     },
     {
-      title: '终端类型',
+      title: '终端',
       dataIndex: 'terminalType',
       key: 'terminalType',
-      render: (type: string) => type.toUpperCase()
+      width: 90,
+      render: (type: string) => (
+        <span style={{ 
+          color: 'var(--accent)', 
+          fontFamily: "'JetBrains Mono', monospace", 
+          fontSize: 11 
+        }}>
+          {type.toUpperCase()}
+        </span>
+      )
     },
     {
       title: '工作目录',
       dataIndex: 'cwd',
       key: 'cwd',
+      ellipsis: true,
     },
     {
       title: '初始命令',
       dataIndex: 'initialCommand',
       key: 'initialCommand',
       ellipsis: true,
+      render: (cmd: string) => cmd ? (
+        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: 'var(--terminal-green)' }}>
+          {cmd}
+        </span>
+      ) : '-'
     },
     {
       title: '操作',
       key: 'action',
-      width: 150,
+      width: 120,
       render: (_, record) => (
-        <Space>
-          <Button 
-            type="link" 
-            size="small" 
-            icon={<EditOutlined />} 
-            onClick={() => handleEdit(record)}
-          >
+        <Space size={4}>
+          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
             编辑
           </Button>
           <Popconfirm
@@ -80,12 +93,7 @@ export default function PresetsDialog({ open, onClose }: PresetsDialogProps) {
             okText="确定"
             cancelText="取消"
           >
-            <Button 
-              type="link" 
-              size="small" 
-              danger 
-              icon={<DeleteOutlined />}
-            >
+            <Button type="link" size="small" danger icon={<DeleteOutlined />}>
               删除
             </Button>
           </Popconfirm>
@@ -97,32 +105,36 @@ export default function PresetsDialog({ open, onClose }: PresetsDialogProps) {
   return (
     <>
       <Modal
-        title="预设管理"
+        title={
+          <Space>
+            <SettingOutlined style={{ color: 'var(--accent)' }} />
+            <span>预设管理</span>
+          </Space>
+        }
         open={open}
         onCancel={onClose}
         footer={null}
-        width={700}
+        width={660}
       >
-        <div className="mb-4 flex justify-end">
-          <Button 
-            type="primary" 
-            icon={<PlusOutlined />} 
-            onClick={handleAdd}
-          >
+        <div className="mb-3 flex justify-end">
+          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} size="small">
             新建预设
           </Button>
         </div>
         
-        <Table
-          columns={columns}
-          dataSource={presets}
-          rowKey="id"
-          pagination={false}
-          size="small"
-        />
-        
-        {presets.length === 0 && (
-          <div className="text-center text-gray-500 py-8">
+        {presets.length > 0 ? (
+          <Table
+            columns={columns}
+            dataSource={presets}
+            rowKey="id"
+            pagination={false}
+            size="small"
+          />
+        ) : (
+          <div 
+            className="text-center py-10"
+            style={{ color: 'var(--text-muted)', fontSize: 13 }}
+          >
             暂无预设，点击"新建预设"创建
           </div>
         )}

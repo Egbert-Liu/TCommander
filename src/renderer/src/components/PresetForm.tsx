@@ -54,13 +54,9 @@ export default function PresetForm({ open, onClose, editingPreset }: PresetFormP
           </Button>
         </Space>
       }
-      width={500}
+      width={460}
     >
-      <Form 
-        form={form} 
-        layout="vertical"
-        initialValues={editingPreset || {}}
-      >
+      <Form form={form} layout="vertical" size="small" initialValues={editingPreset || {}}>
         <Form.Item
           name="name"
           label="预设名称"
@@ -81,17 +77,11 @@ export default function PresetForm({ open, onClose, editingPreset }: PresetFormP
           </Select>
         </Form.Item>
 
-        <Form.Item
-          name="cwd"
-          label="工作目录"
-        >
+        <Form.Item name="cwd" label="工作目录">
           <Input placeholder="例如：C:\Projects" />
         </Form.Item>
 
-        <Form.Item
-          name="initialCommand"
-          label="初始命令"
-        >
+        <Form.Item name="initialCommand" label="初始命令">
           <Input placeholder="例如：npm run dev" />
         </Form.Item>
       </Form>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { ConfigProvider, theme, Empty, Button } from 'antd'
+import { ConfigProvider, theme, Button } from 'antd'
+import { PlusOutlined, CodeOutlined } from '@ant-design/icons'
 import { useAppStore } from './store'
 import Sidebar from './components/Sidebar'
 import Toolbar from './components/Toolbar'
@@ -9,17 +10,9 @@ import NewSessionDialog from './components/NewSessionDialog'
 import PresetsDialog from './components/PresetsDialog'
 
 function App() {
-  const { sessions, darkMode, isFullscreen, filteredSessions } = useAppStore()
+  const { sessions, isFullscreen, filteredSessions } = useAppStore()
   const [showNewSession, setShowNewSession] = useState(false)
   const [showPresets, setShowPresets] = useState(false)
-
-  useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-    }
-  }, [darkMode])
 
   if (isFullscreen) {
     return <FullscreenTerminal />
@@ -28,13 +21,16 @@ function App() {
   return (
     <ConfigProvider
       theme={{
-        algorithm: darkMode ? theme.darkAlgorithm : theme.defaultAlgorithm,
+        algorithm: theme.darkAlgorithm,
         token: {
-          colorPrimary: '#1677ff',
+          colorPrimary: '#38bdf8',
+          borderRadius: 6,
+          fontSize: 13,
+          fontFamily: "'DM Sans', -apple-system, sans-serif",
         },
       }}
     >
-      <div className="h-screen flex flex-col bg-gray-50 dark:bg-gray-900">
+      <div className="h-screen flex flex-col" style={{ background: 'var(--bg-primary)' }}>
         <Toolbar 
           onNewSession={() => setShowNewSession(true)} 
           onOpenPresets={() => setShowPresets(true)}
@@ -43,26 +39,42 @@ function App() {
         <div className="flex flex-1 overflow-hidden">
           <Sidebar />
           
-          <main className="flex-1 overflow-auto p-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredSessions.map((session) => (
-                <SessionCard key={session.id} session={session} />
-              ))}
-            </div>
-            
-            {filteredSessions.length === 0 && sessions.length === 0 && (
-              <Empty 
-                description="暂无会话" 
-                className="flex flex-col items-center justify-center h-full"
-              >
+          <main className="flex-1 overflow-auto p-5">
+            {filteredSessions.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {filteredSessions.map((session, index) => (
+                  <div key={session.id} className="animate-fade-in" style={{ animationDelay: `${index * 50}ms` }}>
+                    <SessionCard session={session} />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full gap-5">
+                <div 
+                  className="w-20 h-20 rounded-2xl flex items-center justify-center"
+                  style={{ 
+                    background: 'var(--accent-dim)',
+                    border: '1px solid var(--border-color)'
+                  }}
+                >
+                  <CodeOutlined style={{ fontSize: 36, color: 'var(--accent)' }} />
+                </div>
+                <div className="text-center">
+                  <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 4 }}>
+                    暂无终端会话
+                  </p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                    创建一个新会话开始管理你的终端
+                  </p>
+                </div>
                 <Button 
                   type="primary" 
+                  icon={<PlusOutlined />}
                   onClick={() => setShowNewSession(true)}
-                  size="large"
                 >
-                  创建第一个会话
+                  新建会话
                 </Button>
-              </Empty>
+              </div>
             )}
           </main>
         </div>

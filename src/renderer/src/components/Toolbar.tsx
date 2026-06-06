@@ -1,5 +1,5 @@
-import { SearchOutlined, PlusOutlined, CameraOutlined, SettingOutlined } from '@ant-design/icons'
-import { Input, Button, Dropdown, Tooltip, message } from 'antd'
+import { SearchOutlined, PlusOutlined, CameraOutlined, SettingOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import { Input, Button, Dropdown, message } from 'antd'
 import type { MenuProps } from 'antd'
 import { useAppStore } from '../store'
 
@@ -52,36 +52,55 @@ export default function Toolbar({ onNewSession, onOpenPresets }: ToolbarProps) {
   ]
 
   return (
-    <div className="h-14 px-4 flex items-center justify-between border-b bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-      <div className="flex items-center gap-3">
-        <h1 className="text-lg font-semibold text-blue-600 dark:text-blue-400 m-0">
+    <div 
+      className="h-12 px-4 flex items-center justify-between"
+      style={{ 
+        borderBottom: '1px solid var(--border-color)',
+        background: 'var(--bg-secondary)'
+      }}
+    >
+      <div className="flex items-center gap-2.5">
+        <div 
+          className="w-7 h-7 rounded-md flex items-center justify-center"
+          style={{ background: 'var(--accent-dim)' }}
+        >
+          <ThunderboltOutlined style={{ color: 'var(--accent)', fontSize: 14 }} />
+        </div>
+        <span 
+          style={{ 
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 13,
+            fontWeight: 600,
+            color: 'var(--text-primary)',
+            letterSpacing: '-0.02em'
+          }}
+        >
           Client Manager
-        </h1>
+        </span>
       </div>
       
-      <div className="flex items-center gap-3">
-        <Input.Search
+      <div className="flex items-center gap-2">
+        <Input
           placeholder="搜索会话..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-64"
-          prefix={<SearchOutlined />}
+          prefix={<SearchOutlined style={{ color: 'var(--text-muted)', fontSize: 12 }} />}
           allowClear
+          className="w-52"
+          size="small"
         />
 
         <Button 
           type="primary" 
           icon={<PlusOutlined />}
           onClick={onNewSession}
-          size="middle"
+          size="small"
         >
-          新建会话
+          新建
         </Button>
         
         <Dropdown menu={{ items }} placement="bottomRight">
-          <Button icon={<SettingOutlined />} size="middle">
-            更多
-          </Button>
+          <Button icon={<SettingOutlined />} size="small" />
         </Dropdown>
       </div>
     </div>
