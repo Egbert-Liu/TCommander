@@ -183,7 +183,7 @@ body {
 
 .ant-table-tbody > tr > td {
   border-bottom: 1px solid var(--border-color) !important;
-  color: 'var(--text-primary)' !important;
+  color: var(--text-primary) !important;
 }
 
 .ant-table-tbody > tr:hover > td {
@@ -294,6 +294,34 @@ body {
 @keyframes pulse-glow {
   0%, 100% { box-shadow: 0 0 0 0 var(--accent-glow); }
   50% { box-shadow: 0 0 12px 2px var(--accent-glow); }
+}
+
+@keyframes pulse-error {
+  0%, 100% { border-color: rgba(248, 113, 113, 0.3); box-shadow: 0 0 8px rgba(248, 113, 113, 0.1); }
+  50% { border-color: rgba(248, 113, 113, 0.7); box-shadow: 0 0 20px rgba(248, 113, 113, 0.25); }
+}
+
+@keyframes pulse-confirm {
+  0%, 100% { border-color: rgba(251, 191, 36, 0.3); box-shadow: 0 0 8px rgba(251, 191, 36, 0.1); }
+  50% { border-color: rgba(251, 191, 36, 0.7); box-shadow: 0 0 20px rgba(251, 191, 36, 0.25); }
+}
+
+@keyframes pulse-input {
+  0%, 100% { border-color: rgba(56, 189, 248, 0.3); box-shadow: 0 0 8px rgba(56, 189, 248, 0.1); }
+  50% { border-color: rgba(56, 189, 248, 0.7); box-shadow: 0 0 20px rgba(56, 189, 248, 0.25); }
+}
+
+.card-status-error {
+  animation: pulse-error 2s ease-in-out infinite;
+  border-color: rgba(248, 113, 113, 0.3) !important;
+}
+.card-status-needs-confirm {
+  animation: pulse-confirm 2s ease-in-out infinite;
+  border-color: rgba(251, 191, 36, 0.3) !important;
+}
+.card-status-needs-input {
+  animation: pulse-input 2s ease-in-out infinite;
+  border-color: rgba(56, 189, 248, 0.3) !important;
 }
 
 .animate-fade-in {

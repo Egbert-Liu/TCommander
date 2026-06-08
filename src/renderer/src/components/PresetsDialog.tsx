@@ -12,13 +12,13 @@ interface PresetsDialogProps {
 }
 
 export default function PresetsDialog({ open, onClose }: PresetsDialogProps) {
-  const { presets, removePreset } = useAppStore()
+  const presets = useAppStore((s) => s.presets)
+  const removePreset = useAppStore((s) => s.removePreset)
   const [showForm, setShowForm] = useState(false)
   const [editingPreset, setEditingPreset] = useState<Preset | null>(null)
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     removePreset(id)
-    await window.electronAPI.storageSet('presets', useAppStore.getState().presets)
     message.success('预设已删除')
   }
 
@@ -81,21 +81,17 @@ export default function PresetsDialog({ open, onClose }: PresetsDialogProps) {
     {
       title: '操作',
       key: 'action',
-      width: 120,
+      width: 72,
       render: (_, record) => (
         <Space size={4}>
-          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)}>
-            编辑
-          </Button>
+          <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)} title="编辑" />
           <Popconfirm
             title="确定删除此预设?"
             onConfirm={() => handleDelete(record.id)}
             okText="确定"
             cancelText="取消"
           >
-            <Button type="link" size="small" danger icon={<DeleteOutlined />}>
-              删除
-            </Button>
+            <Button type="link" size="small" danger icon={<DeleteOutlined />} title="删除" />
           </Popconfirm>
         </Space>
       ),

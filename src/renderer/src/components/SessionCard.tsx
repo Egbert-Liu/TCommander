@@ -1,9 +1,8 @@
-import { useEffect, useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { Tag, Button, Input, Space, Popconfirm, Select, Popover, Checkbox } from 'antd'
 import { ExpandOutlined, DeleteFilled, SendOutlined, CheckCircleFilled, CloseCircleFilled, CodeFilled, PlayCircleFilled, EditFilled, StopFilled, EnterOutlined, ArrowUpOutlined, ArrowDownOutlined, SettingOutlined } from '@ant-design/icons'
 import { Session } from '../types'
 import { useAppStore } from '../store'
-import { stripAnsi } from '../utils/statusDetector'
 
 interface SessionCardProps {
   session: Session
@@ -40,49 +39,17 @@ export default function SessionCard({ session }: SessionCardProps) {
   const quickActions = useAppStore((s) => s.quickActions)
   const setQuickActions = useAppStore((s) => s.setQuickActions)
 
-  const [preview, setPreview] = useState('')
   const [input, setInput] = useState('')
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState(session.name)
   const [previewHover, setPreviewHover] = useState(false)
   const nameInputRef = useRef<any>(null)
 
-  useEffect(() => {
-    const handleOutput = (sessionId: string, data: string) => {
-      if (sessionId === session.id) {
-        setPreview(prev => {
-          const newPreview = prev + data
-          const lines = newPreview.split('\n')
-          return lines.slice(-previewLineCount).join('\n')
-        })
-        const currentState = useAppStore.getState()
-        const currentSession = currentState.sessions.find(s => s.id === session.id)
-        currentState.updateSession(session.id, {
-          history: [...(currentSession?.history || []), data],
-          lastActivityAt: Date.now()
-        })
-      }
-    }
-
-    const handleExit = (sessionId: string, _exitCode: number) => {
-      if (sessionId === session.id) {
-        useAppStore.getState().updateSession(session.id, { status: 'error' })
-      }
-    }
-
-    window.electronAPI.onSessionOutput(handleOutput)
-    window.electronAPI.onSessionExit(handleExit)
-
-    return () => {
-      window.electronAPI.removeAllListeners()
-    }
-  }, [session.id])
-
-  useEffect(() => {
-    if (editingName && nameInputRef.current) {
-      nameInputRef.current.focus()
-    }
-  }, [editingName])
+  const preview = useMemo(() => {
+    if (!session.previewText) return '等待输出...'
+    const lines = session.previewText.split('\n')
+    return lines.slice(-previewLineCount).join('\n')
+  }, [session.previewText, previewLineCount])
 
   const handleSendInput = async () => {
     if (input.trim()) {
@@ -148,6 +115,7 @@ export default function SessionCard({ session }: SessionCardProps) {
 
   const statusCfg = STATUS_CONFIG[session.status] || STATUS_CONFIG.idle
   const sessionGroup = groups.find(g => g.id === session.groupId)
+  const statusClass = statusCfg.glow ? `card-status-${session.status}` : ''
 
   const settingsContent = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 120 }}>
@@ -166,23 +134,23 @@ export default function SessionCard({ session }: SessionCardProps) {
 
   return (
     <div
-      className="rounded-xl overflow-hidden flex flex-col"
+      className={`rounded-xl overflow-hidden flex flex-col ${statusClass}`}
       style={{
         background: 'var(--bg-card)',
         border: '1px solid var(--border-color)',
         backdropFilter: 'blur(12px)',
         transition: 'all 0.25s ease',
-        ...(statusCfg.glow ? { boxShadow: `0 0 24px ${statusCfg.bg}, inset 0 1px 0 ${statusCfg.color}15`, borderColor: `${statusCfg.color}25` } : {})
       }}
       onMouseEnter={(e) => {
+        e.currentTarget.style.animationPlayState = 'paused'
         e.currentTarget.style.borderColor = 'var(--border-hover)'
         e.currentTarget.style.transform = 'translateY(-2px)'
-        e.currentTarget.style.boxShadow = `0 8px 24px rgba(0,0,0,0.3)${statusCfg.glow ? `, 0 0 20px ${statusCfg.bg}` : ''}`
+        e.currentTarget.style.boxShadow = `0 8px 24px rgba(0,0,0,0.3)`
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = statusCfg.glow ? `${statusCfg.color}25` : 'var(--border-color)'
+        e.currentTarget.style.animationPlayState = 'running'
         e.currentTarget.style.transform = 'translateY(0)'
-        e.currentTarget.style.boxShadow = statusCfg.glow ? `0 0 24px ${statusCfg.bg}` : 'none'
+        e.currentTarget.style.boxShadow = 'none'
       }}
     >
       <div
@@ -249,14 +217,16 @@ export default function SessionCard({ session }: SessionCardProps) {
             color={statusCfg.color}
             style={{
               margin: 0,
-              fontSize: 9,
+              fontSize: statusCfg.glow ? 10 : 9,
               lineHeight: '16px',
               background: statusCfg.bg,
-              border: 'none',
+              border: statusCfg.glow ? `1px solid ${statusCfg.color}40` : 'none',
               fontFamily: "'JetBrains Mono', monospace",
               padding: '0 4px',
               borderRadius: 3,
               flexShrink: 0,
+              fontWeight: statusCfg.glow ? 600 : 400,
+              letterSpacing: '-0.01em',
             }}
           >
             {statusCfg.label}
@@ -304,7 +274,7 @@ export default function SessionCard({ session }: SessionCardProps) {
         style={{
           height: previewLineCount * 16,
           minHeight: 48,
-          background: previewHover ? 'var(--terminal-bg-hover, rgba(13,17,23,0.95))' : 'var(--terminal-bg)',
+          background: previewHover ? 'rgba(13,17,23,0.95)' : 'var(--terminal-bg)',
           fontFamily: "'JetBrains Mono', monospace",
           fontSize: 10,
           lineHeight: 1.6,
@@ -316,101 +286,36 @@ export default function SessionCard({ session }: SessionCardProps) {
         onMouseEnter={() => setPreviewHover(true)}
         onMouseLeave={() => setPreviewHover(false)}
       >
-        <pre className="whitespace-pre-wrap m-0">{stripAnsi(preview) || '等待输出...'}</pre>
+        <pre className="whitespace-pre-wrap m-0">{preview || '等待输出...'}</pre>
       </div>
 
       <div className="px-2.5 py-1.5 flex items-center gap-1" style={{ borderTop: '1px solid var(--border-color)' }}>
         {quickActions.includes('Y') && (
-          <Button
-            size="small"
-            type="primary"
-            onClick={handleQuickConfirm}
-            style={{ fontSize: 10, minWidth: 28, height: 22, padding: '0 6px' }}
-          >
-            Y
-          </Button>
+          <Button size="small" type="primary" onClick={handleQuickConfirm} style={{ fontSize: 10, minWidth: 28, height: 22, padding: '0 6px' }}>Y</Button>
         )}
         {quickActions.includes('N') && (
-          <Button
-            size="small"
-            danger
-            onClick={handleQuickDeny}
-            style={{ fontSize: 10, minWidth: 28, height: 22, padding: '0 6px' }}
-          >
-            N
-          </Button>
+          <Button size="small" danger onClick={handleQuickDeny} style={{ fontSize: 10, minWidth: 28, height: 22, padding: '0 6px' }}>N</Button>
         )}
         {quickActions.includes('CtrlC') && (
-          <Button
-            size="small"
-            onClick={handleCtrlC}
-            icon={<StopFilled style={{ fontSize: 9 }} />}
-            style={{ fontSize: 10, minWidth: 28, height: 22, padding: '0 6px' }}
-            title="Ctrl+C"
-          >
-            C-c
-          </Button>
+          <Button size="small" onClick={handleCtrlC} icon={<StopFilled style={{ fontSize: 9 }} />} style={{ fontSize: 10, minWidth: 28, height: 22, padding: '0 6px' }} title="Ctrl+C">C-c</Button>
         )}
         {quickActions.includes('Up') && (
-          <Button
-            size="small"
-            onClick={handleArrowUp}
-            icon={<ArrowUpOutlined style={{ fontSize: 9 }} />}
-            style={{ fontSize: 10, minWidth: 28, height: 22, padding: '0 6px' }}
-            title="上箭头"
-          />
+          <Button size="small" onClick={handleArrowUp} icon={<ArrowUpOutlined style={{ fontSize: 9 }} />} style={{ fontSize: 10, minWidth: 28, height: 22, padding: '0 6px' }} title="上箭头" />
         )}
         {quickActions.includes('Down') && (
-          <Button
-            size="small"
-            onClick={handleArrowDown}
-            icon={<ArrowDownOutlined style={{ fontSize: 9 }} />}
-            style={{ fontSize: 10, minWidth: 28, height: 22, padding: '0 6px' }}
-            title="下箭头"
-          />
+          <Button size="small" onClick={handleArrowDown} icon={<ArrowDownOutlined style={{ fontSize: 9 }} />} style={{ fontSize: 10, minWidth: 28, height: 22, padding: '0 6px' }} title="下箭头" />
         )}
         {quickActions.includes('Input') && (
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onPressEnter={handleSendInput}
-            placeholder="输入..."
-            size="small"
-            style={{ flex: 1, fontSize: 10, height: 22 }}
-          />
+          <Input value={input} onChange={(e) => setInput(e.target.value)} onPressEnter={handleSendInput} placeholder="输入..." size="small" style={{ flex: 1, fontSize: 10, height: 22 }} />
         )}
         {quickActions.includes('Send') && (
-          <Button
-            type="primary"
-            icon={<SendOutlined style={{ fontSize: 9 }} />}
-            onClick={handleSendInput}
-            size="small"
-            style={{ minWidth: 24, width: 24, height: 22 }}
-            title="发送"
-          />
+          <Button type="primary" icon={<SendOutlined style={{ fontSize: 9 }} />} onClick={handleSendInput} size="small" style={{ minWidth: 24, width: 24, height: 22 }} title="发送" />
         )}
         {quickActions.includes('Enter') && (
-          <Button
-            size="small"
-            icon={<EnterOutlined style={{ fontSize: 9 }} />}
-            onClick={handleEnter}
-            style={{ minWidth: 24, width: 24, height: 22 }}
-            title="Enter"
-          />
+          <Button size="small" icon={<EnterOutlined style={{ fontSize: 9 }} />} onClick={handleEnter} style={{ minWidth: 24, width: 24, height: 22 }} title="Enter" />
         )}
-        <Popover
-          content={settingsContent}
-          title="快捷操作显示设置"
-          trigger="click"
-          placement="topRight"
-        >
-          <Button
-            type="text"
-            icon={<SettingOutlined style={{ fontSize: 10 }} />}
-            size="small"
-            style={{ minWidth: 20, width: 20, height: 22, flexShrink: 0 }}
-            title="快捷操作设置"
-          />
+        <Popover content={settingsContent} title="快捷操作显示设置" trigger="click" placement="topRight">
+          <Button type="text" icon={<SettingOutlined style={{ fontSize: 10 }} />} size="small" style={{ minWidth: 20, width: 20, height: 22, flexShrink: 0 }} title="快捷操作设置" />
         </Popover>
       </div>
     </div>

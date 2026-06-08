@@ -4,6 +4,7 @@ import os from 'os'
 interface SessionConfig {
   terminalType: 'powershell' | 'cmd' | 'bash'
   cwd?: string
+  initialCommand?: string
   cols?: number
   rows?: number
 }
@@ -12,12 +13,14 @@ interface PtySession {
   id: string
   ptyProcess: pty.IPty
   config: SessionConfig
+  destroyed: boolean
 }
 
 export function createPtyManager() {
   const sessions = new Map<string, PtySession>()
-  const outputListeners: Array<(sessionId: string, data: string) => void> = []
-  const exitListeners: Array<(sessionId: string, exitCode: number) => void> = []
+  let outputListeners: Array<(sessionId: string, data: string) => void> = []
+  let exitListeners: Array<(sessionId: string, exitCode: number) => void> = []
+  let disposed = false
 
   function getShellPath(type: string): string {
     if (os.platform() === 'win32') {
@@ -40,6 +43,8 @@ export function createPtyManager() {
   }
 
   function createSession(config: SessionConfig): string {
+    if (disposed) return ''
+
     const id = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     const shell = getShellPath(config.terminalType)
     const cwd = config.cwd || os.homedir()
@@ -56,51 +61,91 @@ export function createPtyManager() {
       }
     })
 
+    const session: PtySession = { id, ptyProcess, config, destroyed: false }
+
     ptyProcess.onData((data) => {
+      if (session.destroyed || disposed) return
       outputListeners.forEach((listener) => listener(id, data))
     })
 
     ptyProcess.onExit(({ exitCode }) => {
+      if (disposed) return
+      session.destroyed = true
       sessions.delete(id)
       exitListeners.forEach((listener) => listener(id, exitCode || 0))
     })
 
-    sessions.set(id, { id, ptyProcess, config })
+    sessions.set(id, session)
+
+    if (config.initialCommand) {
+      let sent = false
+      const sendCommand = () => {
+        if (sent || session.destroyed || disposed) return
+        sent = true
+        try {
+          ptyProcess.write(config.initialCommand! + '\r')
+        } catch {
+          // PTY 可能已被系统回收
+        }
+      }
+      const disposable = ptyProcess.onData(() => {
+        sendCommand()
+        try { disposable.dispose() } catch { /* ignore */ }
+      })
+      setTimeout(() => {
+        try { disposable.dispose() } catch { /* ignore */ }
+        sendCommand()
+      }, 2000)
+    }
+
     return id
   }
 
   function sendInput(sessionId: string, data: string): void {
+    if (disposed) return
     const session = sessions.get(sessionId)
-    if (session) {
-      session.ptyProcess.write(data)
+    if (session && !session.destroyed) {
+      try {
+        session.ptyProcess.write(data)
+      } catch {
+        // PTY 可能已被系统回收
+      }
     }
   }
 
   function closeSession(sessionId: string): void {
+    if (disposed) return
     const session = sessions.get(sessionId)
     if (session) {
+      session.destroyed = true
+      sessions.delete(sessionId)
       try {
         session.ptyProcess.kill()
-      } catch (e) {
-        console.error('Error killing session:', e)
+      } catch {
+        // PTY 可能已被系统回收
       }
-      sessions.delete(sessionId)
     }
   }
 
   function resizeSession(sessionId: string, cols: number, rows: number): void {
+    if (disposed) return
     const session = sessions.get(sessionId)
-    if (session) {
-      session.ptyProcess.resize(cols, rows)
+    if (session && !session.destroyed) {
+      try {
+        session.ptyProcess.resize(cols, rows)
+      } catch {
+        // PTY 可能已被系统回收
+      }
     }
   }
 
   function closeAllSessions(): void {
     sessions.forEach((session) => {
+      session.destroyed = true
       try {
         session.ptyProcess.kill()
-      } catch (e) {
-        console.error('Error killing session:', e)
+      } catch {
+        // PTY 可能已被系统回收
       }
     })
     sessions.clear()
@@ -114,6 +159,21 @@ export function createPtyManager() {
     exitListeners.push(listener)
   }
 
+  function dispose(): void {
+    disposed = true
+    outputListeners = []
+    exitListeners = []
+    sessions.forEach((session) => {
+      session.destroyed = true
+      try {
+        session.ptyProcess.kill()
+      } catch {
+        // PTY 可能已被系统回收
+      }
+    })
+    sessions.clear()
+  }
+
   return {
     createSession,
     sendInput,
@@ -121,6 +181,7 @@ export function createPtyManager() {
     resizeSession,
     closeAllSessions,
     onOutput,
-    onExit
+    onExit,
+    dispose,
   }
 }

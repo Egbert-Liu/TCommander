@@ -7,9 +7,8 @@ interface ElectronAPI {
   resizeSession: (sessionId: string, cols: number, rows: number) => Promise<void>
   storageGet: (key: string) => Promise<any>
   storageSet: (key: string, value: any) => Promise<void>
-  onSessionOutput: (callback: (sessionId: string, data: string) => void) => void
-  onSessionExit: (callback: (sessionId: string, exitCode: number) => void) => void
-  removeAllListeners: () => void
+  onSessionOutput: (callback: (sessionId: string, data: string) => void) => () => void
+  onSessionExit: (callback: (sessionId: string, exitCode: number) => void) => () => void
 }
 
 declare global {

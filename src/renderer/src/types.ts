@@ -6,7 +6,9 @@ export interface Session {
   groupId?: string
   terminalType: 'powershell' | 'cmd' | 'bash'
   cwd: string
+  initialCommand?: string
   history: string[]
+  previewText: string
   status: SessionStatus
   createdAt: number
   lastActivityAt: number
@@ -41,6 +43,7 @@ export interface SnapshotData {
     groupId?: string
     terminalType: string
     cwd: string
+    initialCommand?: string
     history: string[]
   }>
   groups: Group[]

@@ -1,14 +1,15 @@
-import { SearchOutlined, PlusCircleFilled, CameraFilled, SettingFilled, ThunderboltFilled, SunFilled, MoonFilled } from '@ant-design/icons'
-import { Input, Button, Dropdown, Tooltip, Select } from 'antd'
+import { SearchOutlined, PlusCircleFilled, CameraFilled, SettingFilled, ThunderboltFilled, SunFilled, MoonFilled, HistoryOutlined } from '@ant-design/icons'
+import { Input, Button, Dropdown, Tooltip, Select, message } from 'antd'
 import type { MenuProps } from 'antd'
 import { useAppStore } from '../store'
 
 interface ToolbarProps {
   onNewSession: () => void
   onOpenPresets: () => void
+  onOpenSnapshots: () => void
 }
 
-export default function Toolbar({ onNewSession, onOpenPresets }: ToolbarProps) {
+export default function Toolbar({ onNewSession, onOpenPresets, onOpenSnapshots }: ToolbarProps) {
   const searchQuery = useAppStore((s) => s.searchQuery)
   const setSearchQuery = useAppStore((s) => s.setSearchQuery)
   const previewLineCount = useAppStore((s) => s.previewLineCount)
@@ -17,10 +18,15 @@ export default function Toolbar({ onNewSession, onOpenPresets }: ToolbarProps) {
   const darkMode = useAppStore((s) => s.darkMode)
   const toggleDarkMode = useAppStore((s) => s.toggleDarkMode)
 
-  const handleSnapshot = async () => {
+  const handleSnapshot = () => {
     const sessions = useAppStore.getState().sessions
     const groups = useAppStore.getState().groups
-    
+
+    if (sessions.length === 0) {
+      message.warning('当前没有活跃会话，无法创建快照')
+      return
+    }
+
     const snapshot = {
       id: `snapshot-${Date.now()}`,
       name: `快照 ${new Date().toLocaleString()}`,
@@ -30,15 +36,16 @@ export default function Toolbar({ onNewSession, onOpenPresets }: ToolbarProps) {
           groupId: s.groupId,
           terminalType: s.terminalType,
           cwd: s.cwd,
+          initialCommand: s.initialCommand,
           history: s.history
         })),
         groups
       },
       createdAt: Date.now()
     }
-    
+
     addSnapshot(snapshot)
-    await window.electronAPI.storageSet('snapshots', [...useAppStore.getState().snapshots, snapshot])
+    message.success('快照已保存')
   }
 
   const items: MenuProps['items'] = [
@@ -53,6 +60,12 @@ export default function Toolbar({ onNewSession, onOpenPresets }: ToolbarProps) {
       icon: <CameraFilled style={{ fontSize: 12 }} />,
       label: '保存快照',
       onClick: handleSnapshot
+    },
+    {
+      key: 'restore',
+      icon: <HistoryOutlined style={{ fontSize: 12 }} />,
+      label: '从快照恢复',
+      onClick: onOpenSnapshots
     }
   ]
 

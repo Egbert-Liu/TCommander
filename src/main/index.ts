@@ -20,6 +20,10 @@ function createWindow() {
     frame: true,
   })
 
+  mainWindow.on('closed', () => {
+    mainWindow = null
+  })
+
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL)
     mainWindow.webContents.openDevTools()
@@ -28,8 +32,11 @@ function createWindow() {
   }
 }
 
+function isWindowValid(): boolean {
+  return mainWindow !== null && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()
+}
+
 app.whenReady().then(() => {
-  // 注册IPC处理器
   ipcMain.handle('create-session', (_, config) => ptyManager.createSession(config))
   ipcMain.handle('send-input', (_, sessionId, data) => ptyManager.sendInput(sessionId, data))
   ipcMain.handle('close-session', (_, sessionId) => ptyManager.closeSession(sessionId))
@@ -40,13 +47,22 @@ app.whenReady().then(() => {
   ipcMain.handle('storage-get', (_, key) => storageManager.get(key))
   ipcMain.handle('storage-set', (_, key, value) => storageManager.set(key, value))
   
-  // 转发PTY事件
   ptyManager.onOutput((sessionId, data) => {
-    mainWindow?.webContents.send('session-output', sessionId, data)
+    if (!isWindowValid()) return
+    try {
+      mainWindow!.webContents.send('session-output', sessionId, data)
+    } catch {
+      // 窗口已被销毁
+    }
   })
   
   ptyManager.onExit((sessionId, exitCode) => {
-    mainWindow?.webContents.send('session-exit', sessionId, exitCode)
+    if (!isWindowValid()) return
+    try {
+      mainWindow!.webContents.send('session-exit', sessionId, exitCode)
+    } catch {
+      // 窗口已被销毁
+    }
   })
 
   createWindow()
@@ -65,5 +81,5 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
-  ptyManager.closeAllSessions()
+  ptyManager.dispose()
 })

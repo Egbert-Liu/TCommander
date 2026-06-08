@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Modal, Form, Input, Select, Button, Space, message } from 'antd'
 import { useAppStore } from '../store'
 import { Preset } from '../types'
@@ -13,6 +13,17 @@ export default function PresetForm({ open, onClose, editingPreset }: PresetFormP
   const { addPreset, updatePreset } = useAppStore()
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
+
+  // Update form values when editingPreset changes
+  useEffect(() => {
+    if (open) {
+      if (editingPreset) {
+        form.setFieldsValue(editingPreset)
+      } else {
+        form.resetFields()
+      }
+    }
+  }, [open, editingPreset, form])
 
   const handleSubmit = async () => {
     try {
@@ -31,7 +42,6 @@ export default function PresetForm({ open, onClose, editingPreset }: PresetFormP
         message.success('预设已创建')
       }
 
-      await window.electronAPI.storageSet('presets', useAppStore.getState().presets)
       form.resetFields()
       onClose()
     } catch (error) {

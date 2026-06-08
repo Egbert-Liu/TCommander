@@ -3,7 +3,6 @@ import { Button, message } from 'antd'
 import { CompressOutlined, CodeFilled, CopyOutlined } from '@ant-design/icons'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
-import { ClipboardAddon } from '@xterm/addon-clipboard'
 import '@xterm/xterm/css/xterm.css'
 import { useAppStore } from '../store'
 
@@ -23,9 +22,10 @@ export default function FullscreenTerminal() {
     const terminal = new Terminal({
       cursorBlink: true,
       fontSize: 14,
-      lineHeight: 1.2,
+      lineHeight: 1.25,
       fontFamily: "'JetBrains Mono', Menlo, Monaco, monospace",
-      scrollback: 5000,
+      scrollback: 10000,
+      convertEol: true,
       theme: {
         background: '#0d1117',
         foreground: '#c9d1d9',
@@ -54,16 +54,11 @@ export default function FullscreenTerminal() {
 
     const fit = new FitAddon()
     terminal.loadAddon(fit)
-
-    try {
-      const clipboard = new ClipboardAddon()
-      terminal.loadAddon(clipboard)
-    } catch (e) {
-      console.warn('ClipboardAddon not available:', e)
-    }
-
     terminal.open(terminalRef.current)
-    fit.fit()
+
+    requestAnimationFrame(() => {
+      fit.fit()
+    })
 
     terminalInstance.current = terminal
     fitAddon.current = fit
@@ -92,10 +87,12 @@ export default function FullscreenTerminal() {
     terminalRef.current.addEventListener('contextmenu', handleContextMenu)
 
     const handleResize = () => {
-      fit.fit()
-      if (activeSessionId) {
-        window.electronAPI.resizeSession(activeSessionId, terminal.cols, terminal.rows)
-      }
+      requestAnimationFrame(() => {
+        fit.fit()
+        if (activeSessionId) {
+          window.electronAPI.resizeSession(activeSessionId, terminal.cols, terminal.rows)
+        }
+      })
     }
 
     window.addEventListener('resize', handleResize)
@@ -117,6 +114,8 @@ export default function FullscreenTerminal() {
       window.removeEventListener('keydown', handleKeyDown)
       terminalRef.current?.removeEventListener('contextmenu', handleContextMenu)
       terminal.dispose()
+      terminalInstance.current = null
+      fitAddon.current = null
     }
   }, [activeSessionId])
 
@@ -136,11 +135,12 @@ export default function FullscreenTerminal() {
       }
     }
 
-    window.electronAPI.onSessionOutput(handleOutput)
-    window.electronAPI.onSessionExit(handleExit)
+    const unsubOutput = window.electronAPI.onSessionOutput(handleOutput)
+    const unsubExit = window.electronAPI.onSessionExit(handleExit)
 
     return () => {
-      window.electronAPI.removeAllListeners()
+      unsubOutput()
+      unsubExit()
     }
   }, [activeSessionId])
 
@@ -159,17 +159,17 @@ export default function FullscreenTerminal() {
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col" style={{ background: '#0d1117' }}>
-      <div 
-        className="flex items-center justify-between px-4 h-10"
-        style={{ 
+      <div
+        className="flex items-center justify-between px-4 h-10 flex-shrink-0"
+        style={{
           background: '#161b22',
           borderBottom: '1px solid rgba(56, 189, 248, 0.1)'
         }}
       >
         <div className="flex items-center gap-2">
-          <CodeFilled style={{ color: 'var(--accent)', fontSize: 14 }} />
-          <span 
-            style={{ 
+          <CodeFilled style={{ color: '#58a6ff', fontSize: 14 }} />
+          <span
+            style={{
               fontFamily: "'JetBrains Mono', monospace",
               fontSize: 12,
               fontWeight: 600,
@@ -200,8 +200,8 @@ export default function FullscreenTerminal() {
           />
         </div>
       </div>
-      
-      <div ref={terminalRef} className="flex-1 overflow-hidden" style={{ padding: '4px 0' }} />
+
+      <div ref={terminalRef} className="flex-1" style={{ minHeight: 0 }} />
     </div>
   )
 }

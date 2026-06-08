@@ -1,20 +1,7 @@
 import { useState } from 'react'
-import { Menu, Popover, Tooltip } from 'antd'
-import type { MenuProps } from 'antd'
-import { AppstoreFilled, PlusCircleFilled, FolderFilled, MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons'
+import { Tooltip, Popconfirm } from 'antd'
+import { AppstoreFilled, PlusCircleFilled, FolderFilled, MenuFoldOutlined, MenuUnfoldOutlined, DeleteOutlined } from '@ant-design/icons'
 import { useAppStore } from '../store'
-
-const collapsedMenuStyles = `
-  .ant-menu-inline-collapsed .ant-menu-item {
-    padding: 0 calc(50% - 13px) !important;
-  }
-  .ant-menu-inline-collapsed .ant-menu-item .ant-menu-title-content {
-    display: none !important;
-  }
-  .ant-menu-inline-collapsed .ant-menu-item .anticon {
-    margin-inline-end: 0 !important;
-  }
-`.replace(/\n\s*/g, ' ').trim()
 
 const PRESET_COLORS = [
   '#38bdf8', '#818cf8', '#a78bfa', '#c084fc',
@@ -51,9 +38,11 @@ interface SidebarProps {
 export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   const groups = useAppStore((s) => s.groups)
   const selectedGroupId = useAppStore((s) => s.selectedGroupId)
+  const sessions = useAppStore((s) => s.sessions)
   const setSelectedGroupId = useAppStore((s) => s.setSelectedGroupId)
   const addGroup = useAppStore((s) => s.addGroup)
   const updateGroup = useAppStore((s) => s.updateGroup)
+  const removeGroup = useAppStore((s) => s.removeGroup)
   const [newGroupName, setNewGroupName] = useState('')
   const [newGroupColor, setNewGroupColor] = useState(PRESET_COLORS[0])
   const [showAddGroup, setShowAddGroup] = useState(false)
@@ -61,7 +50,7 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   const [editingName, setEditingName] = useState('')
   const [duplicateError, setDuplicateError] = useState(false)
 
-  const handleAddGroup = () => {
+  const handleAddGroup = async () => {
     const trimmed = newGroupName.trim()
     if (!trimmed) return
     if (groups.some(g => g.name === trimmed)) {
@@ -86,7 +75,7 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
     setDuplicateError(false)
   }
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editingGroupId) return
     const trimmed = editingName.trim()
     if (!trimmed) {
@@ -102,73 +91,77 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
     setDuplicateError(false)
   }
 
-  const menuItems: MenuProps['items'] = [
-    {
-      key: 'all',
-      icon: collapsed ? (
-        <Tooltip title="全部会话" placement="right">
-          <AppstoreFilled style={{ fontSize: 13 }} />
-        </Tooltip>
-      ) : (
-        <AppstoreFilled style={{ fontSize: 13 }} />
-      ),
-      label: collapsed ? '' : '全部会话',
-    },
-    ...groups.map(group => ({
-      key: group.id,
-      icon: collapsed ? (
-        <Tooltip title={group.name} placement="right">
-          <FolderFilled
-            style={{ fontSize: 13, color: group.color, filter: `drop-shadow(0 0 3px ${group.color}50)` }}
-          />
-        </Tooltip>
-      ) : (
-        <FolderFilled
-          style={{ fontSize: 13, color: group.color, filter: `drop-shadow(0 0 3px ${group.color}50)` }}
-        />
-      ),
-      label: collapsed ? '' : (
-        editingGroupId === group.id ? (
-          <input
-            value={editingName}
-            onChange={(e) => { setEditingName(e.target.value); setDuplicateError(false) }}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') setEditingGroupId(null) }}
-            onBlur={handleSaveEdit}
-            autoFocus
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              fontSize: 12,
-              background: 'var(--bg-primary)',
-              border: duplicateError ? '1px solid var(--danger)' : '1px solid var(--accent)',
-              borderRadius: 3,
-              color: 'var(--text-primary)',
-              outline: 'none',
-              width: '100%',
-              padding: '0 4px',
-              height: 20,
-              fontFamily: "'DM Sans', sans-serif"
-            }}
-          />
-        ) : (
-          <span
-            onDoubleClick={(e) => { e.stopPropagation(); handleStartEdit(group.id, group.name) }}
-            title="双击编辑名称"
-            style={{ cursor: 'text' }}
-          >
-            {group.name}
-          </span>
-        )
-      ),
-    }))
-  ]
-
-  const handleMenuClick = (e: { key: string }) => {
-    if (e.key === 'all') {
-      setSelectedGroupId(null)
-    } else {
-      setSelectedGroupId(e.key)
-    }
+  const handleSelectItem = (groupId: string | null) => {
+    setSelectedGroupId(groupId)
   }
+
+  const renderCollapsedItem = (icon: React.ReactNode, label: string, groupId: string | null, isActive: boolean) => (
+    <Tooltip title={label} placement="right" mouseEnterDelay={0.1} mouseLeaveDelay={0.05}>
+      <button
+        onClick={() => handleSelectItem(groupId)}
+        className="w-full flex items-center justify-center"
+        style={{
+          height: 36,
+          borderRadius: 6,
+          background: isActive ? 'var(--accent-dim)' : 'transparent',
+          color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
+          border: 'none',
+          cursor: 'pointer',
+          transition: 'all 0.15s ease',
+          fontSize: 15,
+        }}
+        onMouseEnter={(e) => {
+          if (!isActive) {
+            e.currentTarget.style.background = 'var(--accent-dim)'
+            e.currentTarget.style.color = 'var(--accent)'
+          }
+        }}
+        onMouseLeave={(e) => {
+          if (!isActive) {
+            e.currentTarget.style.background = 'transparent'
+            e.currentTarget.style.color = 'var(--text-secondary)'
+          }
+        }}
+      >
+        {icon}
+      </button>
+    </Tooltip>
+  )
+
+  const renderExpandedItem = (icon: React.ReactNode, label: React.ReactNode, groupId: string | null, isActive: boolean) => (
+    <button
+      onClick={() => handleSelectItem(groupId)}
+      className="w-full flex items-center gap-2.5"
+      style={{
+        height: 32,
+        borderRadius: 6,
+        padding: '0 10px',
+        background: isActive ? 'var(--accent-dim)' : 'transparent',
+        color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
+        border: 'none',
+        cursor: 'pointer',
+        transition: 'all 0.15s ease',
+        fontSize: 13,
+        textAlign: 'left',
+        width: '100%',
+      }}
+      onMouseEnter={(e) => {
+        if (!isActive) {
+          e.currentTarget.style.background = 'var(--accent-dim)'
+          e.currentTarget.style.color = 'var(--accent)'
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!isActive) {
+          e.currentTarget.style.background = 'transparent'
+          e.currentTarget.style.color = 'var(--text-secondary)'
+        }
+      }}
+    >
+      <span style={{ fontSize: 14, display: 'flex', alignItems: 'center' }}>{icon}</span>
+      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+    </button>
+  )
 
   return (
     <div
@@ -178,136 +171,287 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
         minWidth: collapsed ? 52 : 208,
         maxWidth: collapsed ? 52 : 208,
         borderRight: '1px solid var(--border-color)',
-        background: 'var(--bg-secondary)'
+        background: 'var(--bg-secondary)',
       }}
     >
-      <style>{collapsedMenuStyles}</style>
-
       <div
-        className="flex items-center justify-between px-3 h-9"
+        className="flex items-center justify-between px-2 h-10 flex-shrink-0"
         style={{ borderBottom: '1px solid var(--border-color)' }}
       >
         {!collapsed && (
-          <span
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-              color: 'var(--text-muted)',
-              fontFamily: "'JetBrains Mono', monospace"
-            }}
-          >
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', fontFamily: "'JetBrains Mono', monospace", letterSpacing: '0.5px' }}>
             分组
           </span>
         )}
         <button
           onClick={onToggleCollapse}
-          className="flex items-center justify-center w-6 h-6 rounded-md transition-colors"
+          className="flex items-center justify-center"
           style={{
+            width: 28,
+            height: 28,
+            borderRadius: 4,
             background: 'transparent',
             border: 'none',
             color: 'var(--text-muted)',
             cursor: 'pointer',
             marginLeft: collapsed ? 'auto' : undefined,
             marginRight: collapsed ? 'auto' : undefined,
+            fontSize: 14,
+            transition: 'all 0.15s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = 'var(--accent)'
+            e.currentTarget.style.background = 'var(--accent-dim)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = 'var(--text-muted)'
+            e.currentTarget.style.background = 'transparent'
           }}
         >
-          {collapsed ? <MenuUnfoldOutlined style={{ fontSize: 13 }} /> : <MenuFoldOutlined style={{ fontSize: 13 }} />}
+          {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
         </button>
       </div>
 
-      <div className="flex-1 overflow-hidden">
-        <Menu
-          mode="inline"
-          selectedKeys={selectedGroupId ? [selectedGroupId] : ['all']}
-          onClick={handleMenuClick}
-          className="border-r-0 bg-transparent"
-          items={menuItems}
-          inlineCollapsed={collapsed}
-          style={{ overflow: 'hidden' }}
-        />
+      <div className="flex-1 overflow-y-auto overflow-x-hidden py-1" style={{ padding: collapsed ? '4px 6px' : '4px 8px' }}>
+        {collapsed ? (
+          <div className="flex flex-col gap-1">
+            {renderCollapsedItem(
+              <AppstoreFilled />,
+              '全部会话',
+              null,
+              !selectedGroupId
+            )}
+            {groups.map(group => (
+              renderCollapsedItem(
+                <FolderFilled style={{ color: group.color, filter: `drop-shadow(0 0 3px ${group.color}50)` }} />,
+                group.name,
+                group.id,
+                selectedGroupId === group.id
+              )
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-0.5">
+            {renderExpandedItem(
+              <AppstoreFilled />,
+              '全部会话',
+              null,
+              !selectedGroupId
+            )}
+            {groups.map(group => (
+              <div key={group.id}>
+                {editingGroupId === group.id ? (
+                  <div className="flex items-center gap-1" style={{ padding: '0 10px', height: 32 }}>
+                    <FolderFilled style={{ fontSize: 14, color: group.color, flexShrink: 0 }} />
+                    <input
+                      value={editingName}
+                      onChange={(e) => { setEditingName(e.target.value); setDuplicateError(false) }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') setEditingGroupId(null) }}
+                      onBlur={handleSaveEdit}
+                      autoFocus
+                      style={{
+                        fontSize: 12,
+                        background: 'var(--bg-primary)',
+                        border: duplicateError ? '1px solid var(--danger)' : '1px solid var(--accent)',
+                        borderRadius: 3,
+                        color: 'var(--text-primary)',
+                        outline: 'none',
+                        width: '100%',
+                        padding: '0 4px',
+                        height: 22,
+                        fontFamily: "'DM Sans', sans-serif",
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex items-center group">
+                    <div className="flex-1 min-w-0">
+                      {renderExpandedItem(
+                        <FolderFilled style={{ color: group.color, filter: `drop-shadow(0 0 3px ${group.color}50)` }} />,
+                        <span
+                          onDoubleClick={(e) => { e.stopPropagation(); handleStartEdit(group.id, group.name) }}
+                          title="双击编辑名称"
+                          style={{ cursor: 'text', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                        >
+                          {group.name}
+                          <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 400 }}>
+                            {sessions.filter(s => s.groupId === group.id).length}
+                          </span>
+                        </span>,
+                        group.id,
+                        selectedGroupId === group.id
+                      )}
+                    </div>
+                    <Popconfirm
+                      title="删除分组"
+                      description="会话将移至未分组状态"
+                      onConfirm={() => removeGroup(group.id)}
+                      okText="删除"
+                      cancelText="取消"
+                      okButtonProps={{ danger: true, size: 'small' }}
+                      cancelButtonProps={{ size: 'small' }}
+                    >
+                      <button
+                        className="opacity-0 group-hover:opacity-100"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          width: 22,
+                          height: 22,
+                          borderRadius: 3,
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--text-muted)',
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 10,
+                          transition: 'opacity 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.color = 'var(--danger)'
+                          e.currentTarget.style.background = 'rgba(248,113,113,0.1)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.color = 'var(--text-muted)'
+                          e.currentTarget.style.background = 'transparent'
+                        }}
+                      >
+                        <DeleteOutlined />
+                      </button>
+                    </Popconfirm>
+                  </div>
+                )}
+              </div>
+            ))}
+            {duplicateError && (
+              <div style={{ color: 'var(--danger)', fontSize: 10, padding: '0 10px', marginTop: 2 }}>
+                分组名称已存在
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {!collapsed && (
-        <div className="p-3" style={{ borderTop: '1px solid var(--border-color)' }}>
+        <div className="flex-shrink-0" style={{ padding: '8px', borderTop: '1px solid var(--border-color)' }}>
           {showAddGroup ? (
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <input
-                type="text"
                 value={newGroupName}
                 onChange={(e) => { setNewGroupName(e.target.value); setDuplicateError(false) }}
-                onKeyDown={(e) => e.key === 'Enter' && handleAddGroup()}
                 placeholder="分组名称"
+                onKeyDown={(e) => { if (e.key === 'Enter') handleAddGroup(); if (e.key === 'Escape') setShowAddGroup(false) }}
                 autoFocus
-                className="w-full px-2.5 py-1.5 text-xs rounded-md"
                 style={{
+                  fontSize: 12,
                   background: 'var(--bg-primary)',
                   border: duplicateError ? '1px solid var(--danger)' : '1px solid var(--border-color)',
+                  borderRadius: 4,
                   color: 'var(--text-primary)',
                   outline: 'none',
-                  fontFamily: "'DM Sans', sans-serif"
+                  width: '100%',
+                  padding: '4px 8px',
+                  height: 28,
+                  fontFamily: "'DM Sans', sans-serif",
                 }}
               />
-              {duplicateError && (
-                <span style={{ fontSize: 10, color: 'var(--danger)' }}>该分组名称已存在</span>
-              )}
-              <div className="flex items-center gap-2">
-                <Popover
-                  content={<ColorPicker value={newGroupColor} onChange={setNewGroupColor} />}
-                  trigger="click"
-                  placement="rightTop"
+              <ColorPicker value={newGroupColor} onChange={setNewGroupColor} />
+              <div className="flex gap-1">
+                <button
+                  onClick={handleAddGroup}
+                  style={{
+                    flex: 1,
+                    height: 26,
+                    borderRadius: 4,
+                    background: 'var(--accent)',
+                    color: '#0a0e17',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: 11,
+                    fontWeight: 600,
+                  }}
                 >
-                  <button
-                    className="w-6 h-6 rounded-full flex-shrink-0"
-                    style={{
-                      backgroundColor: newGroupColor,
-                      border: '2px solid rgba(255,255,255,0.15)',
-                      boxShadow: `0 0 8px ${newGroupColor}40`
-                    }}
-                  />
-                </Popover>
-                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>选择颜色</span>
-              </div>
-              <div className="flex gap-1.5">
+                  确定
+                </button>
                 <button
                   onClick={() => { setShowAddGroup(false); setDuplicateError(false) }}
-                  className="flex-1 px-2 py-1.5 text-xs rounded-md"
                   style={{
+                    flex: 1,
+                    height: 26,
+                    borderRadius: 4,
                     background: 'transparent',
+                    color: 'var(--text-muted)',
                     border: '1px solid var(--border-color)',
-                    color: 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    fontSize: 11,
                   }}
                 >
                   取消
                 </button>
-                <button
-                  onClick={handleAddGroup}
-                  className="flex-1 px-2 py-1.5 text-xs rounded-md font-medium"
-                  style={{
-                    background: 'var(--accent)',
-                    border: 'none',
-                    color: '#0a0e17',
-                  }}
-                >
-                  添加
-                </button>
               </div>
+              {duplicateError && (
+                <div style={{ color: 'var(--danger)', fontSize: 10 }}>分组名称已存在</div>
+              )}
             </div>
           ) : (
             <button
               onClick={() => setShowAddGroup(true)}
-              className="w-full flex items-center gap-2 px-2 py-1.5 text-xs rounded-md transition-colors"
+              className="w-full flex items-center justify-center gap-1.5"
               style={{
-                background: 'transparent',
+                height: 28,
+                borderRadius: 4,
+                background: 'var(--accent-dim)',
                 border: '1px dashed var(--border-color)',
-                color: 'var(--text-muted)',
+                color: 'var(--accent)',
+                cursor: 'pointer',
+                fontSize: 11,
+                fontWeight: 500,
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--accent-glow)'
+                e.currentTarget.style.borderColor = 'var(--accent)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'var(--accent-dim)'
+                e.currentTarget.style.borderColor = 'var(--border-color)'
               }}
             >
-              <PlusCircleFilled style={{ fontSize: 12, color: 'var(--accent)' }} />
-              添加分组
+              <PlusCircleFilled style={{ fontSize: 11 }} />
+              新建分组
             </button>
           )}
+        </div>
+      )}
+
+      {collapsed && (
+        <div className="flex-shrink-0 flex justify-center py-2">
+          <Tooltip title="新建分组" placement="right" mouseEnterDelay={0.1}>
+            <button
+              onClick={() => {
+                // Expand sidebar first, then show add group form
+                onToggleCollapse()
+                setTimeout(() => setShowAddGroup(true), 250)
+              }}
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 4,
+                background: 'var(--accent-dim)',
+                border: '1px dashed var(--border-color)',
+                color: 'var(--accent)',
+                cursor: 'pointer',
+                fontSize: 12,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <PlusCircleFilled />
+            </button>
+          </Tooltip>
         </div>
       )}
     </div>

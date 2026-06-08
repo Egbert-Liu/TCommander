@@ -25,8 +25,14 @@ export default function NewSessionDialog({ open, onClose }: NewSessionDialogProp
       
       const sessionId = await window.electronAPI.createSession({
         terminalType: values.terminalType,
-        cwd: values.cwd || undefined
+        cwd: values.cwd || undefined,
+        initialCommand: values.initialCommand || undefined
       })
+
+      if (!sessionId) {
+        message.error('创建会话失败，请重试')
+        return
+      }
 
       const session = {
         id: sessionId,
@@ -34,7 +40,9 @@ export default function NewSessionDialog({ open, onClose }: NewSessionDialogProp
         groupId: values.groupId,
         terminalType: values.terminalType,
         cwd: values.cwd || '~',
+        initialCommand: values.initialCommand || undefined,
         history: [],
+        previewText: '',
         status: 'idle' as const,
         createdAt: Date.now(),
         lastActivityAt: Date.now()
@@ -42,7 +50,6 @@ export default function NewSessionDialog({ open, onClose }: NewSessionDialogProp
 
       addSession(session)
 
-      // 如果勾选了保存为预设
       if (saveAsPreset) {
         const name = presetName.trim() || values.name
         const preset = {
@@ -54,14 +61,7 @@ export default function NewSessionDialog({ open, onClose }: NewSessionDialogProp
           groupId: values.groupId || undefined
         }
         addPreset(preset)
-        await window.electronAPI.storageSet('presets', useAppStore.getState().presets)
         message.success(`预设"${name}"已保存`)
-      }
-
-      if (values.initialCommand) {
-        setTimeout(async () => {
-          await window.electronAPI.sendInput(sessionId, values.initialCommand + '\r')
-        }, 500)
       }
 
       form.resetFields()

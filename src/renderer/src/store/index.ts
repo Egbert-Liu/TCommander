@@ -37,6 +37,10 @@ interface AppState {
   setPreviewLineCount: (count: number) => void
   setQuickActions: (actions: string[]) => void
   toggleDarkMode: () => void
+  setDarkMode: (dark: boolean) => void
+  setPresets: (presets: Preset[]) => void
+  setGroups: (groups: Group[]) => void
+  setSnapshots: (snapshots: Snapshot[]) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -67,41 +71,63 @@ export const useAppStore = create<AppState>((set) => ({
   
   setActiveSession: (id) => set({ activeSessionId: id }),
   
-  addGroup: (group) => set((state) => ({
-    groups: [...state.groups, group]
-  })),
+  addGroup: (group) => set((state) => {
+    const groups = [...state.groups, group]
+    window.electronAPI?.storageSet('groups', groups)
+    return { groups }
+  }),
   
-  updateGroup: (id, updates) => set((state) => ({
-    groups: state.groups.map(g => g.id === id ? { ...g, ...updates } : g)
-  })),
+  updateGroup: (id, updates) => set((state) => {
+    const groups = state.groups.map(g => g.id === id ? { ...g, ...updates } : g)
+    window.electronAPI?.storageSet('groups', groups)
+    return { groups }
+  }),
   
-  removeGroup: (id) => set((state) => ({
-    groups: state.groups.filter(g => g.id !== id)
-  })),
+  removeGroup: (id) => set((state) => {
+    const groups = state.groups.filter(g => g.id !== id)
+    window.electronAPI?.storageSet('groups', groups)
+    // Clear orphaned groupId from sessions that belonged to this group
+    const sessions = state.sessions.map(s =>
+      s.groupId === id ? { ...s, groupId: undefined } : s
+    )
+    return { groups, sessions }
+  }),
   
-  addPreset: (preset) => set((state) => ({
-    presets: [...state.presets, preset]
-  })),
+  addPreset: (preset) => set((state) => {
+    const presets = [...state.presets, preset]
+    window.electronAPI?.storageSet('presets', presets)
+    return { presets }
+  }),
   
-  updatePreset: (id, updates) => set((state) => ({
-    presets: state.presets.map(p => p.id === id ? { ...p, ...updates } : p)
-  })),
+  updatePreset: (id, updates) => set((state) => {
+    const presets = state.presets.map(p => p.id === id ? { ...p, ...updates } : p)
+    window.electronAPI?.storageSet('presets', presets)
+    return { presets }
+  }),
   
-  removePreset: (id) => set((state) => ({
-    presets: state.presets.filter(p => p.id !== id)
-  })),
+  removePreset: (id) => set((state) => {
+    const presets = state.presets.filter(p => p.id !== id)
+    window.electronAPI?.storageSet('presets', presets)
+    return { presets }
+  }),
   
-  addSnapshot: (snapshot) => set((state) => ({
-    snapshots: [...state.snapshots, snapshot]
-  })),
+  addSnapshot: (snapshot) => set((state) => {
+    const snapshots = [...state.snapshots, snapshot]
+    window.electronAPI?.storageSet('snapshots', snapshots)
+    return { snapshots }
+  }),
   
-  updateSnapshot: (id, updates) => set((state) => ({
-    snapshots: state.snapshots.map(s => s.id === id ? { ...s, ...updates } : s)
-  })),
+  updateSnapshot: (id, updates) => set((state) => {
+    const snapshots = state.snapshots.map(s => s.id === id ? { ...s, ...updates } : s)
+    window.electronAPI?.storageSet('snapshots', snapshots)
+    return { snapshots }
+  }),
   
-  removeSnapshot: (id) => set((state) => ({
-    snapshots: state.snapshots.filter(s => s.id !== id)
-  })),
+  removeSnapshot: (id) => set((state) => {
+    const snapshots = state.snapshots.filter(s => s.id !== id)
+    window.electronAPI?.storageSet('snapshots', snapshots)
+    return { snapshots }
+  }),
   
   setSearchQuery: (query) => set({ searchQuery: query }),
   
@@ -113,5 +139,17 @@ export const useAppStore = create<AppState>((set) => ({
   
   setQuickActions: (actions) => set({ quickActions: actions }),
   
-  toggleDarkMode: () => set((state) => ({ darkMode: !state.darkMode })),
+  toggleDarkMode: () => set((state) => {
+    const newDark = !state.darkMode
+    window.electronAPI?.storageSet('darkMode', newDark)
+    return { darkMode: newDark }
+  }),
+  
+  setDarkMode: (dark) => set({ darkMode: dark }),
+  
+  setPresets: (presets) => set({ presets }),
+  
+  setGroups: (groups) => set({ groups }),
+  
+  setSnapshots: (snapshots) => set({ snapshots }),
 }))
