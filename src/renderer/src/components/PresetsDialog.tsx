@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Modal, Table, Button, Space, Popconfirm, message } from 'antd'
-import { PlusOutlined, DeleteOutlined, EditOutlined, SettingOutlined } from '@ant-design/icons'
+import { PlusOutlined, DeleteOutlined, EditOutlined, SettingOutlined, PlayCircleOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import { useAppStore } from '../store'
 import PresetForm from './PresetForm'
@@ -14,6 +14,8 @@ interface PresetsDialogProps {
 export default function PresetsDialog({ open, onClose }: PresetsDialogProps) {
   const presets = useAppStore((s) => s.presets)
   const removePreset = useAppStore((s) => s.removePreset)
+  const addSession = useAppStore((s) => s.addSession)
+  const defaultQuickActions = useAppStore((s) => s.defaultQuickActions)
   const [showForm, setShowForm] = useState(false)
   const [editingPreset, setEditingPreset] = useState<Preset | null>(null)
 
@@ -37,6 +39,40 @@ export default function PresetsDialog({ open, onClose }: PresetsDialogProps) {
     setEditingPreset(null)
   }
 
+  const handleCreateFromPreset = async (preset: Preset) => {
+    try {
+      const sessionId = await window.electronAPI.createSession({
+        terminalType: preset.terminalType as 'powershell' | 'cmd' | 'bash',
+        cwd: preset.cwd || undefined,
+        initialCommand: preset.initialCommand || undefined
+      })
+
+      if (!sessionId) {
+        message.error('创建会话失败')
+        return
+      }
+
+      addSession({
+        id: sessionId,
+        name: preset.name,
+        groupId: preset.groupId,
+        terminalType: preset.terminalType as 'powershell' | 'cmd' | 'bash',
+        cwd: preset.cwd || '~',
+        initialCommand: preset.initialCommand || undefined,
+        history: [],
+        previewText: '',
+        status: 'idle',
+        quickActions: [...defaultQuickActions],
+        createdAt: Date.now(),
+        lastActivityAt: Date.now()
+      })
+
+      message.success(`会话"${preset.name}"已创建`)
+    } catch {
+      message.error('创建会话失败')
+    }
+  }
+
   const columns: ColumnsType<Preset> = [
     {
       title: '名称',
@@ -53,7 +89,7 @@ export default function PresetsDialog({ open, onClose }: PresetsDialogProps) {
       width: 90,
       render: (type: string) => (
         <span style={{ 
-          color: 'var(--accent)', 
+          color: 'var(--ant-color-primary)', 
           fontFamily: "'JetBrains Mono', monospace", 
           fontSize: 11 
         }}>
@@ -73,7 +109,7 @@ export default function PresetsDialog({ open, onClose }: PresetsDialogProps) {
       key: 'initialCommand',
       ellipsis: true,
       render: (cmd: string) => cmd ? (
-        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: 'var(--terminal-green)' }}>
+        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: '#a6e3a1' }}>
           {cmd}
         </span>
       ) : '-'
@@ -81,9 +117,18 @@ export default function PresetsDialog({ open, onClose }: PresetsDialogProps) {
     {
       title: '操作',
       key: 'action',
-      width: 72,
+      width: 120,
       render: (_, record) => (
         <Space size={4}>
+          <Button
+            type="primary"
+            size="small"
+            icon={<PlayCircleOutlined />}
+            onClick={() => handleCreateFromPreset(record)}
+            title="从此预设创建会话"
+          >
+            创建
+          </Button>
           <Button type="link" size="small" icon={<EditOutlined />} onClick={() => handleEdit(record)} title="编辑" />
           <Popconfirm
             title="确定删除此预设?"
@@ -103,14 +148,14 @@ export default function PresetsDialog({ open, onClose }: PresetsDialogProps) {
       <Modal
         title={
           <Space>
-            <SettingOutlined style={{ color: 'var(--accent)' }} />
+            <SettingOutlined style={{ color: 'var(--ant-color-primary)' }} />
             <span>预设管理</span>
           </Space>
         }
         open={open}
         onCancel={onClose}
         footer={null}
-        width={660}
+        width={700}
       >
         <div className="mb-3 flex justify-end">
           <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} size="small">
@@ -129,7 +174,7 @@ export default function PresetsDialog({ open, onClose }: PresetsDialogProps) {
         ) : (
           <div 
             className="text-center py-10"
-            style={{ color: 'var(--text-muted)', fontSize: 13 }}
+            style={{ color: 'var(--ant-color-text-tertiary)', fontSize: 13 }}
           >
             暂无预设，点击"新建预设"创建
           </div>

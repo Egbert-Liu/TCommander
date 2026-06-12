@@ -9,7 +9,8 @@ import FullscreenTerminal from './components/FullscreenTerminal'
 import NewSessionDialog from './components/NewSessionDialog'
 import PresetsDialog from './components/PresetsDialog'
 import SnapshotsDialog from './components/SnapshotsDialog'
-import { cleanTerminalOutput, detectStatus, truncateHistory } from './utils/statusDetector'
+import RulesDialog from './components/RulesDialog'
+import { cleanTerminalOutput, detectStatusWithRules, truncateHistory } from './utils/statusDetector'
 
 function App() {
   const sessions = useAppStore((s) => s.sessions)
@@ -21,29 +22,30 @@ function App() {
   const setGroups = useAppStore((s) => s.setGroups)
   const setSnapshots = useAppStore((s) => s.setSnapshots)
   const setDarkMode = useAppStore((s) => s.setDarkMode)
+  const setRules = useAppStore((s) => s.setRules)
 
   const [showNewSession, setShowNewSession] = useState(false)
   const [showPresets, setShowPresets] = useState(false)
   const [showSnapshots, setShowSnapshots] = useState(false)
+  const [showRules, setShowRules] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light')
-  }, [darkMode])
+  const [resetTarget, setResetTarget] = useState<import('./types').Session | null>(null)
 
   useEffect(() => {
     const loadPersistedData = async () => {
       try {
-        const [savedPresets, savedGroups, savedSnapshots, savedDarkMode] = await Promise.all([
+        const [savedPresets, savedGroups, savedSnapshots, savedDarkMode, savedRules] = await Promise.all([
           window.electronAPI.storageGet('presets'),
           window.electronAPI.storageGet('groups'),
           window.electronAPI.storageGet('snapshots'),
           window.electronAPI.storageGet('darkMode'),
+          window.electronAPI.storageGet('rules'),
         ])
         if (savedPresets && Array.isArray(savedPresets)) setPresets(savedPresets)
         if (savedGroups && Array.isArray(savedGroups)) setGroups(savedGroups)
         if (savedSnapshots && Array.isArray(savedSnapshots)) setSnapshots(savedSnapshots)
         if (typeof savedDarkMode === 'boolean') setDarkMode(savedDarkMode)
+        if (savedRules && Array.isArray(savedRules) && savedRules.length > 0) setRules(savedRules)
       } catch (e) {
         console.error('加载持久化数据失败:', e)
       }
@@ -75,12 +77,13 @@ function App() {
       const newHistory = truncateHistory(rawHistory)
       const fullRaw = newHistory.join('')
       const cleanText = cleanTerminalOutput(fullRaw)
-      const newStatus = detectStatus(fullRaw)
+      const detectResult = detectStatusWithRules(fullRaw, state.rules)
 
       state.updateSession(sessionId, {
         history: newHistory,
         previewText: cleanText,
-        status: newStatus,
+        status: detectResult.status,
+        matchedRuleName: detectResult.matchedRuleName,
         lastActivityAt: Date.now()
       })
     }
@@ -156,6 +159,47 @@ function App() {
     }
   }, [])
 
+  // ========== 修复: 进入全屏时立即 flush 当前会话的批处理数据 ==========
+  // 确保 FullscreenTerminal 的 replay 包含最新的数据，不会丢失最近 30ms 的输出
+  const isFs = useAppStore((s) => s.isFullscreen)
+  const activeId = useAppStore((s) => s.activeSessionId)
+  useEffect(() => {
+    if (isFs && activeId) {
+      // 清除当前会话的 batch timer，立即 flush
+      const timer = batchTimerRef.current[activeId]
+      if (timer) {
+        clearTimeout(timer)
+        delete batchTimerRef.current[activeId]
+      }
+      // 手动 flush 一次（复用同一逻辑）
+      const state = useAppStore.getState()
+      const session = state.sessions.find((s: any) => s.id === activeId)
+      if (session) {
+        const pending = pendingBufferRef.current[activeId]
+        const batched = batchQueueRef.current[activeId]
+        const chunks: string[] = []
+        if (pending && pending.length > 0) chunks.push(...pending)
+        if (batched && batched.length > 0) chunks.push(...batched)
+        if (chunks.length > 0) {
+          pendingBufferRef.current[activeId] = []
+          batchQueueRef.current[activeId] = []
+          const rawHistory = [...session.history, ...chunks]
+          const newHistory = truncateHistory(rawHistory)
+          const fullRaw = newHistory.join('')
+          const cleanText = cleanTerminalOutput(fullRaw)
+          const detectResult = detectStatusWithRules(fullRaw, state.rules)
+          state.updateSession(activeId, {
+            history: newHistory,
+            previewText: cleanText,
+            status: detectResult.status,
+            matchedRuleName: detectResult.matchedRuleName,
+            lastActivityAt: Date.now()
+          })
+        }
+      }
+    }
+  }, [isFs, activeId])
+
   const filteredSessions = useMemo(() => {
     const STATUS_PRIORITY: Record<string, number> = {
       'error': 0,
@@ -182,9 +226,15 @@ function App() {
       const pa = STATUS_PRIORITY[a.status] ?? 5
       const pb = STATUS_PRIORITY[b.status] ?? 5
       if (pa !== pb) return pa - pb
-      return a.createdAt - b.createdAt
+      // 使用 createdAt + id 确保排序稳定，避免相同状态卡片位置跳动
+      if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt
+      return a.id.localeCompare(b.id)
     })
   }, [sessions, searchQuery, selectedGroupId])
+
+  const handleResetSession = (oldSession: import('./types').Session) => {
+    setResetTarget(oldSession)
+  }
 
   if (isFullscreen) {
     return <FullscreenTerminal />
@@ -202,11 +252,12 @@ function App() {
         },
       }}
     >
-      <div className="h-screen flex flex-col" style={{ background: 'var(--bg-primary)' }}>
+      <div className="h-screen flex flex-col">
         <Toolbar 
           onNewSession={() => setShowNewSession(true)} 
           onOpenPresets={() => setShowPresets(true)}
           onOpenSnapshots={() => setShowSnapshots(true)}
+          onOpenRules={() => setShowRules(true)}
         />
         
         <div className="flex flex-1 overflow-hidden">
@@ -217,10 +268,10 @@ function App() {
           
           <main className="flex-1 overflow-auto p-5">
             {filteredSessions.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
                 {filteredSessions.map((session, index) => (
                   <div key={session.id} className="animate-fade-in" style={{ animationDelay: `${index * 50}ms` }}>
-                    <SessionCard session={session} />
+                    <SessionCard session={session} onResetSession={handleResetSession} />
                   </div>
                 ))}
               </div>
@@ -230,16 +281,15 @@ function App() {
                   className="w-20 h-20 rounded-2xl flex items-center justify-center"
                   style={{ 
                     background: 'linear-gradient(135deg, rgba(56,189,248,0.15) 0%, rgba(129,140,248,0.15) 100%)',
-                    border: '1px solid var(--border-color)'
                   }}
                 >
-                  <CodeFilled style={{ fontSize: 36, color: 'var(--accent)' }} />
+                  <CodeFilled style={{ fontSize: 36, color: '#38bdf8' }} />
                 </div>
                 <div className="text-center">
-                  <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 4 }}>
+                  <p style={{ color: 'var(--ant-color-text-secondary)', fontSize: 14, marginBottom: 4 }}>
                     暂无终端会话
                   </p>
-                  <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+                  <p style={{ color: 'var(--ant-color-text-tertiary)', fontSize: 12 }}>
                     创建一个新会话开始管理你的终端
                   </p>
                 </div>
@@ -255,9 +305,10 @@ function App() {
           </main>
         </div>
 
-        <NewSessionDialog 
-          open={showNewSession} 
-          onClose={() => setShowNewSession(false)} 
+        <NewSessionDialog
+          open={showNewSession || !!resetTarget}
+          onClose={() => { setShowNewSession(false); setResetTarget(null) }}
+          resetSession={resetTarget}
         />
         
         <PresetsDialog 
@@ -268,6 +319,11 @@ function App() {
         <SnapshotsDialog
           open={showSnapshots}
           onClose={() => setShowSnapshots(false)}
+        />
+
+        <RulesDialog
+          open={showRules}
+          onClose={() => setShowRules(false)}
         />
       </div>
     </ConfigProvider>

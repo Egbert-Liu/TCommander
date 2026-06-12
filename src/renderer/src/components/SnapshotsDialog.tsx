@@ -11,6 +11,7 @@ export default function SnapshotsDialog({ open, onClose }: SnapshotsDialogProps)
   const snapshots = useAppStore((s) => s.snapshots)
   const removeSnapshot = useAppStore((s) => s.removeSnapshot)
   const setGroups = useAppStore((s) => s.setGroups)
+  const defaultQuickActions = useAppStore((s) => s.defaultQuickActions)
 
   const handleRestore = async (snapshotId: string) => {
     const snapshot = snapshots.find(s => s.id === snapshotId)
@@ -41,6 +42,7 @@ export default function SnapshotsDialog({ open, onClose }: SnapshotsDialogProps)
           history: [],
           previewText: '',
           status: 'idle',
+          quickActions: [...defaultQuickActions],
           createdAt: Date.now(),
           lastActivityAt: Date.now(),
         })
@@ -62,7 +64,7 @@ export default function SnapshotsDialog({ open, onClose }: SnapshotsDialogProps)
     <Modal
       title={
         <span style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 14 }}>
-          <HistoryOutlined style={{ marginRight: 8, color: 'var(--accent)' }} />
+          <HistoryOutlined style={{ marginRight: 8, color: 'var(--ant-color-primary)' }} />
           快照管理
         </span>
       }
@@ -72,7 +74,7 @@ export default function SnapshotsDialog({ open, onClose }: SnapshotsDialogProps)
       width={520}
     >
       {snapshots.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)' }}>
+        <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--ant-color-text-tertiary)' }}>
           <HistoryOutlined style={{ fontSize: 32, marginBottom: 8, display: 'block' }} />
           暂无快照，点击工具栏"保存快照"创建
         </div>
@@ -83,17 +85,17 @@ export default function SnapshotsDialog({ open, onClose }: SnapshotsDialogProps)
               key={snapshot.id}
               style={{
                 padding: '10px 12px',
-                borderBottom: '1px solid var(--border-color)',
+                borderBottom: '1px solid var(--ant-color-border)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
               }}
             >
               <div>
-                <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--text-primary)' }}>
+                <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--ant-color-text)' }}>
                   {snapshot.name}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: 'var(--ant-color-text-tertiary)', marginTop: 2 }}>
                   {snapshot.data.sessions.length} 个会话 · {snapshot.data.groups.length} 个分组
                 </div>
               </div>

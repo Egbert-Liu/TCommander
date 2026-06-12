@@ -51,8 +51,8 @@ export function createPtyManager() {
     
     const ptyProcess = pty.spawn(shell, [], {
       name: 'xterm-256color',
-      cols: config.cols || 80,
-      rows: config.rows || 24,
+      cols: config.cols || 160,
+      rows: config.rows || 40,
       cwd,
       env: {
         ...process.env,

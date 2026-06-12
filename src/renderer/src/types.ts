@@ -1,5 +1,19 @@
 export type SessionStatus = 'idle' | 'needs-input' | 'needs-confirm' | 'error' | 'running'
 
+export type TriggerType = 'contains' | 'equals' | 'regex' | 'startsWith' | 'endsWith'
+
+export interface TriggerRule {
+  id: string
+  name: string
+  triggerType: TriggerType
+  pattern: string
+  status: SessionStatus
+  enabled: boolean
+  isSystem: boolean
+  caseSensitive: boolean
+  description?: string
+}
+
 export interface Session {
   id: string
   name: string
@@ -10,6 +24,8 @@ export interface Session {
   history: string[]
   previewText: string
   status: SessionStatus
+  matchedRuleName?: string
+  quickActions: string[]
   createdAt: number
   lastActivityAt: number
 }

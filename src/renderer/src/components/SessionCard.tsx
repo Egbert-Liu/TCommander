@@ -1,11 +1,12 @@
 import { useState, useRef, useMemo } from 'react'
-import { Tag, Button, Input, Space, Popconfirm, Select, Popover, Checkbox } from 'antd'
-import { ExpandOutlined, DeleteFilled, SendOutlined, CheckCircleFilled, CloseCircleFilled, CodeFilled, PlayCircleFilled, EditFilled, StopFilled, EnterOutlined, ArrowUpOutlined, ArrowDownOutlined, SettingOutlined } from '@ant-design/icons'
+import { Tag, Button, Input, Space, Popconfirm, Select, Popover, Checkbox, Tooltip } from 'antd'
+import { ExpandOutlined, DeleteFilled, SendOutlined, CheckCircleFilled, CloseCircleFilled, CodeFilled, PlayCircleFilled, EditFilled, StopFilled, EnterOutlined, ArrowUpOutlined, ArrowDownOutlined, SettingOutlined, ReloadOutlined, SafetyCertificateFilled } from '@ant-design/icons'
 import { Session } from '../types'
 import { useAppStore } from '../store'
 
 interface SessionCardProps {
   session: Session
+  onResetSession?: (session: Session) => void
 }
 
 const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string; glow: boolean; icon: React.ReactNode }> = {
@@ -29,21 +30,21 @@ const ACTION_LABELS: Record<string, string> = {
   'Enter': 'Enter',
 }
 
-export default function SessionCard({ session }: SessionCardProps) {
+export default function SessionCard({ session, onResetSession }: SessionCardProps) {
   const removeSession = useAppStore((s) => s.removeSession)
   const updateSession = useAppStore((s) => s.updateSession)
   const setActiveSession = useAppStore((s) => s.setActiveSession)
   const setIsFullscreen = useAppStore((s) => s.setIsFullscreen)
   const groups = useAppStore((s) => s.groups)
   const previewLineCount = useAppStore((s) => s.previewLineCount)
-  const quickActions = useAppStore((s) => s.quickActions)
-  const setQuickActions = useAppStore((s) => s.setQuickActions)
 
   const [input, setInput] = useState('')
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState(session.name)
   const [previewHover, setPreviewHover] = useState(false)
   const nameInputRef = useRef<any>(null)
+
+  const quickActions = session.quickActions
 
   const preview = useMemo(() => {
     if (!session.previewText) return '等待输出...'
@@ -106,11 +107,18 @@ export default function SessionCard({ session }: SessionCardProps) {
   }
 
   const handleToggleQuickAction = (key: string) => {
-    if (quickActions.includes(key)) {
-      setQuickActions(quickActions.filter(a => a !== key))
-    } else {
-      setQuickActions([...quickActions, key])
-    }
+    const currentActions = session.quickActions
+    const newActions = currentActions.includes(key)
+      ? currentActions.filter((a: string) => a !== key)
+      : [...currentActions, key]
+    updateSession(session.id, { quickActions: newActions })
+  }
+
+  const handleDismissStatus = () => {
+    updateSession(session.id, {
+      status: 'running',
+      matchedRuleName: undefined,
+    })
   }
 
   const statusCfg = STATUS_CONFIG[session.status] || STATUS_CONFIG.idle
@@ -118,7 +126,7 @@ export default function SessionCard({ session }: SessionCardProps) {
   const statusClass = statusCfg.glow ? `card-status-${session.status}` : ''
 
   const settingsContent = (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 120 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 140 }}>
       {ALL_QUICK_ACTIONS.map(key => (
         <Checkbox
           key={key}
@@ -136,26 +144,22 @@ export default function SessionCard({ session }: SessionCardProps) {
     <div
       className={`rounded-xl overflow-hidden flex flex-col ${statusClass}`}
       style={{
-        background: 'var(--bg-card)',
-        border: '1px solid var(--border-color)',
+        background: 'var(--ant-color-bg-container)',
+        border: '1px solid var(--ant-color-border)',
         backdropFilter: 'blur(12px)',
-        transition: 'all 0.25s ease',
+        transition: 'box-shadow 0.2s ease, border-color 0.2s ease',
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.animationPlayState = 'paused'
-        e.currentTarget.style.borderColor = 'var(--border-hover)'
-        e.currentTarget.style.transform = 'translateY(-2px)'
-        e.currentTarget.style.boxShadow = `0 8px 24px rgba(0,0,0,0.3)`
+        e.currentTarget.style.borderColor = 'var(--ant-color-primary)'
+        e.currentTarget.style.boxShadow = `0 4px 16px rgba(0,0,0,0.2)`
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.animationPlayState = 'running'
-        e.currentTarget.style.transform = 'translateY(0)'
         e.currentTarget.style.boxShadow = 'none'
       }}
     >
       <div
         className="flex items-center justify-between px-3 py-2"
-        style={{ borderBottom: '1px solid var(--border-color)' }}
+        style={{ borderBottom: '1px solid var(--ant-color-border)' }}
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <div
@@ -181,7 +185,7 @@ export default function SessionCard({ session }: SessionCardProps) {
               style={{
                 fontSize: 11,
                 fontWeight: 600,
-                color: 'var(--text-primary)',
+                color: 'var(--ant-color-text)',
                 fontFamily: "'JetBrains Mono', monospace",
                 cursor: 'text',
                 overflow: 'hidden',
@@ -232,6 +236,32 @@ export default function SessionCard({ session }: SessionCardProps) {
             {statusCfg.label}
           </Tag>
 
+          {session.matchedRuleName && statusCfg.glow && (
+            <Tooltip title={`触发规则: ${session.matchedRuleName}`}>
+              <Tag
+                style={{
+                  margin: 0,
+                  fontSize: 8,
+                  lineHeight: '14px',
+                  background: 'var(--ant-color-fill-quaternary)',
+                  border: '1px solid var(--ant-color-border)',
+                  color: 'var(--ant-color-text-tertiary)',
+                  fontFamily: "'JetBrains Mono', monospace",
+                  padding: '0 3px',
+                  borderRadius: 2,
+                  maxWidth: 120,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  cursor: 'help',
+                }}
+              >
+                <SafetyCertificateFilled style={{ fontSize: 7, marginRight: 2 }} />
+                {session.matchedRuleName}
+              </Tag>
+            </Tooltip>
+          )}
+
           <Select
             value={session.groupId || undefined}
             onChange={handleGroupChange}
@@ -269,16 +299,44 @@ export default function SessionCard({ session }: SessionCardProps) {
         </Space>
       </div>
 
+      {statusCfg.glow && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '4px 10px',
+            background: `${statusCfg.color}08`,
+            borderBottom: '1px solid var(--ant-color-border)',
+          }}
+        >
+          <span style={{ fontSize: 10, color: statusCfg.color, fontFamily: "'JetBrains Mono', monospace" }}>
+            ⚡ 触发规则: {session.matchedRuleName || statusCfg.label}
+          </span>
+          <Space size={4}>
+            <Button
+              size="small"
+              type="primary"
+              icon={<CheckCircleFilled style={{ fontSize: 9 }} />}
+              onClick={handleDismissStatus}
+              style={{ fontSize: 9, height: 20, padding: '0 6px', background: statusCfg.color, borderColor: statusCfg.color }}
+            >
+              已处理
+            </Button>
+          </Space>
+        </div>
+      )}
+
       <div
         className="overflow-auto px-2.5 py-1.5"
         style={{
           height: previewLineCount * 16,
           minHeight: 48,
-          background: previewHover ? 'rgba(13,17,23,0.95)' : 'var(--terminal-bg)',
+          background: previewHover ? 'rgba(13,17,23,0.95)' : '#1e1e2e',
           fontFamily: "'JetBrains Mono', monospace",
           fontSize: 10,
           lineHeight: 1.6,
-          color: 'var(--terminal-green)',
+          color: '#a6e3a1',
           cursor: 'pointer',
           transition: 'background 0.2s ease',
         }}
@@ -289,7 +347,7 @@ export default function SessionCard({ session }: SessionCardProps) {
         <pre className="whitespace-pre-wrap m-0">{preview || '等待输出...'}</pre>
       </div>
 
-      <div className="px-2.5 py-1.5 flex items-center gap-1" style={{ borderTop: '1px solid var(--border-color)' }}>
+      <div className="px-2.5 py-1.5 flex items-center gap-1" style={{ borderTop: '1px solid var(--ant-color-border)' }}>
         {quickActions.includes('Y') && (
           <Button size="small" type="primary" onClick={handleQuickConfirm} style={{ fontSize: 10, minWidth: 28, height: 22, padding: '0 6px' }}>Y</Button>
         )}
@@ -317,6 +375,15 @@ export default function SessionCard({ session }: SessionCardProps) {
         <Popover content={settingsContent} title="快捷操作显示设置" trigger="click" placement="topRight">
           <Button type="text" icon={<SettingOutlined style={{ fontSize: 10 }} />} size="small" style={{ minWidth: 20, width: 20, height: 22, flexShrink: 0 }} title="快捷操作设置" />
         </Popover>
+        <Tooltip title="重置会话">
+          <Button
+            type="text"
+            icon={<ReloadOutlined style={{ fontSize: 10 }} />}
+            size="small"
+            onClick={() => onResetSession?.(session)}
+            style={{ minWidth: 20, width: 20, height: 22, flexShrink: 0 }}
+          />
+        </Tooltip>
       </div>
     </div>
   )

@@ -1,4 +1,4 @@
-import { SearchOutlined, PlusCircleFilled, CameraFilled, SettingFilled, ThunderboltFilled, SunFilled, MoonFilled, HistoryOutlined } from '@ant-design/icons'
+import { SearchOutlined, PlusCircleFilled, CameraFilled, SettingFilled, ThunderboltFilled, SunFilled, MoonFilled, HistoryOutlined, SafetyCertificateFilled } from '@ant-design/icons'
 import { Input, Button, Dropdown, Tooltip, Select, message } from 'antd'
 import type { MenuProps } from 'antd'
 import { useAppStore } from '../store'
@@ -7,9 +7,10 @@ interface ToolbarProps {
   onNewSession: () => void
   onOpenPresets: () => void
   onOpenSnapshots: () => void
+  onOpenRules: () => void
 }
 
-export default function Toolbar({ onNewSession, onOpenPresets, onOpenSnapshots }: ToolbarProps) {
+export default function Toolbar({ onNewSession, onOpenPresets, onOpenSnapshots, onOpenRules }: ToolbarProps) {
   const searchQuery = useAppStore((s) => s.searchQuery)
   const setSearchQuery = useAppStore((s) => s.setSearchQuery)
   const previewLineCount = useAppStore((s) => s.previewLineCount)
@@ -66,6 +67,12 @@ export default function Toolbar({ onNewSession, onOpenPresets, onOpenSnapshots }
       icon: <HistoryOutlined style={{ fontSize: 12 }} />,
       label: '从快照恢复',
       onClick: onOpenSnapshots
+    },
+    {
+      key: 'rules',
+      icon: <SafetyCertificateFilled style={{ fontSize: 12 }} />,
+      label: '规则配置',
+      onClick: onOpenRules
     }
   ]
 
@@ -73,8 +80,8 @@ export default function Toolbar({ onNewSession, onOpenPresets, onOpenSnapshots }
     <div 
       className="h-12 px-4 flex items-center justify-between"
       style={{ 
-        borderBottom: '1px solid var(--border-color)',
-        background: 'var(--bg-secondary)'
+        borderBottom: '1px solid var(--ant-color-border)',
+        background: 'var(--ant-color-bg-container)'
       }}
     >
       <div className="flex items-center gap-2.5">
@@ -92,7 +99,7 @@ export default function Toolbar({ onNewSession, onOpenPresets, onOpenSnapshots }
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: 14,
             fontWeight: 700,
-            color: 'var(--text-primary)',
+            color: 'var(--ant-color-text)',
             letterSpacing: '-0.02em'
           }}
         >
@@ -105,7 +112,7 @@ export default function Toolbar({ onNewSession, onOpenPresets, onOpenSnapshots }
           placeholder="搜索会话..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          prefix={<SearchOutlined style={{ color: 'var(--text-muted)', fontSize: 12 }} />}
+          prefix={<SearchOutlined style={{ color: 'var(--ant-color-text-tertiary)', fontSize: 12 }} />}
           allowClear
           className="w-56"
           size="small"

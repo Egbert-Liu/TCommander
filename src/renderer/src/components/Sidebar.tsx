@@ -103,8 +103,8 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
         style={{
           height: 36,
           borderRadius: 6,
-          background: isActive ? 'var(--accent-dim)' : 'transparent',
-          color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
+          background: isActive ? 'var(--ant-color-primary-bg)' : 'transparent',
+          color: isActive ? 'var(--ant-color-primary)' : 'var(--ant-color-text-secondary)',
           border: 'none',
           cursor: 'pointer',
           transition: 'all 0.15s ease',
@@ -112,14 +112,14 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
         }}
         onMouseEnter={(e) => {
           if (!isActive) {
-            e.currentTarget.style.background = 'var(--accent-dim)'
-            e.currentTarget.style.color = 'var(--accent)'
+            e.currentTarget.style.background = 'var(--ant-color-primary-bg)'
+            e.currentTarget.style.color = 'var(--ant-color-primary)'
           }
         }}
         onMouseLeave={(e) => {
           if (!isActive) {
             e.currentTarget.style.background = 'transparent'
-            e.currentTarget.style.color = 'var(--text-secondary)'
+            e.currentTarget.style.color = 'var(--ant-color-text-secondary)'
           }
         }}
       >
@@ -136,8 +136,8 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
         height: 32,
         borderRadius: 6,
         padding: '0 10px',
-        background: isActive ? 'var(--accent-dim)' : 'transparent',
-        color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
+        background: isActive ? 'var(--ant-color-primary-bg)' : 'transparent',
+        color: isActive ? 'var(--ant-color-primary)' : 'var(--ant-color-text-secondary)',
         border: 'none',
         cursor: 'pointer',
         transition: 'all 0.15s ease',
@@ -147,14 +147,14 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
       }}
       onMouseEnter={(e) => {
         if (!isActive) {
-          e.currentTarget.style.background = 'var(--accent-dim)'
-          e.currentTarget.style.color = 'var(--accent)'
+          e.currentTarget.style.background = 'var(--ant-color-primary-bg)'
+          e.currentTarget.style.color = 'var(--ant-color-primary)'
         }
       }}
       onMouseLeave={(e) => {
         if (!isActive) {
           e.currentTarget.style.background = 'transparent'
-          e.currentTarget.style.color = 'var(--text-secondary)'
+          e.currentTarget.style.color = 'var(--ant-color-text-secondary)'
         }
       }}
     >
@@ -170,16 +170,16 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
         width: collapsed ? 52 : 208,
         minWidth: collapsed ? 52 : 208,
         maxWidth: collapsed ? 52 : 208,
-        borderRight: '1px solid var(--border-color)',
-        background: 'var(--bg-secondary)',
+        borderRight: '1px solid var(--ant-color-border)',
+        background: 'var(--ant-color-bg-container)',
       }}
     >
       <div
         className="flex items-center justify-between px-2 h-10 flex-shrink-0"
-        style={{ borderBottom: '1px solid var(--border-color)' }}
+        style={{ borderBottom: '1px solid var(--ant-color-border)' }}
       >
         {!collapsed && (
-          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', fontFamily: "'JetBrains Mono', monospace", letterSpacing: '0.5px' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ant-color-primary)', fontFamily: "'JetBrains Mono', monospace", letterSpacing: '0.5px' }}>
             分组
           </span>
         )}
@@ -192,7 +192,7 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
             borderRadius: 4,
             background: 'transparent',
             border: 'none',
-            color: 'var(--text-muted)',
+            color: 'var(--ant-color-text-tertiary)',
             cursor: 'pointer',
             marginLeft: collapsed ? 'auto' : undefined,
             marginRight: collapsed ? 'auto' : undefined,
@@ -200,11 +200,11 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
             transition: 'all 0.15s ease',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.color = 'var(--accent)'
-            e.currentTarget.style.background = 'var(--accent-dim)'
+            e.currentTarget.style.color = 'var(--ant-color-primary)'
+            e.currentTarget.style.background = 'var(--ant-color-primary-bg)'
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.color = 'var(--text-muted)'
+            e.currentTarget.style.color = 'var(--ant-color-text-tertiary)'
             e.currentTarget.style.background = 'transparent'
           }}
         >
@@ -251,10 +251,10 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                       autoFocus
                       style={{
                         fontSize: 12,
-                        background: 'var(--bg-primary)',
-                        border: duplicateError ? '1px solid var(--danger)' : '1px solid var(--accent)',
+                        background: 'var(--ant-color-bg-elevated)',
+                        border: duplicateError ? '1px solid var(--ant-color-error)' : '1px solid var(--ant-color-primary)',
                         borderRadius: 3,
-                        color: 'var(--text-primary)',
+                        color: 'var(--ant-color-text)',
                         outline: 'none',
                         width: '100%',
                         padding: '0 4px',
@@ -274,7 +274,7 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                           style={{ cursor: 'text', display: 'inline-flex', alignItems: 'center', gap: 6 }}
                         >
                           {group.name}
-                          <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 400 }}>
+                          <span style={{ fontSize: 10, color: 'var(--ant-color-text-tertiary)', fontWeight: 400 }}>
                             {sessions.filter(s => s.groupId === group.id).length}
                           </span>
                         </span>,
@@ -300,7 +300,7 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                           borderRadius: 3,
                           background: 'transparent',
                           border: 'none',
-                          color: 'var(--text-muted)',
+                          color: 'var(--ant-color-text-tertiary)',
                           cursor: 'pointer',
                           flexShrink: 0,
                           display: 'flex',
@@ -310,11 +310,11 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                           transition: 'opacity 0.15s ease',
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.color = 'var(--danger)'
-                          e.currentTarget.style.background = 'rgba(248,113,113,0.1)'
+                          e.currentTarget.style.color = 'var(--ant-color-error)'
+                          e.currentTarget.style.background = 'var(--ant-color-error-bg)'
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.color = 'var(--text-muted)'
+                          e.currentTarget.style.color = 'var(--ant-color-text-tertiary)'
                           e.currentTarget.style.background = 'transparent'
                         }}
                       >
@@ -326,7 +326,7 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
               </div>
             ))}
             {duplicateError && (
-              <div style={{ color: 'var(--danger)', fontSize: 10, padding: '0 10px', marginTop: 2 }}>
+              <div style={{ color: 'var(--ant-color-error)', fontSize: 10, padding: '0 10px', marginTop: 2 }}>
                 分组名称已存在
               </div>
             )}
@@ -335,7 +335,7 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
       </div>
 
       {!collapsed && (
-        <div className="flex-shrink-0" style={{ padding: '8px', borderTop: '1px solid var(--border-color)' }}>
+        <div className="flex-shrink-0" style={{ padding: '8px', borderTop: '1px solid var(--ant-color-border)' }}>
           {showAddGroup ? (
             <div className="flex flex-col gap-2">
               <input
@@ -346,10 +346,10 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                 autoFocus
                 style={{
                   fontSize: 12,
-                  background: 'var(--bg-primary)',
-                  border: duplicateError ? '1px solid var(--danger)' : '1px solid var(--border-color)',
+                  background: 'var(--ant-color-bg-elevated)',
+                  border: duplicateError ? '1px solid var(--ant-color-error)' : '1px solid var(--ant-color-border)',
                   borderRadius: 4,
-                  color: 'var(--text-primary)',
+                  color: 'var(--ant-color-text)',
                   outline: 'none',
                   width: '100%',
                   padding: '4px 8px',
@@ -365,8 +365,8 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                     flex: 1,
                     height: 26,
                     borderRadius: 4,
-                    background: 'var(--accent)',
-                    color: '#0a0e17',
+                    background: 'var(--ant-color-primary)',
+                    color: '#ffffff',
                     border: 'none',
                     cursor: 'pointer',
                     fontSize: 11,
@@ -382,8 +382,8 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                     height: 26,
                     borderRadius: 4,
                     background: 'transparent',
-                    color: 'var(--text-muted)',
-                    border: '1px solid var(--border-color)',
+                    color: 'var(--ant-color-text-tertiary)',
+                    border: '1px solid var(--ant-color-border)',
                     cursor: 'pointer',
                     fontSize: 11,
                   }}
@@ -392,7 +392,7 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                 </button>
               </div>
               {duplicateError && (
-                <div style={{ color: 'var(--danger)', fontSize: 10 }}>分组名称已存在</div>
+                <div style={{ color: 'var(--ant-color-error)', fontSize: 10 }}>分组名称已存在</div>
               )}
             </div>
           ) : (
@@ -402,21 +402,23 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
               style={{
                 height: 28,
                 borderRadius: 4,
-                background: 'var(--accent-dim)',
-                border: '1px dashed var(--border-color)',
-                color: 'var(--accent)',
+                background: 'var(--ant-color-primary-bg)',
+                border: '1px dashed var(--ant-color-border)',
+                color: 'var(--ant-color-primary)',
                 cursor: 'pointer',
                 fontSize: 11,
                 fontWeight: 500,
                 transition: 'all 0.15s ease',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'var(--accent-glow)'
-                e.currentTarget.style.borderColor = 'var(--accent)'
+                e.currentTarget.style.background = 'var(--ant-color-primary)'
+                e.currentTarget.style.borderColor = 'var(--ant-color-primary)'
+                e.currentTarget.style.color = '#ffffff'
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'var(--accent-dim)'
-                e.currentTarget.style.borderColor = 'var(--border-color)'
+                e.currentTarget.style.background = 'var(--ant-color-primary-bg)'
+                e.currentTarget.style.borderColor = 'var(--ant-color-border)'
+                e.currentTarget.style.color = 'var(--ant-color-primary)'
               }}
             >
               <PlusCircleFilled style={{ fontSize: 11 }} />
@@ -431,7 +433,6 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
           <Tooltip title="新建分组" placement="right" mouseEnterDelay={0.1}>
             <button
               onClick={() => {
-                // Expand sidebar first, then show add group form
                 onToggleCollapse()
                 setTimeout(() => setShowAddGroup(true), 250)
               }}
@@ -439,9 +440,9 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                 width: 32,
                 height: 32,
                 borderRadius: 4,
-                background: 'var(--accent-dim)',
-                border: '1px dashed var(--border-color)',
-                color: 'var(--accent)',
+                background: 'var(--ant-color-primary-bg)',
+                border: '1px dashed var(--ant-color-border)',
+                color: 'var(--ant-color-primary)',
                 cursor: 'pointer',
                 fontSize: 12,
                 display: 'flex',

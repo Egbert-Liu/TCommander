@@ -1,85 +1,163 @@
-import { SessionStatus } from '../types'
+import { SessionStatus, TriggerRule } from '../types'
 
-export function detectStatus(output: string): SessionStatus {
-  const cleanOutput = stripAnsi(output)
+export const DEFAULT_SYSTEM_RULES: TriggerRule[] = [
+  {
+    id: 'sys-error',
+    name: '错误检测',
+    triggerType: 'regex',
+    pattern: '(?:error|Error|ERROR)',
+    status: 'error',
+    enabled: true,
+    isSystem: true,
+    caseSensitive: false,
+    description: '检测终端输出中的错误信息',
+  },
+  {
+    id: 'sys-confirm-yn',
+    name: '确认提示 (Y/N)',
+    triggerType: 'regex',
+    pattern: '\\[y\\/n\\]|\\(y\\/n\\)|\\[yes\\/no\\]|\\(yes\\/no\\)|\\(y\\/n\\/[a-z]\\)|\\[y\\/n\\/[a-z]\\]',
+    status: 'needs-confirm',
+    enabled: true,
+    isSystem: true,
+    caseSensitive: false,
+    description: '检测 [y/n]、(yes/no) 等确认提示',
+  },
+  {
+    id: 'sys-confirm-question',
+    name: '确认提示 (Do you want)',
+    triggerType: 'regex',
+    pattern: 'do you want to|are you sure|would you like|confirm\\?|press\\s+[yYnN]\\s+to',
+    status: 'needs-confirm',
+    enabled: true,
+    isSystem: true,
+    caseSensitive: false,
+    description: '检测"是否确认"类提示',
+  },
+  {
+    id: 'sys-confirm-choice',
+    name: '选择菜单',
+    triggerType: 'regex',
+    pattern: '❯\\s*\\d+\\.|\\d+\\.\\s*(?:Yes|No|yes|no)\\b',
+    status: 'needs-confirm',
+    enabled: true,
+    isSystem: true,
+    caseSensitive: false,
+    description: '检测编号选择菜单（如 ❯ 1. Yes）',
+  },
+  {
+    id: 'sys-trust-folder',
+    name: '信任文件夹',
+    triggerType: 'regex',
+    pattern: '\\btrust\\b.*\\bfolder\\b|\\b(accept|reject)\\b',
+    status: 'needs-confirm',
+    enabled: true,
+    isSystem: true,
+    caseSensitive: false,
+    description: '检测"是否信任此文件夹"提示',
+  },
+  {
+    id: 'sys-needs-input',
+    name: '输入提示',
+    triggerType: 'regex',
+    pattern: '\\?\\s*$|:\\s*$',
+    status: 'needs-input',
+    enabled: true,
+    isSystem: true,
+    caseSensitive: false,
+    description: '检测末尾以 ? 或 : 结尾的输入提示',
+  },
+  {
+    id: 'sys-idle-prompt',
+    name: '空闲提示符',
+    triggerType: 'regex',
+    pattern: '[#>$]\\s*$',
+    status: 'idle',
+    enabled: true,
+    isSystem: true,
+    caseSensitive: false,
+    description: '检测命令行提示符（$、>、#）',
+  },
+]
+
+const STATUS_PRIORITY: Record<string, number> = {
+  'error': 0,
+  'needs-confirm': 1,
+  'needs-input': 2,
+  'running': 3,
+  'idle': 4,
+}
+
+function testRule(cleanLine: string, _rawLine: string, rule: TriggerRule): boolean {
+  const text = rule.caseSensitive ? cleanLine : cleanLine.toLowerCase()
+  const pattern = rule.caseSensitive ? rule.pattern : rule.pattern.toLowerCase()
+
+  switch (rule.triggerType) {
+    case 'contains':
+      return text.includes(pattern)
+    case 'equals':
+      return text === pattern
+    case 'startsWith':
+      return text.startsWith(pattern)
+    case 'endsWith':
+      return text.endsWith(pattern)
+    case 'regex':
+      try {
+        const flags = rule.caseSensitive ? 'g' : 'gi'
+        return new RegExp(rule.pattern, flags).test(cleanLine)
+      } catch {
+        return false
+      }
+    default:
+      return false
+  }
+}
+
+export interface DetectResult {
+  status: SessionStatus
+  matchedRuleName?: string
+}
+
+export function detectStatusWithRules(
+  rawOutput: string,
+  rules: TriggerRule[]
+): DetectResult {
+  const cleanOutput = stripAnsi(rawOutput)
   const lines = cleanOutput.split('\n').filter(l => l.trim())
+  if (lines.length === 0) return { status: 'running' }
+
   const tailLines = lines.slice(-8)
   const tailText = tailLines.join('\n')
-  const lowerTail = tailText.toLowerCase()
+  const lastLine = lines[lines.length - 1]
 
-  // Only check recent output for errors, not the entire history
-  if (/(?:error|Error|ERROR)/.test(tailText)) {
-    return 'error'
-  }
+  const activeRules = rules.filter(r => r.enabled)
 
-  if (hasConfirmationPattern(tailText, lowerTail)) {
-    return 'needs-confirm'
-  }
+  const matches: { status: SessionStatus; priority: number; ruleName: string }[] = []
 
-  if (tailText.includes('?') || tailText.includes(':')) {
-    const lastLine = lines[lines.length - 1] || ''
-    if (lastLine.includes('?') || lastLine.endsWith(':')) {
-      return 'needs-input'
+  for (const rule of activeRules) {
+    const targetText = rule.status === 'idle' ? lastLine : tailText
+    if (testRule(targetText, targetText, rule)) {
+      matches.push({
+        status: rule.status,
+        priority: STATUS_PRIORITY[rule.status] ?? 5,
+        ruleName: rule.name,
+      })
     }
   }
 
-  if (tailText.includes('$') || tailText.includes('>') || tailText.includes('#')) {
-    return 'idle'
+  if (matches.length > 0) {
+    matches.sort((a, b) => a.priority - b.priority)
+    return {
+      status: matches[0].status,
+      matchedRuleName: matches[0].ruleName,
+    }
   }
 
-  return 'running'
+  return { status: 'running' }
 }
 
-function hasConfirmationPattern(text: string, lower: string): boolean {
-  if (/❯\s*\d+\./i.test(text)) {
-    return true
-  }
-
-  if (/\d+\.\s*(?:Yes|No|yes|no)\b/.test(text)) {
-    return true
-  }
-
-  if (/\[y\/n\]/i.test(text) || /\(y\/n\)/i.test(text)) {
-    return true
-  }
-
-  if (/\[yes\/no\]/i.test(text) || /\(yes\/no\)/i.test(text)) {
-    return true
-  }
-
-  if (/\(y\/n\/[a-z]\)/i.test(text) || /\[y\/n\/[a-z]\]/i.test(text)) {
-    return true
-  }
-
-  if (/\byes\b.*\b(no|exit)\b/i.test(lower) || /\bno\b.*\b(yes|continue)\b/i.test(lower)) {
-    return true
-  }
-
-  if (/do you want to/i.test(lower) || /are you sure/i.test(lower) || /would you like/i.test(lower)) {
-    return true
-  }
-
-  if (/confirm/i.test(lower) && (/\[y\/n\]/i.test(text) || /\(y\/n\)/i.test(text) || /\(yes\/no\)/i.test(text))) {
-    return true
-  }
-
-  if (/press\s+[yYnN]\s+to/i.test(text)) {
-    return true
-  }
-
-  if (/\btrust\b.*\bfolder\b/i.test(lower)) {
-    return true
-  }
-
-  if (/\b(accept|reject)\b/i.test(text)) {
-    return true
-  }
-
-  if (/\?\s*\[y\/n\]/i.test(text) || /\?\s*\(yes\/no\)/i.test(text) || /\?\s*\(y\/n\)/i.test(text)) {
-    return true
-  }
-
-  return false
+export function detectStatus(rawOutput: string): DetectResult {
+  return detectStatusWithRules(rawOutput, DEFAULT_SYSTEM_RULES)
 }
 
 export function stripAnsi(str: string): string {
@@ -93,50 +171,62 @@ export function stripAnsi(str: string): string {
 }
 
 export function cleanTerminalOutput(raw: string): string {
-  let cleaned = stripAnsi(raw)
+  const withoutAnsi = stripAnsi(raw)
+  const outputLines: string[] = []
+  let cursorCol = 0
+  let currentLine = ''
+  let i = 0
 
-  const lines = cleaned.split('\n')
-  const processed: string[] = []
+  while (i < withoutAnsi.length) {
+    const ch = withoutAnsi[i]
 
-  for (const line of lines) {
-    const parts = line.split('\r')
-    let resolved = ''
-
-    if (parts.length === 1) {
-      resolved = parts[0]
-    } else {
-      let accumulated = ''
-      for (const part of parts) {
-        if (part.length >= accumulated.length) {
-          accumulated = part
-        } else {
-          accumulated = part + accumulated.slice(part.length)
-        }
-      }
-      resolved = accumulated
-    }
-
-    const trimmed = resolved.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '').trimEnd()
-
-    if (trimmed.length === 0) continue
-
-    if (processed.length > 0 && processed[processed.length - 1] === trimmed) {
+    if (ch === '\r') {
+      cursorCol = 0
+      i++
       continue
     }
 
-    processed.push(trimmed)
+    if (ch === '\n') {
+      outputLines.push(currentLine.trimEnd())
+      currentLine = ''
+      cursorCol = 0
+      i++
+      continue
+    }
+
+    if (ch.charCodeAt(0) < 0x20) {
+      i++
+      continue
+    }
+
+    while (currentLine.length < cursorCol) {
+      currentLine += ' '
+    }
+
+    if (cursorCol < currentLine.length) {
+      currentLine = currentLine.slice(0, cursorCol) + ch + currentLine.slice(cursorCol + 1)
+    } else {
+      currentLine += ch
+    }
+    cursorCol++
+    i++
   }
 
-  // Keep only last 200 lines to prevent unbounded growth in preview
-  const maxPreviewLines = 200
-  if (processed.length > maxPreviewLines) {
-    return processed.slice(-maxPreviewLines).join('\n')
+  if (currentLine.length > 0) {
+    outputLines.push(currentLine.trimEnd())
   }
 
-  return processed.join('\n')
+  const deduped: string[] = []
+  for (const line of outputLines) {
+    if (line.length === 0) continue
+    if (deduped.length > 0 && deduped[deduped.length - 1] === line) continue
+    deduped.push(line)
+  }
+
+  return deduped.join('\n')
 }
 
-export function truncateHistory(history: string[], maxChunks: number = 500): string[] {
-  if (history.length <= maxChunks) return history
-  return history.slice(-maxChunks)
+export function truncateHistory(history: string[], maxLines: number = 200): string[] {
+  if (history.length <= maxLines) return history
+  return history.slice(-maxLines)
 }
