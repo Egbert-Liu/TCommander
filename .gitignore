@@ -26,6 +26,7 @@ dist-ssr
 # Electron
 out/
 release/
+*.tsbuildinfo
 
 # Environment variables
 .env

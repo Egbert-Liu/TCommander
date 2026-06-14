@@ -7,6 +7,7 @@ interface ElectronAPI {
   resizeSession: (sessionId: string, cols: number, rows: number) => Promise<void>
   storageGet: (key: string) => Promise<any>
   storageSet: (key: string, value: any) => Promise<void>
+  setTitleBarOverlay: (opts: { color: string; symbolColor: string }) => Promise<void>
   onSessionOutput: (callback: (sessionId: string, data: string) => void) => () => void
   onSessionExit: (callback: (sessionId: string, exitCode: number) => void) => () => void
 }

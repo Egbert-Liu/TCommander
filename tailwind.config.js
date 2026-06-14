@@ -5,12 +5,7 @@ module.exports = {
     "./src/renderer/src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
-    extend: {
-      colors: {
-        primary: '#1e40af',
-        secondary: '#06b6d4',
-      },
-    },
+    extend: {},
   },
   plugins: [],
   darkMode: ['selector', '[data-theme="dark"]']

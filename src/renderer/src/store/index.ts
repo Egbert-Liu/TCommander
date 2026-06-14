@@ -54,6 +54,15 @@ interface AppState {
   setSnapshots: (snapshots: Snapshot[]) => void
 }
 
+/** 按当前明暗主题同步原生窗口控制按钮（最小化/最大化/关闭）的底色与符号色 */
+function applyTitleBarOverlay(dark: boolean) {
+  window.electronAPI?.setTitleBarOverlay(
+    dark
+      ? { color: '#000000', symbolColor: '#ffffff' }
+      : { color: '#ffffff', symbolColor: '#000000' }
+  )
+}
+
 export const useAppStore = create<AppState>((set) => ({
   sessions: [],
   groups: [],
@@ -178,6 +187,7 @@ export const useAppStore = create<AppState>((set) => ({
   toggleDarkMode: () => set((state) => {
     const newDark = !state.darkMode
     window.electronAPI?.storageSet('darkMode', newDark)
+    applyTitleBarOverlay(newDark)
     // 自动同步终端主题：当前终端主题与新模式不匹配时，切换到对应分组的默认主题
     const currentTheme = TERMINAL_THEMES.find(t => t.id === state.terminalTheme)
     const currentGroup = currentTheme?.group ?? 'dark'
@@ -193,7 +203,10 @@ export const useAppStore = create<AppState>((set) => ({
     return { darkMode: newDark, terminalTheme: newTerminalTheme }
   }),
 
-  setDarkMode: (dark) => set({ darkMode: dark }),
+  setDarkMode: (dark) => {
+    applyTitleBarOverlay(dark)
+    return set({ darkMode: dark })
+  },
 
   setTerminalTheme: (themeId) => {
     window.electronAPI?.storageSet('terminalTheme', themeId)

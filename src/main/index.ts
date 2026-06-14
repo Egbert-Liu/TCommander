@@ -21,8 +21,8 @@ function createWindow() {
     },
     // 隐藏系统默认标题栏（图标 + "Electron" 文字），消除顶部白色边框
     titleBarStyle: 'hidden',
-    // 保留原生窗口控制按钮（最小化/最大化/关闭），但颜色由 CSS 变量
-    // --title-bar-color / --title-bar-text-color 接管，自动适配明暗模式
+    // 保留原生窗口控制按钮（最小化/最大化/关闭）；初始为暗色（#000/#fff），
+    // 运行时由渲染进程经 set-title-bar-overlay IPC 按当前主题同步颜色
     titleBarOverlay: {
       color: '#000000',
       symbolColor: '#ffffff',
@@ -60,6 +60,11 @@ app.whenReady().then(() => {
   
   ipcMain.handle('storage-get', (_, key) => storageManager.get(key))
   ipcMain.handle('storage-set', (_, key, value) => storageManager.set(key, value))
+
+  // 渲染进程按当前明暗主题同步原生窗口控制按钮（最小化/最大化/关闭）的底色与符号色
+  ipcMain.handle('set-title-bar-overlay', (_, opts: { color: string; symbolColor: string }) => {
+    if (isWindowValid()) mainWindow!.setTitleBarOverlay(opts)
+  })
   
   ptyManager.onOutput((sessionId, data) => {
     if (!isWindowValid()) return

@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   storageGet: (key: string) => ipcRenderer.invoke('storage-get', key),
   storageSet: (key: string, value: any) => ipcRenderer.invoke('storage-set', key, value),
+  setTitleBarOverlay: (opts: { color: string; symbolColor: string }) =>
+    ipcRenderer.invoke('set-title-bar-overlay', opts),
   
   onSessionOutput: (callback: (sessionId: string, data: string) => void) => {
     outputCallbacks.push(callback)

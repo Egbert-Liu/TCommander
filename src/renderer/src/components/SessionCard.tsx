@@ -210,7 +210,6 @@ export default function SessionCard({ session, onResetSession, selectable, selec
       style={{
         background: 'var(--ant-color-bg-container)',
         border: '1px solid var(--ant-color-border)',
-        backdropFilter: 'blur(12px)',
       }}
     >
       <div
@@ -269,7 +268,7 @@ export default function SessionCard({ session, onResetSession, selectable, selec
             <Tag
               style={{
                 margin: 0,
-                fontSize: 9,
+                fontSize: 11,
                 lineHeight: '16px',
                 background: `${sessionGroup.color}20`,
                 border: `1px solid ${sessionGroup.color}40`,
@@ -288,7 +287,7 @@ export default function SessionCard({ session, onResetSession, selectable, selec
             color={statusCfg.color}
             style={{
               margin: 0,
-              fontSize: statusCfg.glow ? 10 : 9,
+              fontSize: 11,
               lineHeight: '16px',
               background: statusCfg.bg,
               border: statusCfg.glow ? `1px solid ${statusCfg.color}40` : 'none',
@@ -308,7 +307,7 @@ export default function SessionCard({ session, onResetSession, selectable, selec
               <Tag
                 style={{
                   margin: 0,
-                  fontSize: 8,
+                  fontSize: 11,
                   lineHeight: '14px',
                   background: 'var(--ant-color-fill-quaternary)',
                   border: '1px solid var(--ant-color-border)',
@@ -323,7 +322,7 @@ export default function SessionCard({ session, onResetSession, selectable, selec
                   cursor: 'help',
                 }}
               >
-                <SafetyCertificateFilled style={{ fontSize: 7, marginRight: 2 }} />
+                <SafetyCertificateFilled style={{ fontSize: 11, marginRight: 2 }} />
                 {session.matchedRuleName}
               </Tag>
             </Tooltip>
@@ -410,7 +409,7 @@ export default function SessionCard({ session, onResetSession, selectable, selec
             type="primary"
             size="small"
             onClick={handleQuickConfirm}
-            style={{ fontSize: 9, fontWeight: 700, width: 22, height: 20, minWidth: 22, padding: 0, borderRadius: 3 }}
+            style={{ fontSize: 11, fontWeight: 700, width: 22, height: 20, minWidth: 22, padding: 0, borderRadius: 3 }}
           >
             Y
           </Button>
@@ -420,7 +419,7 @@ export default function SessionCard({ session, onResetSession, selectable, selec
             danger
             size="small"
             onClick={handleQuickDeny}
-            style={{ fontSize: 9, fontWeight: 700, width: 22, height: 20, minWidth: 22, padding: 0, borderRadius: 3 }}
+            style={{ fontSize: 11, fontWeight: 700, width: 22, height: 20, minWidth: 22, padding: 0, borderRadius: 3 }}
           >
             N
           </Button>
@@ -430,7 +429,7 @@ export default function SessionCard({ session, onResetSession, selectable, selec
             <Button
               size="small"
               onClick={handleCtrlC}
-              icon={<StopFilled style={{ fontSize: 9 }} />}
+              icon={<StopFilled style={{ fontSize: 11 }} />}
               style={{ width: 22, height: 20, minWidth: 22, padding: 0, borderRadius: 3 }}
             />
           </Tooltip>
@@ -440,7 +439,7 @@ export default function SessionCard({ session, onResetSession, selectable, selec
             <Button
               size="small"
               onClick={handleArrowUp}
-              icon={<ArrowUpOutlined style={{ fontSize: 8 }} />}
+              icon={<ArrowUpOutlined style={{ fontSize: 11 }} />}
               style={{ width: 20, height: 20, minWidth: 20, padding: 0, borderRadius: 3 }}
             />
           </Tooltip>
@@ -450,7 +449,7 @@ export default function SessionCard({ session, onResetSession, selectable, selec
             <Button
               size="small"
               onClick={handleArrowDown}
-              icon={<ArrowDownOutlined style={{ fontSize: 8 }} />}
+              icon={<ArrowDownOutlined style={{ fontSize: 11 }} />}
               style={{ width: 20, height: 20, minWidth: 20, padding: 0, borderRadius: 3 }}
             />
           </Tooltip>
@@ -468,12 +467,12 @@ export default function SessionCard({ session, onResetSession, selectable, selec
         )}
         {quickActions.includes('Send') && (
           <Tooltip title="发送">
-            <Button type="primary" icon={<SendOutlined style={{ fontSize: 8 }} />} onClick={handleSendInput} size="small" style={{ width: 22, height: 20, minWidth: 22, padding: 0, borderRadius: 3 }} />
+            <Button type="primary" icon={<SendOutlined style={{ fontSize: 11 }} />} onClick={handleSendInput} size="small" style={{ width: 22, height: 20, minWidth: 22, padding: 0, borderRadius: 3 }} />
           </Tooltip>
         )}
         {quickActions.includes('Enter') && (
           <Tooltip title="Enter">
-            <Button size="small" icon={<EnterOutlined style={{ fontSize: 8 }} />} onClick={handleEnter} style={{ width: 20, height: 20, minWidth: 20, padding: 0, borderRadius: 3 }} />
+            <Button size="small" icon={<EnterOutlined style={{ fontSize: 11 }} />} onClick={handleEnter} style={{ width: 20, height: 20, minWidth: 20, padding: 0, borderRadius: 3 }} />
           </Tooltip>
         )}
         <Popover content={settingsContent} title="快捷操作显示设置" trigger="click" placement="topRight">

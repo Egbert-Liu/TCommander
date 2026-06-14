@@ -34,10 +34,6 @@ function ThemeSync() {
       '--ant-color-fill-quaternary': token.colorFillQuaternary,
       '--ant-color-error': token.colorError,
       '--ant-color-error-bg': token.colorErrorBg,
-      // Electron titleBarOverlay 颜色变量（Windows）：让最小化/最大化/关闭按钮
-      // 自动跟随 antd 明暗主题，与顶部 Toolbar 完全融合
-      '--title-bar-color': token.colorBgLayout,
-      '--title-bar-text-color': token.colorText,
     }
     Object.entries(vars).forEach(([k, v]) => root.style.setProperty(k, String(v)))
   }, [token])
@@ -426,7 +422,7 @@ function App() {
           cssVar: true,
           algorithm: darkMode ? theme.darkAlgorithm : theme.defaultAlgorithm,
           token: {
-            colorPrimary: '#5b8def',
+            colorPrimary: '#38bdf8',
             borderRadius: 6,
             fontSize: 13,
             fontFamily: "'DM Sans', -apple-system, sans-serif",
