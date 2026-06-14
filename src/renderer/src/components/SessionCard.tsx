@@ -1,12 +1,16 @@
-import { useState, useRef, useMemo } from 'react'
-import { Tag, Button, Input, Space, Popconfirm, Select, Popover, Checkbox, Tooltip } from 'antd'
-import { ExpandOutlined, DeleteFilled, SendOutlined, CheckCircleFilled, CloseCircleFilled, CodeFilled, PlayCircleFilled, EditFilled, StopFilled, EnterOutlined, ArrowUpOutlined, ArrowDownOutlined, SettingOutlined, ReloadOutlined, SafetyCertificateFilled } from '@ant-design/icons'
+import { useState, useRef, useMemo, useCallback } from 'react'
+import { Tag, Button, Input, Space, Popconfirm, Select, Popover, Checkbox, Tooltip, Dropdown, message } from 'antd'
+import type { MenuProps } from 'antd'
+import { ExpandOutlined, DeleteFilled, SendOutlined, CheckCircleFilled, CloseCircleFilled, CodeFilled, PlayCircleFilled, EditFilled, StopFilled, EnterOutlined, ArrowUpOutlined, ArrowDownOutlined, SettingOutlined, ReloadOutlined, SafetyCertificateFilled, CopyOutlined, ClearOutlined } from '@ant-design/icons'
 import { Session } from '../types'
 import { useAppStore } from '../store'
 
 interface SessionCardProps {
   session: Session
   onResetSession?: (session: Session) => void
+  selectable?: boolean
+  selected?: boolean
+  onSelect?: (id: string, selected: boolean) => void
 }
 
 const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string; glow: boolean; icon: React.ReactNode }> = {
@@ -30,7 +34,7 @@ const ACTION_LABELS: Record<string, string> = {
   'Enter': 'Enter',
 }
 
-export default function SessionCard({ session, onResetSession }: SessionCardProps) {
+export default function SessionCard({ session, onResetSession, selectable, selected, onSelect }: SessionCardProps) {
   const removeSession = useAppStore((s) => s.removeSession)
   const updateSession = useAppStore((s) => s.updateSession)
   const setActiveSession = useAppStore((s) => s.setActiveSession)
@@ -41,7 +45,6 @@ export default function SessionCard({ session, onResetSession }: SessionCardProp
   const [input, setInput] = useState('')
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState(session.name)
-  const [previewHover, setPreviewHover] = useState(false)
   const nameInputRef = useRef<any>(null)
 
   const quickActions = session.quickActions
@@ -54,8 +57,21 @@ export default function SessionCard({ session, onResetSession }: SessionCardProp
 
   const handleSendInput = async () => {
     if (input.trim()) {
+      // 多行文本：把 textarea 内的换行转为 PTY 的回车，整体一次性发送
       await window.electronAPI.sendInput(session.id, input + '\r')
       setInput('')
+    }
+  }
+
+  // 回车 = 发送；Shift+回车 = 换行（不换行则不会阻止默认行为）
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter') {
+      if (e.shiftKey) {
+        // 让 textarea 正常插入换行，不做其它处理
+        return
+      }
+      e.preventDefault()
+      handleSendInput()
     }
   }
 
@@ -121,6 +137,45 @@ export default function SessionCard({ session, onResetSession }: SessionCardProp
     })
   }
 
+  const handleCopyPreview = useCallback(async () => {
+    const text = session.previewText || preview
+    if (text) {
+      await navigator.clipboard.writeText(text)
+      message.success('已复制到剪贴板')
+    }
+  }, [session.previewText, preview])
+
+  const handleClearHistory = () => {
+    updateSession(session.id, {
+      history: [],
+      previewText: '',
+    })
+  }
+
+  // 右键菜单
+  const contextMenuItems: MenuProps['items'] = [
+    {
+      key: 'copy',
+      icon: <CopyOutlined style={{ fontSize: 11 }} />,
+      label: '复制预览内容',
+      onClick: handleCopyPreview,
+    },
+    {
+      key: 'fullscreen',
+      icon: <ExpandOutlined style={{ fontSize: 11 }} />,
+      label: '全屏查看',
+      onClick: handleFullscreen,
+    },
+    { type: 'divider' },
+    {
+      key: 'clear',
+      icon: <ClearOutlined style={{ fontSize: 11 }} />,
+      label: '清空历史',
+      danger: true,
+      onClick: handleClearHistory,
+    },
+  ]
+
   const statusCfg = STATUS_CONFIG[session.status] || STATUS_CONFIG.idle
   const sessionGroup = groups.find(g => g.id === session.groupId)
   const statusClass = statusCfg.glow ? `card-status-${session.status}` : ''
@@ -137,24 +192,25 @@ export default function SessionCard({ session, onResetSession }: SessionCardProp
           {ACTION_LABELS[key]}
         </Checkbox>
       ))}
+      <div style={{ height: 1, background: 'var(--ant-color-border)', margin: '4px 0' }} />
+      <Button
+        size="small"
+        icon={<ReloadOutlined style={{ fontSize: 11 }} />}
+        onClick={() => onResetSession?.(session)}
+        style={{ fontSize: 11, justifyContent: 'flex-start', height: 26 }}
+      >
+        重置会话
+      </Button>
     </div>
   )
 
   return (
     <div
-      className={`rounded-xl overflow-hidden flex flex-col ${statusClass}`}
+      className={`session-card rounded-xl overflow-hidden flex flex-col ${statusClass}`}
       style={{
         background: 'var(--ant-color-bg-container)',
         border: '1px solid var(--ant-color-border)',
         backdropFilter: 'blur(12px)',
-        transition: 'box-shadow 0.2s ease, border-color 0.2s ease',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = 'var(--ant-color-primary)'
-        e.currentTarget.style.boxShadow = `0 4px 16px rgba(0,0,0,0.2)`
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.boxShadow = 'none'
       }}
     >
       <div
@@ -162,6 +218,17 @@ export default function SessionCard({ session, onResetSession }: SessionCardProp
         style={{ borderBottom: '1px solid var(--ant-color-border)' }}
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
+          {selectable && (
+            <Checkbox
+              checked={selected}
+              onChange={(e) => {
+                e.stopPropagation()
+                onSelect?.(session.id, e.target.checked)
+              }}
+              onClick={(e) => e.stopPropagation()}
+              style={{ flexShrink: 0 }}
+            />
+          )}
           <div
             className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
             style={{ background: statusCfg.bg }}
@@ -283,6 +350,17 @@ export default function SessionCard({ session, onResetSession }: SessionCardProp
         </div>
 
         <Space size={1} className="flex-shrink-0 ml-1">
+          {statusCfg.glow && (
+            <Tooltip title={`标记为已处理（触发规则: ${session.matchedRuleName || statusCfg.label}）`}>
+              <Button
+                type="text"
+                size="small"
+                icon={<CheckCircleFilled style={{ fontSize: 10 }} />}
+                onClick={handleDismissStatus}
+                style={{ minWidth: 20, width: 20, height: 20, color: statusCfg.color }}
+              />
+            </Tooltip>
+          )}
           <Button type="text" icon={<EditFilled style={{ fontSize: 10 }} />} onClick={() => setEditingName(true)} size="small" style={{ minWidth: 20, width: 20, height: 20 }} />
           <Button type="text" icon={<ExpandOutlined style={{ fontSize: 10 }} />} onClick={handleFullscreen} size="small" style={{ minWidth: 20, width: 20, height: 20 }} />
           <Popconfirm
@@ -299,91 +377,108 @@ export default function SessionCard({ session, onResetSession }: SessionCardProp
         </Space>
       </div>
 
-      {statusCfg.glow && (
+      <Dropdown menu={{ items: contextMenuItems }} trigger={['contextMenu']}>
         <div
+          className="session-card-preview overflow-auto px-2.5 py-1.5"
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '4px 10px',
-            background: `${statusCfg.color}08`,
-            borderBottom: '1px solid var(--ant-color-border)',
+            height: previewLineCount * 16,
+            minHeight: 48,
+            background: 'var(--ant-color-fill)',
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 10,
+            lineHeight: 1.6,
+            color: 'var(--ant-color-text)',
+            cursor: 'pointer',
+            userSelect: 'text',
+          }}
+          onClick={handleFullscreen}
+          onDoubleClick={(e) => {
+            e.stopPropagation()
+            handleCopyPreview()
           }}
         >
-          <span style={{ fontSize: 10, color: statusCfg.color, fontFamily: "'JetBrains Mono', monospace" }}>
-            ⚡ 触发规则: {session.matchedRuleName || statusCfg.label}
-          </span>
-          <Space size={4}>
-            <Button
-              size="small"
-              type="primary"
-              icon={<CheckCircleFilled style={{ fontSize: 9 }} />}
-              onClick={handleDismissStatus}
-              style={{ fontSize: 9, height: 20, padding: '0 6px', background: statusCfg.color, borderColor: statusCfg.color }}
-            >
-              已处理
-            </Button>
-          </Space>
+          <pre className="whitespace-pre-wrap m-0">{preview || '等待输出...'}</pre>
         </div>
-      )}
+      </Dropdown>
 
       <div
-        className="overflow-auto px-2.5 py-1.5"
-        style={{
-          height: previewLineCount * 16,
-          minHeight: 48,
-          background: previewHover ? 'rgba(13,17,23,0.95)' : '#1e1e2e',
-          fontFamily: "'JetBrains Mono', monospace",
-          fontSize: 10,
-          lineHeight: 1.6,
-          color: '#a6e3a1',
-          cursor: 'pointer',
-          transition: 'background 0.2s ease',
-        }}
-        onClick={handleFullscreen}
-        onMouseEnter={() => setPreviewHover(true)}
-        onMouseLeave={() => setPreviewHover(false)}
+        className="px-2 flex items-center gap-1"
+        style={{ borderTop: '1px solid var(--ant-color-border)', height: 28 }}
       >
-        <pre className="whitespace-pre-wrap m-0">{preview || '等待输出...'}</pre>
-      </div>
-
-      <div className="px-2.5 py-1.5 flex items-center gap-1" style={{ borderTop: '1px solid var(--ant-color-border)' }}>
         {quickActions.includes('Y') && (
-          <Button size="small" type="primary" onClick={handleQuickConfirm} style={{ fontSize: 10, minWidth: 28, height: 22, padding: '0 6px' }}>Y</Button>
+          <Button
+            type="primary"
+            size="small"
+            onClick={handleQuickConfirm}
+            style={{ fontSize: 9, fontWeight: 700, width: 22, height: 20, minWidth: 22, padding: 0, borderRadius: 3 }}
+          >
+            Y
+          </Button>
         )}
         {quickActions.includes('N') && (
-          <Button size="small" danger onClick={handleQuickDeny} style={{ fontSize: 10, minWidth: 28, height: 22, padding: '0 6px' }}>N</Button>
+          <Button
+            danger
+            size="small"
+            onClick={handleQuickDeny}
+            style={{ fontSize: 9, fontWeight: 700, width: 22, height: 20, minWidth: 22, padding: 0, borderRadius: 3 }}
+          >
+            N
+          </Button>
         )}
         {quickActions.includes('CtrlC') && (
-          <Button size="small" onClick={handleCtrlC} icon={<StopFilled style={{ fontSize: 9 }} />} style={{ fontSize: 10, minWidth: 28, height: 22, padding: '0 6px' }} title="Ctrl+C">C-c</Button>
+          <Tooltip title="Ctrl+C">
+            <Button
+              size="small"
+              onClick={handleCtrlC}
+              icon={<StopFilled style={{ fontSize: 9 }} />}
+              style={{ width: 22, height: 20, minWidth: 22, padding: 0, borderRadius: 3 }}
+            />
+          </Tooltip>
         )}
         {quickActions.includes('Up') && (
-          <Button size="small" onClick={handleArrowUp} icon={<ArrowUpOutlined style={{ fontSize: 9 }} />} style={{ fontSize: 10, minWidth: 28, height: 22, padding: '0 6px' }} title="上箭头" />
+          <Tooltip title="上箭头">
+            <Button
+              size="small"
+              onClick={handleArrowUp}
+              icon={<ArrowUpOutlined style={{ fontSize: 8 }} />}
+              style={{ width: 20, height: 20, minWidth: 20, padding: 0, borderRadius: 3 }}
+            />
+          </Tooltip>
         )}
         {quickActions.includes('Down') && (
-          <Button size="small" onClick={handleArrowDown} icon={<ArrowDownOutlined style={{ fontSize: 9 }} />} style={{ fontSize: 10, minWidth: 28, height: 22, padding: '0 6px' }} title="下箭头" />
+          <Tooltip title="下箭头">
+            <Button
+              size="small"
+              onClick={handleArrowDown}
+              icon={<ArrowDownOutlined style={{ fontSize: 8 }} />}
+              style={{ width: 20, height: 20, minWidth: 20, padding: 0, borderRadius: 3 }}
+            />
+          </Tooltip>
         )}
+
         {quickActions.includes('Input') && (
-          <Input value={input} onChange={(e) => setInput(e.target.value)} onPressEnter={handleSendInput} placeholder="输入..." size="small" style={{ flex: 1, fontSize: 10, height: 22 }} />
+          <Input.TextArea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="输入… Enter发送"
+            autoSize={{ minRows: 1, maxRows: 2 }}
+            style={{ flex: 1, fontSize: 10, lineHeight: '18px', height: 20, maxHeight: 44, padding: '1px 6px', borderRadius: 3, resize: 'none', overflow: 'auto' }}
+          />
         )}
         {quickActions.includes('Send') && (
-          <Button type="primary" icon={<SendOutlined style={{ fontSize: 9 }} />} onClick={handleSendInput} size="small" style={{ minWidth: 24, width: 24, height: 22 }} title="发送" />
+          <Tooltip title="发送">
+            <Button type="primary" icon={<SendOutlined style={{ fontSize: 8 }} />} onClick={handleSendInput} size="small" style={{ width: 22, height: 20, minWidth: 22, padding: 0, borderRadius: 3 }} />
+          </Tooltip>
         )}
         {quickActions.includes('Enter') && (
-          <Button size="small" icon={<EnterOutlined style={{ fontSize: 9 }} />} onClick={handleEnter} style={{ minWidth: 24, width: 24, height: 22 }} title="Enter" />
+          <Tooltip title="Enter">
+            <Button size="small" icon={<EnterOutlined style={{ fontSize: 8 }} />} onClick={handleEnter} style={{ width: 20, height: 20, minWidth: 20, padding: 0, borderRadius: 3 }} />
+          </Tooltip>
         )}
         <Popover content={settingsContent} title="快捷操作显示设置" trigger="click" placement="topRight">
-          <Button type="text" icon={<SettingOutlined style={{ fontSize: 10 }} />} size="small" style={{ minWidth: 20, width: 20, height: 22, flexShrink: 0 }} title="快捷操作设置" />
+          <Button type="text" icon={<SettingOutlined style={{ fontSize: 10 }} />} size="small" style={{ width: 20, height: 20, minWidth: 20, padding: 0, flexShrink: 0 }} title="快捷操作设置" />
         </Popover>
-        <Tooltip title="重置会话">
-          <Button
-            type="text"
-            icon={<ReloadOutlined style={{ fontSize: 10 }} />}
-            size="small"
-            onClick={() => onResetSession?.(session)}
-            style={{ minWidth: 20, width: 20, height: 22, flexShrink: 0 }}
-          />
-        </Tooltip>
       </div>
     </div>
   )

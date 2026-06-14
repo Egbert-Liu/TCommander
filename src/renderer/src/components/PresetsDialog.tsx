@@ -109,7 +109,7 @@ export default function PresetsDialog({ open, onClose }: PresetsDialogProps) {
       key: 'initialCommand',
       ellipsis: true,
       render: (cmd: string) => cmd ? (
-        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: '#a6e3a1' }}>
+        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: 'var(--ant-color-text-secondary)' }}>
           {cmd}
         </span>
       ) : '-'

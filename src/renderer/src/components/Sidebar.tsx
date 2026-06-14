@@ -20,7 +20,7 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (c: string)
           className="w-5 h-5 rounded-full transition-transform"
           style={{
             backgroundColor: c,
-            border: value === c ? '2px solid white' : '2px solid transparent',
+            border: value === c ? '2px solid var(--ant-color-bg-elevated)' : '2px solid transparent',
             transform: value === c ? 'scale(1.2)' : 'scale(1)',
             boxShadow: value === c ? `0 0 8px ${c}60` : 'none',
           }}
@@ -40,6 +40,7 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   const selectedGroupId = useAppStore((s) => s.selectedGroupId)
   const sessions = useAppStore((s) => s.sessions)
   const setSelectedGroupId = useAppStore((s) => s.setSelectedGroupId)
+  const setStatusFilter = useAppStore((s) => s.setStatusFilter)
   const addGroup = useAppStore((s) => s.addGroup)
   const updateGroup = useAppStore((s) => s.updateGroup)
   const removeGroup = useAppStore((s) => s.removeGroup)
@@ -93,6 +94,8 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
 
   const handleSelectItem = (groupId: string | null) => {
     setSelectedGroupId(groupId)
+    // 互斥：选分组时清空状态筛选
+    if (groupId) setStatusFilter(null)
   }
 
   const renderCollapsedItem = (icon: React.ReactNode, label: string, groupId: string | null, isActive: boolean) => (
@@ -101,14 +104,14 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
         onClick={() => handleSelectItem(groupId)}
         className="w-full flex items-center justify-center"
         style={{
-          height: 36,
-          borderRadius: 6,
+          height: 28,
+          borderRadius: 4,
           background: isActive ? 'var(--ant-color-primary-bg)' : 'transparent',
           color: isActive ? 'var(--ant-color-primary)' : 'var(--ant-color-text-secondary)',
           border: 'none',
           cursor: 'pointer',
           transition: 'all 0.15s ease',
-          fontSize: 15,
+          fontSize: 13,
         }}
         onMouseEnter={(e) => {
           if (!isActive) {
@@ -131,17 +134,17 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
   const renderExpandedItem = (icon: React.ReactNode, label: React.ReactNode, groupId: string | null, isActive: boolean) => (
     <button
       onClick={() => handleSelectItem(groupId)}
-      className="w-full flex items-center gap-2.5"
+      className="w-full flex items-center gap-2"
       style={{
-        height: 32,
-        borderRadius: 6,
-        padding: '0 10px',
+        height: 26,
+        borderRadius: 4,
+        padding: '0 6px',
         background: isActive ? 'var(--ant-color-primary-bg)' : 'transparent',
         color: isActive ? 'var(--ant-color-primary)' : 'var(--ant-color-text-secondary)',
         border: 'none',
         cursor: 'pointer',
         transition: 'all 0.15s ease',
-        fontSize: 13,
+        fontSize: 12,
         textAlign: 'left',
         width: '100%',
       }}
@@ -158,7 +161,7 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
         }
       }}
     >
-      <span style={{ fontSize: 14, display: 'flex', alignItems: 'center' }}>{icon}</span>
+      <span style={{ fontSize: 13, display: 'flex', alignItems: 'center' }}>{icon}</span>
       <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
     </button>
   )
@@ -167,19 +170,19 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
     <div
       className="flex flex-col transition-all duration-200 overflow-hidden"
       style={{
-        width: collapsed ? 52 : 208,
-        minWidth: collapsed ? 52 : 208,
-        maxWidth: collapsed ? 52 : 208,
-        borderRight: '1px solid var(--ant-color-border)',
-        background: 'var(--ant-color-bg-container)',
+        width: collapsed ? 44 : 168,
+        minWidth: collapsed ? 44 : 168,
+        maxWidth: collapsed ? 44 : 168,
+        borderRight: '1px solid var(--ant-color-border-secondary)',
+        background: 'var(--ant-color-bg-layout)',
       }}
     >
       <div
-        className="flex items-center justify-between px-2 h-10 flex-shrink-0"
-        style={{ borderBottom: '1px solid var(--ant-color-border)' }}
+        className="flex items-center justify-between px-1.5 h-8 flex-shrink-0"
+        style={{ borderBottom: '1px solid var(--ant-color-border-secondary)' }}
       >
         {!collapsed && (
-          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ant-color-primary)', fontFamily: "'JetBrains Mono', monospace", letterSpacing: '0.5px' }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ant-color-text-tertiary)', fontFamily: "'JetBrains Mono', monospace" }}>
             分组
           </span>
         )}
@@ -187,8 +190,8 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
           onClick={onToggleCollapse}
           className="flex items-center justify-center"
           style={{
-            width: 28,
-            height: 28,
+            width: 24,
+            height: 24,
             borderRadius: 4,
             background: 'transparent',
             border: 'none',
@@ -196,7 +199,7 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
             cursor: 'pointer',
             marginLeft: collapsed ? 'auto' : undefined,
             marginRight: collapsed ? 'auto' : undefined,
-            fontSize: 14,
+            fontSize: 12,
             transition: 'all 0.15s ease',
           }}
           onMouseEnter={(e) => {
@@ -212,7 +215,7 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto overflow-x-hidden py-1" style={{ padding: collapsed ? '4px 6px' : '4px 8px' }}>
+      <div className="flex-1 overflow-y-auto overflow-x-hidden py-0.5" style={{ padding: collapsed ? '2px 4px' : '2px 6px' }}>
         {collapsed ? (
           <div className="flex flex-col gap-1">
             {renderCollapsedItem(
@@ -335,9 +338,9 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
       </div>
 
       {!collapsed && (
-        <div className="flex-shrink-0" style={{ padding: '8px', borderTop: '1px solid var(--ant-color-border)' }}>
+        <div className="flex-shrink-0" style={{ padding: '4px 6px', borderTop: '1px solid var(--ant-color-border-secondary)' }}>
           {showAddGroup ? (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1.5">
               <input
                 value={newGroupName}
                 onChange={(e) => { setNewGroupName(e.target.value); setDuplicateError(false) }}
@@ -345,15 +348,15 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                 onKeyDown={(e) => { if (e.key === 'Enter') handleAddGroup(); if (e.key === 'Escape') setShowAddGroup(false) }}
                 autoFocus
                 style={{
-                  fontSize: 12,
+                  fontSize: 11,
                   background: 'var(--ant-color-bg-elevated)',
                   border: duplicateError ? '1px solid var(--ant-color-error)' : '1px solid var(--ant-color-border)',
                   borderRadius: 4,
                   color: 'var(--ant-color-text)',
                   outline: 'none',
                   width: '100%',
-                  padding: '4px 8px',
-                  height: 28,
+                  padding: '3px 6px',
+                  height: 22,
                   fontFamily: "'DM Sans', sans-serif",
                 }}
               />
@@ -363,13 +366,13 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                   onClick={handleAddGroup}
                   style={{
                     flex: 1,
-                    height: 26,
+                    height: 22,
                     borderRadius: 4,
                     background: 'var(--ant-color-primary)',
                     color: '#ffffff',
                     border: 'none',
                     cursor: 'pointer',
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: 600,
                   }}
                 >
@@ -379,49 +382,49 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
                   onClick={() => { setShowAddGroup(false); setDuplicateError(false) }}
                   style={{
                     flex: 1,
-                    height: 26,
+                    height: 22,
                     borderRadius: 4,
                     background: 'transparent',
                     color: 'var(--ant-color-text-tertiary)',
                     border: '1px solid var(--ant-color-border)',
                     cursor: 'pointer',
-                    fontSize: 11,
+                    fontSize: 10,
                   }}
                 >
                   取消
                 </button>
               </div>
               {duplicateError && (
-                <div style={{ color: 'var(--ant-color-error)', fontSize: 10 }}>分组名称已存在</div>
+                <div style={{ color: 'var(--ant-color-error)', fontSize: 9 }}>分组名称已存在</div>
               )}
             </div>
           ) : (
             <button
               onClick={() => setShowAddGroup(true)}
-              className="w-full flex items-center justify-center gap-1.5"
+              className="w-full flex items-center justify-center gap-1"
               style={{
-                height: 28,
+                height: 22,
                 borderRadius: 4,
-                background: 'var(--ant-color-primary-bg)',
-                border: '1px dashed var(--ant-color-border)',
-                color: 'var(--ant-color-primary)',
+                background: 'transparent',
+                border: '1px dashed var(--ant-color-border-secondary)',
+                color: 'var(--ant-color-text-tertiary)',
                 cursor: 'pointer',
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: 500,
                 transition: 'all 0.15s ease',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'var(--ant-color-primary)'
-                e.currentTarget.style.borderColor = 'var(--ant-color-primary)'
-                e.currentTarget.style.color = '#ffffff'
-              }}
-              onMouseLeave={(e) => {
                 e.currentTarget.style.background = 'var(--ant-color-primary-bg)'
-                e.currentTarget.style.borderColor = 'var(--ant-color-border)'
+                e.currentTarget.style.borderColor = 'var(--ant-color-primary)'
                 e.currentTarget.style.color = 'var(--ant-color-primary)'
               }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent'
+                e.currentTarget.style.borderColor = 'var(--ant-color-border-secondary)'
+                e.currentTarget.style.color = 'var(--ant-color-text-tertiary)'
+              }}
             >
-              <PlusCircleFilled style={{ fontSize: 11 }} />
+              <PlusCircleFilled style={{ fontSize: 10 }} />
               新建分组
             </button>
           )}
@@ -429,25 +432,35 @@ export default function Sidebar({ collapsed, onToggleCollapse }: SidebarProps) {
       )}
 
       {collapsed && (
-        <div className="flex-shrink-0 flex justify-center py-2">
+        <div className="flex-shrink-0 flex justify-center py-1.5">
           <Tooltip title="新建分组" placement="right" mouseEnterDelay={0.1}>
             <button
               onClick={() => {
                 onToggleCollapse()
-                setTimeout(() => setShowAddGroup(true), 250)
+                setTimeout(() => setShowAddGroup(true), 200)
               }}
               style={{
-                width: 32,
-                height: 32,
+                width: 26,
+                height: 26,
                 borderRadius: 4,
-                background: 'var(--ant-color-primary-bg)',
-                border: '1px dashed var(--ant-color-border)',
-                color: 'var(--ant-color-primary)',
+                background: 'transparent',
+                border: '1px dashed var(--ant-color-border-secondary)',
+                color: 'var(--ant-color-text-tertiary)',
                 cursor: 'pointer',
-                fontSize: 12,
+                fontSize: 11,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--ant-color-primary-bg)'
+                e.currentTarget.style.borderColor = 'var(--ant-color-primary)'
+                e.currentTarget.style.color = 'var(--ant-color-primary)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent'
+                e.currentTarget.style.borderColor = 'var(--ant-color-border-secondary)'
+                e.currentTarget.style.color = 'var(--ant-color-text-tertiary)'
               }}
             >
               <PlusCircleFilled />

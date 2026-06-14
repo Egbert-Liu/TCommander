@@ -15,6 +15,9 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
+  background: var(--ant-color-bg-layout, #fff);
+  color: var(--ant-color-text, #000);
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
 /* 全局滚动条 */
@@ -129,4 +132,19 @@ body {
 
 .animate-fade-in {
   animation: fadeIn 0.2s ease-out;
+}
+
+/* 会话卡片 hover 效果 */
+.session-card {
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.session-card:hover {
+  border-color: var(--ant-color-primary) !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+}
+.session-card:hover .session-card-preview {
+  background: var(--ant-color-fill-quaternary) !important;
+}
+.session-card-preview {
+  transition: background 0.2s ease;
 }

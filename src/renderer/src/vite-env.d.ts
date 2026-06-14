@@ -11,6 +11,15 @@ interface ElectronAPI {
   onSessionExit: (callback: (sessionId: string, exitCode: number) => void) => () => void
 }
 
+// Electron 专用 CSS 属性扩展：-webkit-app-region 用于自定义标题栏拖拽区域
+declare global {
+  namespace React {
+    interface CSSProperties {
+      WebkitAppRegion?: 'drag' | 'no-drag'
+    }
+  }
+}
+
 declare global {
   interface Window {
     electronAPI: ElectronAPI

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Modal, Form, Input, Select, Button, Space, Checkbox, Divider, message } from 'antd'
+import { Modal, Form, Input, Select, Button, Space, Checkbox, Divider, Popconfirm, message } from 'antd'
 import { CodeFilled, SaveFilled, ReloadOutlined, ExclamationCircleFilled } from '@ant-design/icons'
 import { useAppStore } from '../store'
 import { Session } from '../types'
@@ -21,7 +21,6 @@ export default function NewSessionDialog({ open, onClose, resetSession }: NewSes
   const [loading, setLoading] = useState(false)
   const [saveAsPreset, setSaveAsPreset] = useState(false)
   const [presetName, setPresetName] = useState('')
-  const [confirmReset, setConfirmReset] = useState(false)
 
   const isResetMode = !!resetSession
 
@@ -39,7 +38,6 @@ export default function NewSessionDialog({ open, onClose, resetSession }: NewSes
       form.resetFields()
       setSaveAsPreset(false)
       setPresetName('')
-      setConfirmReset(false)
     }
   }, [open, resetSession])
 
@@ -47,12 +45,6 @@ export default function NewSessionDialog({ open, onClose, resetSession }: NewSes
     try {
       setLoading(true)
       const values = await form.validateFields()
-
-      if (isResetMode && resetSession) {
-        setConfirmReset(true)
-        setLoading(false)
-        return
-      }
 
       const sessionId = await window.electronAPI.createSession({
         terminalType: values.terminalType,
@@ -62,6 +54,7 @@ export default function NewSessionDialog({ open, onClose, resetSession }: NewSes
 
       if (!sessionId) {
         message.error('创建会话失败，请重试')
+        setLoading(false)
         return
       }
 
@@ -104,7 +97,7 @@ export default function NewSessionDialog({ open, onClose, resetSession }: NewSes
     }
   }
 
-  const handleConfirmReset = async () => {
+  const handleReset = async () => {
     if (!resetSession) return
     try {
       setLoading(true)
@@ -120,6 +113,7 @@ export default function NewSessionDialog({ open, onClose, resetSession }: NewSes
 
       if (!sessionId) {
         message.error('重置会话失败，请重试')
+        setLoading(false)
         return
       }
 
@@ -141,7 +135,6 @@ export default function NewSessionDialog({ open, onClose, resetSession }: NewSes
       })
 
       message.success('会话已重置')
-      setConfirmReset(false)
       onClose()
     } catch (error) {
       console.error('重置会话失败:', error)
@@ -181,31 +174,44 @@ export default function NewSessionDialog({ open, onClose, resetSession }: NewSes
         footer={
           <Space>
             <Button onClick={onClose}>取消</Button>
-            <Button
-              type="primary"
-              loading={loading}
-              onClick={handleCreate}
-              danger={isResetMode}
-              icon={isResetMode ? <ReloadOutlined /> : undefined}
-            >
-              {isResetMode ? '下一步' : '创建'}
-            </Button>
+            {isResetMode ? (
+              <Popconfirm
+                title="确认重置会话？"
+                description={
+                  <div style={{ fontSize: 12, lineHeight: 1.6 }}>
+                    将关闭「{resetSession?.name}」并创建新的会话
+                  </div>
+                }
+                onConfirm={handleReset}
+                okText="确认重置"
+                cancelText="取消"
+                okButtonProps={{ danger: true, loading }}
+              >
+                <Button type="primary" danger icon={<ReloadOutlined />}>
+                  重置会话
+                </Button>
+              </Popconfirm>
+            ) : (
+              <Button type="primary" loading={loading} onClick={handleCreate} icon={<CodeFilled />}>
+                创建
+              </Button>
+            )}
           </Space>
         }
         width={480}
       >
         {isResetMode && (
           <div style={{
-            background: 'rgba(245, 158, 11, 0.08)',
-            border: '1px solid rgba(245, 158, 11, 0.2)',
+            background: 'rgba(239, 68, 68, 0.08)',
+            border: '1px solid rgba(239, 68, 68, 0.2)',
             borderRadius: 6,
             padding: '8px 12px',
             marginBottom: 12,
             fontSize: 12,
             color: 'var(--ant-color-text-secondary)',
           }}>
-            <ExclamationCircleFilled style={{ color: '#f59e0b', marginRight: 6 }} />
-            重置将关闭当前命令行并创建新的会话，请确认配置后点击"下一步"
+            <ExclamationCircleFilled style={{ color: '#ef4444', marginRight: 6 }} />
+            修改配置后点击"重置会话"将关闭当前命令行并创建新的会话
           </div>
         )}
 
@@ -300,46 +306,6 @@ export default function NewSessionDialog({ open, onClose, resetSession }: NewSes
             </div>
           </>
         )}
-      </Modal>
-
-      <Modal
-        title={
-          <Space>
-            <ExclamationCircleFilled style={{ color: '#ef4444', fontSize: 18 }} />
-            <span>确认重置</span>
-          </Space>
-        }
-        open={confirmReset}
-        onCancel={() => setConfirmReset(false)}
-        footer={
-          <Space>
-            <Button onClick={() => setConfirmReset(false)}>取消</Button>
-            <Button
-              type="primary"
-              danger
-              loading={loading}
-              onClick={handleConfirmReset}
-              icon={<ReloadOutlined />}
-            >
-              确认重置
-            </Button>
-          </Space>
-        }
-        width={400}
-      >
-        <div style={{ fontSize: 13, color: 'var(--ant-color-text)', lineHeight: 1.8 }}>
-          <p style={{ margin: 0 }}>
-            即将执行以下操作：
-          </p>
-          <ul style={{ margin: '8px 0', paddingLeft: 20, color: 'var(--ant-color-text-secondary)' }}>
-            <li>关闭当前命令行进程（<strong style={{ color: '#ef4444' }}>{resetSession?.name}</strong>）</li>
-            <li>清除所有历史输出</li>
-            <li>使用新配置创建新的命令行会话</li>
-          </ul>
-          <p style={{ margin: 0, color: '#ef4444', fontWeight: 600 }}>
-            ⚠ 此操作不可撤销
-          </p>
-        </div>
       </Modal>
     </>
   )

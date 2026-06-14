@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu } from 'electron'
 import path from 'path'
 import { createPtyManager } from './pty'
 import { createStorageManager } from './storage'
@@ -12,10 +12,21 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    title: 'TCommander',
+    icon: path.join(__dirname, '../../build/icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       nodeIntegration: false,
       contextIsolation: true,
+    },
+    // 隐藏系统默认标题栏（图标 + "Electron" 文字），消除顶部白色边框
+    titleBarStyle: 'hidden',
+    // 保留原生窗口控制按钮（最小化/最大化/关闭），但颜色由 CSS 变量
+    // --title-bar-color / --title-bar-text-color 接管，自动适配明暗模式
+    titleBarOverlay: {
+      color: '#000000',
+      symbolColor: '#ffffff',
+      height: 36,
     },
     frame: true,
   })
@@ -37,6 +48,9 @@ function isWindowValid(): boolean {
 }
 
 app.whenReady().then(() => {
+  // 移除默认菜单栏（File/Edit/View/Window/Help），保持界面简洁统一
+  Menu.setApplicationMenu(null)
+
   ipcMain.handle('create-session', (_, config) => ptyManager.createSession(config))
   ipcMain.handle('send-input', (_, sessionId, data) => ptyManager.sendInput(sessionId, data))
   ipcMain.handle('close-session', (_, sessionId) => ptyManager.closeSession(sessionId))

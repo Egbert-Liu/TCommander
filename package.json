@@ -1,7 +1,7 @@
 {
-  "name": "client-manager",
+  "name": "tcommander",
   "version": "1.0.0",
-  "description": "Multi-terminal session manager for developers",
+  "description": "TCommander - Multi-terminal session manager for developers",
   "main": "./out/main/index.js",
   "author": "",
   "license": "MIT",
@@ -43,8 +43,8 @@
     "vite-plugin-electron-renderer": "^0.14.0"
   },
   "build": {
-    "appId": "com.clientmanager.app",
-    "productName": "Client Manager",
+    "appId": "com.tcommander.app",
+    "productName": "TCommander",
     "copyright": "Copyright © 2024",
     "directories": {
       "output": "release"

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { Session, Group, Preset, Snapshot, TriggerRule } from '../types'
 import { DEFAULT_SYSTEM_RULES } from '../utils/statusDetector'
+import { TERMINAL_THEMES } from '../utils/terminalThemes'
 
 interface AppState {
   sessions: Session[]
@@ -11,10 +12,12 @@ interface AppState {
   activeSessionId: string | null
   searchQuery: string
   selectedGroupId: string | null
+  statusFilter: string | null
   isFullscreen: boolean
   darkMode: boolean
   previewLineCount: number
   defaultQuickActions: string[]
+  terminalTheme: string  // 终端主题 ID
 
   addSession: (session: Session) => void
   updateSession: (id: string, updates: Partial<Session>) => void
@@ -40,10 +43,12 @@ interface AppState {
 
   setSearchQuery: (query: string) => void
   setSelectedGroupId: (id: string | null) => void
+  setStatusFilter: (status: string | null) => void
   setIsFullscreen: (fullscreen: boolean) => void
   setPreviewLineCount: (count: number) => void
   toggleDarkMode: () => void
   setDarkMode: (dark: boolean) => void
+  setTerminalTheme: (themeId: string) => void
   setPresets: (presets: Preset[]) => void
   setGroups: (groups: Group[]) => void
   setSnapshots: (snapshots: Snapshot[]) => void
@@ -58,9 +63,11 @@ export const useAppStore = create<AppState>((set) => ({
   activeSessionId: null,
   searchQuery: '',
   selectedGroupId: null,
+  statusFilter: null,
   isFullscreen: false,
   darkMode: true,
-  previewLineCount: 20,
+  terminalTheme: 'github-dark',
+  previewLineCount: 10,
   defaultQuickActions: ['Y', 'N', 'CtrlC', 'Up', 'Down', 'Input', 'Send', 'Enter'],
 
   addSession: (session) => set((state) => ({
@@ -162,6 +169,8 @@ export const useAppStore = create<AppState>((set) => ({
 
   setSelectedGroupId: (id) => set({ selectedGroupId: id }),
 
+  setStatusFilter: (status) => set({ statusFilter: status }),
+
   setIsFullscreen: (fullscreen) => set({ isFullscreen: fullscreen }),
 
   setPreviewLineCount: (count) => set({ previewLineCount: count }),
@@ -169,10 +178,27 @@ export const useAppStore = create<AppState>((set) => ({
   toggleDarkMode: () => set((state) => {
     const newDark = !state.darkMode
     window.electronAPI?.storageSet('darkMode', newDark)
-    return { darkMode: newDark }
+    // 自动同步终端主题：当前终端主题与新模式不匹配时，切换到对应分组的默认主题
+    const currentTheme = TERMINAL_THEMES.find(t => t.id === state.terminalTheme)
+    const currentGroup = currentTheme?.group ?? 'dark'
+    let newTerminalTheme = state.terminalTheme
+    if ((newDark && currentGroup === 'light') || (!newDark && currentGroup === 'dark')) {
+      const targetGroup = newDark ? 'dark' : 'light'
+      const fallback = TERMINAL_THEMES.find(t => t.group === targetGroup)
+      if (fallback) {
+        newTerminalTheme = fallback.id
+        window.electronAPI?.storageSet('terminalTheme', newTerminalTheme)
+      }
+    }
+    return { darkMode: newDark, terminalTheme: newTerminalTheme }
   }),
 
   setDarkMode: (dark) => set({ darkMode: dark }),
+
+  setTerminalTheme: (themeId) => {
+    window.electronAPI?.storageSet('terminalTheme', themeId)
+    return set({ terminalTheme: themeId })
+  },
 
   setPresets: (presets) => set({ presets }),
 

@@ -31,3 +31,17 @@ release/
 .env
 .env.local
 .env.*.local
+
+# 文档（仅保留 README.md，忽略其余文档）
+ARCHITECTURE.md
+CLAUDE.md
+PRD.md
+基础prd.md
+docs/
+.trae/
+
+# 构建缓存与临时工具
+.ebcache/
+.tools/
+scripts/check-nsis.ps1
+scripts/show-output.ps1
