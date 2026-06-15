@@ -4,6 +4,37 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 设计令牌：颜色/字号/圆角/间距/阴影/层级/动效。新代码请优先 var()，避免裸魔法数字。 */
+:root {
+  /* 主色：单一来源 */
+  --primary: #38bdf8;
+
+  /* 字号：全局下限 11px */
+  --fs-xs: 11px;  --fs-sm: 12px;  --fs-md: 13px;  --fs-lg: 15px;
+
+  /* 圆角 */
+  --radius-sm: 4px;  --radius-md: 8px;  --radius-lg: 12px;
+
+  /* 间距（8 倍数节奏） */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px;  --sp-4: 16px;  --sp-6: 24px;
+
+  /* 阴影：--shadow-md 与原 .session-card:hover 阴影一致 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.16);
+
+  /* 层级 */
+  --z-dropdown: 1000;  --z-modal: 1100;  --z-fullscreen: 1200;
+
+  /* 动效 */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 150ms;  --dur-base: 200ms;
+
+  /* 原生窗口控制按钮区宽度（Windows 右侧三按钮约 138px）；macOS 无此区，默认 0，
+     运行时由 ThemeSync 按平台覆盖 */
+  --titlebar-control-width: 0px;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -22,8 +53,8 @@ body {
 
 /* 全局滚动条 */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -31,12 +62,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(128, 128, 128, 0.3);
+  background: rgba(128, 128, 128, 0.45);
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(128, 128, 128, 0.5);
+  background: rgba(128, 128, 128, 0.6);
 }
 
 /* xterm 终端样式 */
@@ -55,70 +86,24 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes pulse-error {
-  0%, 100% {
-    box-shadow: 0 0 8px rgba(248, 113, 113, 0.2), inset 0 0 15px rgba(248, 113, 113, 0.03);
-  }
-  50% {
-    box-shadow: 0 0 20px rgba(248, 113, 113, 0.3), inset 0 0 20px rgba(248, 113, 113, 0.05);
-  }
+/* 状态脉冲：对左侧色条 ::before 做 opacity 动画（合成层友好，替代 box-shadow 重绘） */
+@keyframes status-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
 }
 
-@keyframes pulse-confirm {
-  0%, 100% {
-    box-shadow: 0 0 8px rgba(251, 191, 36, 0.2), inset 0 0 15px rgba(251, 191, 36, 0.03);
-  }
-  50% {
-    box-shadow: 0 0 20px rgba(251, 191, 36, 0.3), inset 0 0 20px rgba(251, 191, 36, 0.05);
-  }
-}
-
-@keyframes pulse-input {
-  0%, 100% {
-    box-shadow: 0 0 8px rgba(56, 189, 248, 0.2), inset 0 0 15px rgba(56, 189, 248, 0.03);
-  }
-  50% {
-    box-shadow: 0 0 20px rgba(56, 189, 248, 0.3), inset 0 0 20px rgba(56, 189, 248, 0.05);
-  }
-}
-
-.card-status-error {
-  animation: pulse-error 2s ease-in-out infinite;
-  border: 2px solid rgba(248, 113, 113, 0.4) !important;
-  position: relative;
-}
-.card-status-error::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: linear-gradient(180deg, #f87171, #ef4444);
-  border-radius: 3px 0 0 3px;
-}
-
-.card-status-needs-confirm {
-  animation: pulse-confirm 2s ease-in-out infinite;
-  border: 2px solid rgba(251, 191, 36, 0.4) !important;
-  position: relative;
-}
-.card-status-needs-confirm::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: linear-gradient(180deg, #fbbf24, #f59e0b);
-  border-radius: 3px 0 0 3px;
-}
-
+.card-status-error,
+.card-status-needs-confirm,
 .card-status-needs-input {
-  animation: pulse-input 2s ease-in-out infinite;
-  border: 2px solid rgba(56, 189, 248, 0.4) !important;
   position: relative;
 }
+
+.card-status-error { border: 2px solid color-mix(in srgb, var(--status-error) 40%, transparent) !important; }
+.card-status-needs-confirm { border: 2px solid color-mix(in srgb, var(--status-needs-confirm) 40%, transparent) !important; }
+.card-status-needs-input { border: 2px solid color-mix(in srgb, var(--status-needs-input) 40%, transparent) !important; }
+
+.card-status-error::before,
+.card-status-needs-confirm::before,
 .card-status-needs-input::before {
   content: '';
   position: absolute;
@@ -126,12 +111,25 @@ body {
   top: 0;
   bottom: 0;
   width: 3px;
-  background: linear-gradient(180deg, #38bdf8, #0ea5e9);
   border-radius: 3px 0 0 3px;
+  animation: status-pulse 2s ease-in-out infinite;
 }
+
+.card-status-error::before { background: var(--status-error); }
+.card-status-needs-confirm::before { background: var(--status-needs-confirm); }
+.card-status-needs-input::before { background: var(--status-needs-input); }
 
 .animate-fade-in {
   animation: fadeIn 0.2s ease-out;
+}
+
+/* 无障碍兜底：尊重系统「减弱动效」设置 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* 会话卡片 hover 效果 */
@@ -140,11 +138,56 @@ body {
 }
 .session-card:hover {
   border-color: var(--ant-color-primary) !important;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  box-shadow: var(--shadow-md);
 }
 .session-card:hover .session-card-preview {
   background: var(--ant-color-fill-quaternary) !important;
 }
 .session-card-preview {
   transition: background 0.2s ease;
+}
+
+/* 侧边栏交互元素：hover 态由 CSS 接管（替代命令式 onMouseEnter/Leave）。
+   原生 <button> 自带 :focus-visible 焦点环，这里不覆盖 outline，保留键盘可见焦点。 */
+.sb-nav-item {
+  background: transparent;
+  color: var(--ant-color-text-secondary);
+}
+.sb-nav-item:hover {
+  background: var(--ant-color-primary-bg);
+  color: var(--ant-color-primary);
+}
+.sb-nav-item-active,
+.sb-nav-item-active:hover {
+  background: var(--ant-color-primary-bg);
+  color: var(--ant-color-primary);
+}
+
+.sb-icon-btn {
+  background: transparent;
+  color: var(--ant-color-text-tertiary);
+}
+.sb-icon-btn:hover {
+  color: var(--ant-color-primary);
+  background: var(--ant-color-primary-bg);
+}
+
+.sb-danger-btn {
+  background: transparent;
+  color: var(--ant-color-text-tertiary);
+}
+.sb-danger-btn:hover {
+  color: var(--ant-color-error);
+  background: var(--ant-color-error-bg);
+}
+
+.sb-add-btn {
+  background: transparent;
+  border: 1px dashed var(--ant-color-border-secondary);
+  color: var(--ant-color-text-tertiary);
+}
+.sb-add-btn:hover {
+  background: var(--ant-color-primary-bg);
+  border-color: var(--ant-color-primary);
+  color: var(--ant-color-primary);
 }

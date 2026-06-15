@@ -2,6 +2,8 @@ import { PlusCircleFilled, CameraFilled, SettingFilled, SunFilled, MoonFilled, H
 import { Button, Dropdown, Tooltip, Select, message } from 'antd'
 import type { MenuProps } from 'antd'
 import { useAppStore } from '../store'
+import { STATUS_COLORS } from '../utils/statusColors'
+import { createSessionFromConfig } from '../utils/sessionActions'
 import AppIcon from './AppIcon'
 
 interface StatusCounts {
@@ -34,42 +36,17 @@ export default function Toolbar({
   const previewLineCount = useAppStore((s) => s.previewLineCount)
   const setPreviewLineCount = useAppStore((s) => s.setPreviewLineCount)
   const addSnapshot = useAppStore((s) => s.addSnapshot)
-  const addSession = useAppStore((s) => s.addSession)
-  const defaultQuickActions = useAppStore((s) => s.defaultQuickActions)
   const darkMode = useAppStore((s) => s.darkMode)
   const toggleDarkMode = useAppStore((s) => s.toggleDarkMode)
 
   // 快捷创建会话
   const handleQuickCreate = async (terminalType: 'powershell' | 'cmd' | 'bash', name: string) => {
-    try {
-      const sessionId = await window.electronAPI.createSession({
-        terminalType,
-        cwd: undefined,
-        initialCommand: undefined
-      })
-
-      if (!sessionId) {
-        message.error('创建会话失败')
-        return
-      }
-
-      addSession({
-        id: sessionId,
-        name,
-        terminalType,
-        cwd: '~',
-        history: [],
-        previewText: '',
-        status: 'idle',
-        quickActions: [...defaultQuickActions],
-        createdAt: Date.now(),
-        lastActivityAt: Date.now()
-      })
-
-      message.success(`已创建 ${name} 会话`)
-    } catch (e) {
+    const session = await createSessionFromConfig({ name, terminalType, cwd: '~' })
+    if (!session) {
       message.error('创建会话失败')
+      return
     }
+    message.success(`已创建 ${name} 会话`)
   }
 
   const newSessionItems: MenuProps['items'] = [
@@ -179,9 +156,9 @@ export default function Toolbar({
         borderBottom: '1px solid var(--ant-color-border-secondary)',
         background: 'var(--ant-color-bg-layout)',
         // 让整个 Toolbar 成为窗口拖拽区域（替代被隐藏的系统标题栏）
-        // 注意：右侧 138px 留给原生窗口控制按钮（最小化/最大化/关闭），避免重叠
+        // 右侧留出原生窗口控制按钮区（Windows 三按钮；macOS 无），避免重叠
         WebkitAppRegion: 'drag',
-        paddingRight: 138,
+        paddingRight: 'var(--titlebar-control-width)',
       }}
     >
       <div className="flex items-center gap-2">
@@ -206,10 +183,10 @@ export default function Toolbar({
             WebkitAppRegion: 'no-drag',
           }}
         >
-          {renderStatusBtn('running', '运行中', statusCounts.running, '#34d399')}
-          {statusCounts.error > 0 && renderStatusBtn('error', '错误', statusCounts.error, '#f87171')}
-          {statusCounts['needs-confirm'] > 0 && renderStatusBtn('needs-confirm', '待确认', statusCounts['needs-confirm'], '#fbbf24')}
-          {statusCounts['needs-input'] > 0 && renderStatusBtn('needs-input', '待输入', statusCounts['needs-input'], '#38bdf8')}
+          {renderStatusBtn('running', '运行中', statusCounts.running, STATUS_COLORS.running.color)}
+          {statusCounts.error > 0 && renderStatusBtn('error', '错误', statusCounts.error, STATUS_COLORS.error.color)}
+          {statusCounts['needs-confirm'] > 0 && renderStatusBtn('needs-confirm', '待确认', statusCounts['needs-confirm'], STATUS_COLORS['needs-confirm'].color)}
+          {statusCounts['needs-input'] > 0 && renderStatusBtn('needs-input', '待输入', statusCounts['needs-input'], STATUS_COLORS['needs-input'].color)}
         </div>
       </div>
 
@@ -243,19 +220,21 @@ export default function Toolbar({
           <Button
             icon={<CameraFilled />}
             onClick={handleSnapshot}
+            aria-label="保存快照"
             size="small"
             style={{ fontSize: 11 }}
           />
         </Tooltip>
 
         <Dropdown menu={{ items: menuItems }} placement="bottomRight">
-          <Button icon={<SettingFilled />} size="small" style={{ fontSize: 11 }} />
+          <Button icon={<SettingFilled />} aria-label="管理（预设/快照/规则）" size="small" style={{ fontSize: 11 }} />
         </Dropdown>
 
         <Tooltip title={darkMode ? '切换到亮色模式' : '切换到暗色模式'}>
           <Button
             icon={darkMode ? <SunFilled /> : <MoonFilled />}
             onClick={toggleDarkMode}
+            aria-label={darkMode ? '切换到亮色模式' : '切换到暗色模式'}
             size="small"
             style={{ fontSize: 11 }}
           />

@@ -222,7 +222,7 @@ export default function FullscreenTerminal() {
               ))}
             </div>
             <span style={{ fontSize: 13, color: 'var(--ant-color-text)', flex: 1 }}>{t.name}</span>
-            {terminalThemeId === t.id && <CheckOutlined style={{ color: '#38bdf8', fontSize: 12 }} />}
+            {terminalThemeId === t.id && <CheckOutlined style={{ color: 'var(--primary)', fontSize: 12 }} />}
           </div>
         ),
         onClick: () => setTerminalTheme(t.id),
@@ -241,7 +241,7 @@ export default function FullscreenTerminal() {
               ))}
             </div>
             <span style={{ fontSize: 13, color: 'var(--ant-color-text)', flex: 1 }}>{t.name}</span>
-            {terminalThemeId === t.id && <CheckOutlined style={{ color: '#38bdf8', fontSize: 12 }} />}
+            {terminalThemeId === t.id && <CheckOutlined style={{ color: 'var(--primary)', fontSize: 12 }} />}
           </div>
         ),
         onClick: () => setTerminalTheme(t.id),
@@ -300,7 +300,7 @@ export default function FullscreenTerminal() {
         left: 0,
         right: 0,
         bottom: 0,
-        zIndex: 1000,
+        zIndex: 'var(--z-fullscreen)',
         background: 'var(--ant-color-bg-base)',
         display: 'flex',
         flexDirection: 'column',
@@ -312,8 +312,8 @@ export default function FullscreenTerminal() {
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '8px 16px',
-          // 右侧留出 138px 给原生窗口控制按钮（最小化/最大化/关闭）
-          paddingRight: 138,
+          // 右侧留出原生窗口控制按钮区（Windows 三按钮；macOS 无）
+          paddingRight: 'var(--titlebar-control-width)',
           background: 'var(--ant-color-bg-layout)',
           borderBottom: '1px solid var(--ant-color-border)',
           flexShrink: 0,
@@ -375,6 +375,7 @@ export default function FullscreenTerminal() {
               type="text"
               icon={darkMode ? <SunFilled /> : <MoonFilled />}
               onClick={toggleDarkMode}
+              aria-label={darkMode ? '切换到亮色模式' : '切换到暗色模式'}
               style={{ color: 'var(--ant-color-text-secondary)' }}
             />
           </Tooltip>

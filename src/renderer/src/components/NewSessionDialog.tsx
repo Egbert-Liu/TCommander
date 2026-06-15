@@ -3,6 +3,8 @@ import { Modal, Form, Input, Select, Button, Space, Checkbox, Divider, Popconfir
 import { CodeFilled, SaveFilled, ReloadOutlined, ExclamationCircleFilled } from '@ant-design/icons'
 import { useAppStore } from '../store'
 import { Session } from '../types'
+import { createSessionFromConfig } from '../utils/sessionActions'
+import SessionConfigFields from './SessionConfigFields'
 
 interface NewSessionDialogProps {
   open: boolean
@@ -11,12 +13,10 @@ interface NewSessionDialogProps {
 }
 
 export default function NewSessionDialog({ open, onClose, resetSession }: NewSessionDialogProps) {
-  const addSession = useAppStore((s) => s.addSession)
   const removeSession = useAppStore((s) => s.removeSession)
   const addPreset = useAppStore((s) => s.addPreset)
   const presets = useAppStore((s) => s.presets)
   const groups = useAppStore((s) => s.groups)
-  const defaultQuickActions = useAppStore((s) => s.defaultQuickActions)
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [saveAsPreset, setSaveAsPreset] = useState(false)
@@ -46,32 +46,19 @@ export default function NewSessionDialog({ open, onClose, resetSession }: NewSes
       setLoading(true)
       const values = await form.validateFields()
 
-      const sessionId = await window.electronAPI.createSession({
+      const session = await createSessionFromConfig({
+        name: values.name,
         terminalType: values.terminalType,
-        cwd: values.cwd || undefined,
-        initialCommand: values.initialCommand || undefined
+        cwd: values.cwd,
+        initialCommand: values.initialCommand,
+        groupId: values.groupId,
       })
 
-      if (!sessionId) {
+      if (!session) {
         message.error('创建会话失败，请重试')
         setLoading(false)
         return
       }
-
-      addSession({
-        id: sessionId,
-        name: values.name,
-        groupId: values.groupId,
-        terminalType: values.terminalType,
-        cwd: values.cwd || '~',
-        initialCommand: values.initialCommand || undefined,
-        history: [],
-        previewText: '',
-        status: 'idle' as const,
-        quickActions: [...defaultQuickActions],
-        createdAt: Date.now(),
-        lastActivityAt: Date.now()
-      })
 
       if (saveAsPreset) {
         const name = presetName.trim() || values.name
@@ -105,34 +92,22 @@ export default function NewSessionDialog({ open, onClose, resetSession }: NewSes
 
       await window.electronAPI.closeSession(resetSession.id)
 
-      const sessionId = await window.electronAPI.createSession({
+      const session = await createSessionFromConfig({
+        name: values.name,
         terminalType: values.terminalType,
-        cwd: values.cwd || undefined,
-        initialCommand: values.initialCommand || undefined
+        cwd: values.cwd,
+        initialCommand: values.initialCommand,
+        groupId: values.groupId,
+        quickActions: resetSession.quickActions,
       })
 
-      if (!sessionId) {
+      if (!session) {
         message.error('重置会话失败，请重试')
         setLoading(false)
         return
       }
 
       removeSession(resetSession.id)
-
-      addSession({
-        id: sessionId,
-        name: values.name,
-        groupId: values.groupId,
-        terminalType: values.terminalType,
-        cwd: values.cwd || '~',
-        initialCommand: values.initialCommand || undefined,
-        history: [],
-        previewText: '',
-        status: 'idle' as const,
-        quickActions: [...resetSession.quickActions],
-        createdAt: Date.now(),
-        lastActivityAt: Date.now()
-      })
 
       message.success('会话已重置')
       onClose()
@@ -235,14 +210,8 @@ export default function NewSessionDialog({ open, onClose, resetSession }: NewSes
           </div>
         )}
 
-        <Form form={form} layout="vertical" size="small">
-          <Form.Item
-            name="name"
-            label="会话名称"
-            rules={[{ required: true, message: '请输入会话名称' }]}
-          >
-            <Input placeholder="输入会话名称" />
-          </Form.Item>
+        <Form form={form} layout="vertical" size="small" initialValues={{ terminalType: 'powershell' }}>
+          <SessionConfigFields nameLabel="会话名称" namePlaceholder="输入会话名称" />
 
           <Form.Item name="groupId" label="所属分组">
             <Select placeholder="选择分组（可选）" allowClear>
@@ -255,27 +224,6 @@ export default function NewSessionDialog({ open, onClose, resetSession }: NewSes
                 </Select.Option>
               ))}
             </Select>
-          </Form.Item>
-
-          <Form.Item
-            name="terminalType"
-            label="终端类型"
-            rules={[{ required: true, message: '请选择终端类型' }]}
-            initialValue="powershell"
-          >
-            <Select>
-              <Select.Option value="powershell">PowerShell</Select.Option>
-              <Select.Option value="cmd">CMD</Select.Option>
-              <Select.Option value="bash">Bash</Select.Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item name="cwd" label="工作目录">
-            <Input placeholder="留空使用默认目录" />
-          </Form.Item>
-
-          <Form.Item name="initialCommand" label="初始命令">
-            <Input placeholder="创建会话后自动执行的命令" />
           </Form.Item>
         </Form>
 

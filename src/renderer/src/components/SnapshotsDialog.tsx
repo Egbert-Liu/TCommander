@@ -1,6 +1,8 @@
 import { Modal, Button, Popconfirm, message } from 'antd'
 import { HistoryOutlined, DeleteOutlined, UndoOutlined } from '@ant-design/icons'
 import { useAppStore } from '../store'
+import EmptyState from './EmptyState'
+import { createSessionFromConfig } from '../utils/sessionActions'
 
 interface SnapshotsDialogProps {
   open: boolean
@@ -11,7 +13,6 @@ export default function SnapshotsDialog({ open, onClose }: SnapshotsDialogProps)
   const snapshots = useAppStore((s) => s.snapshots)
   const removeSnapshot = useAppStore((s) => s.removeSnapshot)
   const setGroups = useAppStore((s) => s.setGroups)
-  const defaultQuickActions = useAppStore((s) => s.defaultQuickActions)
 
   const handleRestore = async (snapshotId: string) => {
     const snapshot = snapshots.find(s => s.id === snapshotId)
@@ -27,28 +28,13 @@ export default function SnapshotsDialog({ open, onClose }: SnapshotsDialogProps)
     setGroups(newGroups)
 
     for (const sessionData of snapshot.data.sessions) {
-      const config = {
+      await createSessionFromConfig({
         name: sessionData.name,
         terminalType: sessionData.terminalType as 'powershell' | 'cmd' | 'bash',
         cwd: sessionData.cwd,
         initialCommand: sessionData.initialCommand,
         groupId: sessionData.groupId,
-      }
-      try {
-        const sessionId = await window.electronAPI.createSession(config)
-        useAppStore.getState().addSession({
-          id: sessionId,
-          ...config,
-          history: [],
-          previewText: '',
-          status: 'idle',
-          quickActions: [...defaultQuickActions],
-          createdAt: Date.now(),
-          lastActivityAt: Date.now(),
-        })
-      } catch (e) {
-        console.error('恢复会话失败:', e)
-      }
+      })
     }
 
     message.success(`已从快照恢复 ${snapshot.data.sessions.length} 个会话`)
@@ -63,10 +49,10 @@ export default function SnapshotsDialog({ open, onClose }: SnapshotsDialogProps)
   return (
     <Modal
       title={
-        <span style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 14 }}>
-          <HistoryOutlined style={{ marginRight: 8, color: 'var(--ant-color-primary)' }} />
+        <>
+          <HistoryOutlined style={{ color: 'var(--ant-color-primary)', marginRight: 8 }} />
           快照管理
-        </span>
+        </>
       }
       open={open}
       onCancel={onClose}
@@ -74,9 +60,12 @@ export default function SnapshotsDialog({ open, onClose }: SnapshotsDialogProps)
       width={520}
     >
       {snapshots.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '32px 0', color: 'var(--ant-color-text-tertiary)' }}>
-          <HistoryOutlined style={{ fontSize: 32, marginBottom: 8, display: 'block' }} />
-          暂无快照，点击工具栏"保存快照"创建
+        <div className="flex flex-col items-center gap-4 py-8">
+          <EmptyState
+            icon={<HistoryOutlined style={{ fontSize: 28, color: 'var(--primary)' }} />}
+            title="暂无快照"
+            description='点击工具栏"保存快照"创建'
+          />
         </div>
       ) : (
         <div style={{ maxHeight: 400, overflowY: 'auto' }}>

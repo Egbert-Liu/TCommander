@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Modal, Form, Input, Select, Button, Space, message } from 'antd'
+import { Modal, Form, Button, Space, message } from 'antd'
 import { useAppStore } from '../store'
 import { Preset } from '../types'
+import SessionConfigFields from './SessionConfigFields'
 
 interface PresetFormProps {
   open: boolean
@@ -67,33 +68,12 @@ export default function PresetForm({ open, onClose, editingPreset }: PresetFormP
       width={460}
     >
       <Form form={form} layout="vertical" size="small" initialValues={editingPreset || {}}>
-        <Form.Item
-          name="name"
-          label="预设名称"
-          rules={[{ required: true, message: '请输入预设名称' }]}
-        >
-          <Input placeholder="例如：开发环境" />
-        </Form.Item>
-
-        <Form.Item
-          name="terminalType"
-          label="终端类型"
-          rules={[{ required: true, message: '请选择终端类型' }]}
-        >
-          <Select>
-            <Select.Option value="powershell">PowerShell</Select.Option>
-            <Select.Option value="cmd">CMD</Select.Option>
-            <Select.Option value="bash">Bash</Select.Option>
-          </Select>
-        </Form.Item>
-
-        <Form.Item name="cwd" label="工作目录">
-          <Input placeholder="例如：C:\Projects" />
-        </Form.Item>
-
-        <Form.Item name="initialCommand" label="初始命令">
-          <Input placeholder="例如：npm run dev" />
-        </Form.Item>
+        <SessionConfigFields
+          nameLabel="预设名称"
+          namePlaceholder="例如：开发环境"
+          cwdPlaceholder="例如：C:\Projects"
+          commandPlaceholder="例如：npm run dev"
+        />
       </Form>
     </Modal>
   )

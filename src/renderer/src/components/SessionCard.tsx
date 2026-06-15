@@ -4,6 +4,7 @@ import type { MenuProps } from 'antd'
 import { ExpandOutlined, DeleteFilled, SendOutlined, CheckCircleFilled, CloseCircleFilled, CodeFilled, PlayCircleFilled, EditFilled, StopFilled, EnterOutlined, ArrowUpOutlined, ArrowDownOutlined, SettingOutlined, ReloadOutlined, SafetyCertificateFilled, CopyOutlined, ClearOutlined } from '@ant-design/icons'
 import { Session } from '../types'
 import { useAppStore } from '../store'
+import { STATUS_COLORS } from '../utils/statusColors'
 
 interface SessionCardProps {
   session: Session
@@ -14,11 +15,11 @@ interface SessionCardProps {
 }
 
 const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string; glow: boolean; icon: React.ReactNode }> = {
-  'needs-confirm': { color: '#fbbf24', bg: 'rgba(251, 191, 36, 0.1)', label: '需确认', glow: true, icon: <CheckCircleFilled /> },
-  'needs-input':   { color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.1)', label: '待输入', glow: true, icon: <PlayCircleFilled /> },
-  'error':         { color: '#f87171', bg: 'rgba(248, 113, 113, 0.1)', label: '错误', glow: true, icon: <CloseCircleFilled /> },
-  'running':       { color: '#34d399', bg: 'rgba(52, 211, 153, 0.1)', label: '运行中', glow: false, icon: <PlayCircleFilled /> },
-  'idle':          { color: '#64748b', bg: 'rgba(100, 116, 139, 0.08)', label: '空闲', glow: false, icon: <CodeFilled /> },
+  'needs-confirm': { ...STATUS_COLORS['needs-confirm'], label: '需确认', glow: true, icon: <CheckCircleFilled /> },
+  'needs-input':   { ...STATUS_COLORS['needs-input'], label: '待输入', glow: true, icon: <PlayCircleFilled /> },
+  'error':         { ...STATUS_COLORS['error'], label: '错误', glow: true, icon: <CloseCircleFilled /> },
+  'running':       { ...STATUS_COLORS['running'], label: '运行中', glow: false, icon: <PlayCircleFilled /> },
+  'idle':          { ...STATUS_COLORS['idle'], label: '空闲', glow: false, icon: <CodeFilled /> },
 }
 
 const ALL_QUICK_ACTIONS = ['Y', 'N', 'CtrlC', 'Up', 'Down', 'Input', 'Send', 'Enter']
@@ -248,6 +249,10 @@ export default function SessionCard({ session, onResetSession, selectable, selec
           ) : (
             <span
               onClick={() => setEditingName(true)}
+              role="button"
+              tabIndex={0}
+              aria-label="编辑会话名称"
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditingName(true) } }}
               style={{
                 fontSize: 11,
                 fontWeight: 600,
@@ -356,12 +361,13 @@ export default function SessionCard({ session, onResetSession, selectable, selec
                 size="small"
                 icon={<CheckCircleFilled style={{ fontSize: 10 }} />}
                 onClick={handleDismissStatus}
+                aria-label="标记为已处理"
                 style={{ minWidth: 20, width: 20, height: 20, color: statusCfg.color }}
               />
             </Tooltip>
           )}
-          <Button type="text" icon={<EditFilled style={{ fontSize: 10 }} />} onClick={() => setEditingName(true)} size="small" style={{ minWidth: 20, width: 20, height: 20 }} />
-          <Button type="text" icon={<ExpandOutlined style={{ fontSize: 10 }} />} onClick={handleFullscreen} size="small" style={{ minWidth: 20, width: 20, height: 20 }} />
+          <Button type="text" aria-label="重命名会话" icon={<EditFilled style={{ fontSize: 10 }} />} onClick={() => setEditingName(true)} size="small" style={{ minWidth: 20, width: 20, height: 20 }} />
+          <Button type="text" aria-label="全屏查看" icon={<ExpandOutlined style={{ fontSize: 10 }} />} onClick={handleFullscreen} size="small" style={{ minWidth: 20, width: 20, height: 20 }} />
           <Popconfirm
             title="确认删除"
             description="确定要删除此会话吗？终端进程将被关闭。"
@@ -371,7 +377,7 @@ export default function SessionCard({ session, onResetSession, selectable, selec
             okButtonProps={{ danger: true, size: 'small' }}
             cancelButtonProps={{ size: 'small' }}
           >
-            <Button type="text" danger icon={<DeleteFilled style={{ fontSize: 10 }} />} size="small" style={{ minWidth: 20, width: 20, height: 20 }} />
+            <Button type="text" danger aria-label="删除会话" icon={<DeleteFilled style={{ fontSize: 10 }} />} size="small" style={{ minWidth: 20, width: 20, height: 20 }} />
           </Popconfirm>
         </Space>
       </div>
@@ -429,6 +435,7 @@ export default function SessionCard({ session, onResetSession, selectable, selec
             <Button
               size="small"
               onClick={handleCtrlC}
+              aria-label="Ctrl+C"
               icon={<StopFilled style={{ fontSize: 11 }} />}
               style={{ width: 22, height: 20, minWidth: 22, padding: 0, borderRadius: 3 }}
             />
@@ -439,6 +446,7 @@ export default function SessionCard({ session, onResetSession, selectable, selec
             <Button
               size="small"
               onClick={handleArrowUp}
+              aria-label="上箭头"
               icon={<ArrowUpOutlined style={{ fontSize: 11 }} />}
               style={{ width: 20, height: 20, minWidth: 20, padding: 0, borderRadius: 3 }}
             />
@@ -449,6 +457,7 @@ export default function SessionCard({ session, onResetSession, selectable, selec
             <Button
               size="small"
               onClick={handleArrowDown}
+              aria-label="下箭头"
               icon={<ArrowDownOutlined style={{ fontSize: 11 }} />}
               style={{ width: 20, height: 20, minWidth: 20, padding: 0, borderRadius: 3 }}
             />
@@ -467,16 +476,16 @@ export default function SessionCard({ session, onResetSession, selectable, selec
         )}
         {quickActions.includes('Send') && (
           <Tooltip title="发送">
-            <Button type="primary" icon={<SendOutlined style={{ fontSize: 11 }} />} onClick={handleSendInput} size="small" style={{ width: 22, height: 20, minWidth: 22, padding: 0, borderRadius: 3 }} />
+            <Button type="primary" aria-label="发送" icon={<SendOutlined style={{ fontSize: 11 }} />} onClick={handleSendInput} size="small" style={{ width: 22, height: 20, minWidth: 22, padding: 0, borderRadius: 3 }} />
           </Tooltip>
         )}
         {quickActions.includes('Enter') && (
           <Tooltip title="Enter">
-            <Button size="small" icon={<EnterOutlined style={{ fontSize: 11 }} />} onClick={handleEnter} style={{ width: 20, height: 20, minWidth: 20, padding: 0, borderRadius: 3 }} />
+            <Button size="small" aria-label="Enter" icon={<EnterOutlined style={{ fontSize: 11 }} />} onClick={handleEnter} style={{ width: 20, height: 20, minWidth: 20, padding: 0, borderRadius: 3 }} />
           </Tooltip>
         )}
         <Popover content={settingsContent} title="快捷操作显示设置" trigger="click" placement="topRight">
-          <Button type="text" icon={<SettingOutlined style={{ fontSize: 10 }} />} size="small" style={{ width: 20, height: 20, minWidth: 20, padding: 0, flexShrink: 0 }} title="快捷操作设置" />
+          <Button type="text" aria-label="快捷操作设置" icon={<SettingOutlined style={{ fontSize: 10 }} />} size="small" style={{ width: 20, height: 20, minWidth: 20, padding: 0, flexShrink: 0 }} title="快捷操作设置" />
         </Popover>
       </div>
     </div>

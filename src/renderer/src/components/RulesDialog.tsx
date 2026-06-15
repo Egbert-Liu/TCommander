@@ -3,6 +3,7 @@ import { Modal, Switch, Button, Input, Select, Tag, Space, Popconfirm, Empty, Di
 import { PlusOutlined, DeleteOutlined, InfoCircleFilled, EditFilled, CheckOutlined, CloseOutlined } from '@ant-design/icons'
 import { useAppStore } from '../store'
 import { TriggerRule, TriggerType, SessionStatus } from '../types'
+import { STATUS_COLORS } from '../utils/statusColors'
 
 interface RulesDialogProps {
   open: boolean
@@ -18,11 +19,11 @@ const TRIGGER_TYPE_OPTIONS: { value: TriggerType; label: string; desc: string }[
 ]
 
 const STATUS_OPTIONS: { value: SessionStatus; label: string; color: string }[] = [
-  { value: 'error', label: '错误', color: '#f87171' },
-  { value: 'needs-confirm', label: '需确认', color: '#fbbf24' },
-  { value: 'needs-input', label: '待输入', color: '#38bdf8' },
-  { value: 'running', label: '运行中', color: '#34d399' },
-  { value: 'idle', label: '空闲', color: '#64748b' },
+  { value: 'error', label: '错误', color: STATUS_COLORS.error.color },
+  { value: 'needs-confirm', label: '需确认', color: STATUS_COLORS['needs-confirm'].color },
+  { value: 'needs-input', label: '待输入', color: STATUS_COLORS['needs-input'].color },
+  { value: 'running', label: '运行中', color: STATUS_COLORS.running.color },
+  { value: 'idle', label: '空闲', color: STATUS_COLORS.idle.color },
 ]
 
 export default function RulesDialog({ open, onClose }: RulesDialogProps) {
@@ -215,7 +216,7 @@ export default function RulesDialog({ open, onClose }: RulesDialogProps) {
               <Tag
                 style={{
                   margin: 0,
-                  fontSize: 9,
+                  fontSize: 11,
                   lineHeight: '16px',
                   background: `${statusOpt?.color}15`,
                   border: `1px solid ${statusOpt?.color}30`,
@@ -229,7 +230,7 @@ export default function RulesDialog({ open, onClose }: RulesDialogProps) {
               <Tag
                 style={{
                   margin: 0,
-                  fontSize: 9,
+                  fontSize: 11,
                   lineHeight: '16px',
                   background: 'var(--ant-color-primary-bg)',
                   border: 'none',

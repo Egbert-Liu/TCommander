@@ -51,6 +51,7 @@
     },
     "files": [
       "out/**/*",
+      "dist/**/*",
       "package.json"
     ],
     "win": {

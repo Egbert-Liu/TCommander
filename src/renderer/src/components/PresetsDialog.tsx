@@ -4,6 +4,8 @@ import { PlusOutlined, DeleteOutlined, EditOutlined, SettingOutlined, PlayCircle
 import type { ColumnsType } from 'antd/es/table'
 import { useAppStore } from '../store'
 import PresetForm from './PresetForm'
+import EmptyState from './EmptyState'
+import { createSessionFromConfig } from '../utils/sessionActions'
 import { Preset } from '../types'
 
 interface PresetsDialogProps {
@@ -14,8 +16,6 @@ interface PresetsDialogProps {
 export default function PresetsDialog({ open, onClose }: PresetsDialogProps) {
   const presets = useAppStore((s) => s.presets)
   const removePreset = useAppStore((s) => s.removePreset)
-  const addSession = useAppStore((s) => s.addSession)
-  const defaultQuickActions = useAppStore((s) => s.defaultQuickActions)
   const [showForm, setShowForm] = useState(false)
   const [editingPreset, setEditingPreset] = useState<Preset | null>(null)
 
@@ -40,37 +40,18 @@ export default function PresetsDialog({ open, onClose }: PresetsDialogProps) {
   }
 
   const handleCreateFromPreset = async (preset: Preset) => {
-    try {
-      const sessionId = await window.electronAPI.createSession({
-        terminalType: preset.terminalType as 'powershell' | 'cmd' | 'bash',
-        cwd: preset.cwd || undefined,
-        initialCommand: preset.initialCommand || undefined
-      })
-
-      if (!sessionId) {
-        message.error('创建会话失败')
-        return
-      }
-
-      addSession({
-        id: sessionId,
-        name: preset.name,
-        groupId: preset.groupId,
-        terminalType: preset.terminalType as 'powershell' | 'cmd' | 'bash',
-        cwd: preset.cwd || '~',
-        initialCommand: preset.initialCommand || undefined,
-        history: [],
-        previewText: '',
-        status: 'idle',
-        quickActions: [...defaultQuickActions],
-        createdAt: Date.now(),
-        lastActivityAt: Date.now()
-      })
-
-      message.success(`会话"${preset.name}"已创建`)
-    } catch {
+    const session = await createSessionFromConfig({
+      name: preset.name,
+      terminalType: preset.terminalType,
+      cwd: preset.cwd,
+      initialCommand: preset.initialCommand,
+      groupId: preset.groupId,
+    })
+    if (!session) {
       message.error('创建会话失败')
+      return
     }
+    message.success(`会话"${preset.name}"已创建`)
   }
 
   const columns: ColumnsType<Preset> = [
@@ -172,11 +153,12 @@ export default function PresetsDialog({ open, onClose }: PresetsDialogProps) {
             size="small"
           />
         ) : (
-          <div 
-            className="text-center py-10"
-            style={{ color: 'var(--ant-color-text-tertiary)', fontSize: 13 }}
-          >
-            暂无预设，点击"新建预设"创建
+          <div className="flex flex-col items-center gap-4 py-10">
+            <EmptyState
+              icon={<SettingOutlined style={{ fontSize: 28, color: 'var(--primary)' }} />}
+              title="暂无预设"
+              description='点击"新建预设"创建'
+            />
           </div>
         )}
       </Modal>

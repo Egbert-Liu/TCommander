@@ -11,7 +11,10 @@ import NewSessionDialog from './components/NewSessionDialog'
 import PresetsDialog from './components/PresetsDialog'
 import SnapshotsDialog from './components/SnapshotsDialog'
 import RulesDialog from './components/RulesDialog'
+import EmptyState from './components/EmptyState'
 import { cleanTerminalOutput, detectStatusWithRules, truncateHistory } from './utils/statusDetector'
+import { STATUS_COLORS } from './utils/statusColors'
+import { createSessionFromConfig } from './utils/sessionActions'
 
 /** Sync Ant Design theme tokens to :root CSS variables so var(--ant-*) works in all inline styles */
 function ThemeSync() {
@@ -34,6 +37,15 @@ function ThemeSync() {
       '--ant-color-fill-quaternary': token.colorFillQuaternary,
       '--ant-color-error': token.colorError,
       '--ant-color-error-bg': token.colorErrorBg,
+      // 状态色（单一来源 STATUS_COLORS）+ 主色 + 标题栏控制区宽度，供 CSS var 引用
+      ...Object.fromEntries(
+        Object.entries(STATUS_COLORS).flatMap(([status, c]) => [
+          [`--status-${status}`, c.color],
+          [`--status-${status}-bg`, c.bg],
+        ])
+      ),
+      '--primary': '#38bdf8',
+      '--titlebar-control-width': /Win/.test(navigator.userAgent) ? '138px' : '0px',
     }
     Object.entries(vars).forEach(([k, v]) => root.style.setProperty(k, String(v)))
   }, [token])
@@ -99,42 +111,9 @@ function App() {
 
   // 空状态快速创建菜单
   const quickCreateItems = [
-    { key: 'powershell', label: 'PowerShell', onClick: () => {
-      window.electronAPI.createSession({ terminalType: 'powershell' }).then(id => {
-        if (id) {
-          useAppStore.getState().addSession({
-            id, name: 'PowerShell', terminalType: 'powershell', cwd: '~',
-            history: [], previewText: '', status: 'idle',
-            quickActions: [...useAppStore.getState().defaultQuickActions],
-            createdAt: Date.now(), lastActivityAt: Date.now()
-          })
-        }
-      })
-    }},
-    { key: 'cmd', label: 'CMD', onClick: () => {
-      window.electronAPI.createSession({ terminalType: 'cmd' }).then(id => {
-        if (id) {
-          useAppStore.getState().addSession({
-            id, name: 'CMD', terminalType: 'cmd', cwd: '~',
-            history: [], previewText: '', status: 'idle',
-            quickActions: [...useAppStore.getState().defaultQuickActions],
-            createdAt: Date.now(), lastActivityAt: Date.now()
-          })
-        }
-      })
-    }},
-    { key: 'bash', label: 'Bash', onClick: () => {
-      window.electronAPI.createSession({ terminalType: 'bash' }).then(id => {
-        if (id) {
-          useAppStore.getState().addSession({
-            id, name: 'Bash', terminalType: 'bash', cwd: '~',
-            history: [], previewText: '', status: 'idle',
-            quickActions: [...useAppStore.getState().defaultQuickActions],
-            createdAt: Date.now(), lastActivityAt: Date.now()
-          })
-        }
-      })
-    }},
+    { key: 'powershell', label: 'PowerShell', onClick: () => createSessionFromConfig({ name: 'PowerShell', terminalType: 'powershell', cwd: '~' }) },
+    { key: 'cmd', label: 'CMD', onClick: () => createSessionFromConfig({ name: 'CMD', terminalType: 'cmd', cwd: '~' }) },
+    { key: 'bash', label: 'Bash', onClick: () => createSessionFromConfig({ name: 'Bash', terminalType: 'bash', cwd: '~' }) },
   ]
 
   useEffect(() => {
@@ -572,56 +551,24 @@ function App() {
             ) : (
               <div className="flex flex-col items-center justify-center h-full gap-4">
                 {statusFilter ? (
-                  <>
-                    <div
-                      className="w-16 h-16 rounded-xl flex items-center justify-center"
-                      style={{
-                        background: statusFilter === 'error'
-                          ? 'rgba(248, 113, 113, 0.12)'
-                          : statusFilter === 'needs-confirm'
-                            ? 'rgba(251, 191, 36, 0.12)'
-                            : 'rgba(56, 189, 248, 0.12)',
-                      }}
+                  <EmptyState
+                    icon={<CodeFilled style={{ fontSize: 28, color: STATUS_COLORS[statusFilter as keyof typeof STATUS_COLORS]?.color }} />}
+                    tint={STATUS_COLORS[statusFilter as keyof typeof STATUS_COLORS]?.bg}
+                    title={`没有${statusFilter === 'error' ? '错误' : statusFilter === 'needs-confirm' ? '待确认' : statusFilter === 'needs-input' ? '待输入' : statusFilter === 'running' ? '运行中' : statusFilter}的会话`}
+                  >
+                    <button
+                      onClick={() => setStatusFilter(null)}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--ant-color-primary)', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}
                     >
-                      <CodeFilled style={{ fontSize: 28, color: statusFilter === 'error' ? '#f87171' : statusFilter === 'needs-confirm' ? '#fbbf24' : '#38bdf8' }} />
-                    </div>
-                    <div className="text-center">
-                      <p style={{ color: 'var(--ant-color-text-secondary)', fontSize: 13, marginBottom: 2 }}>
-                        没有{statusFilter === 'error' ? '错误' : statusFilter === 'needs-confirm' ? '待确认' : '待输入'}的会话
-                      </p>
-                      <button
-                        onClick={() => setStatusFilter(null)}
-                        style={{
-                          background: 'transparent',
-                          border: 'none',
-                          color: 'var(--ant-color-primary)',
-                          fontSize: 12,
-                          cursor: 'pointer',
-                          textDecoration: 'underline',
-                        }}
-                      >
-                        清除筛选
-                      </button>
-                    </div>
-                  </>
+                      清除筛选
+                    </button>
+                  </EmptyState>
                 ) : sessions.length === 0 ? (
-                  <>
-                    <div
-                      className="w-16 h-16 rounded-xl flex items-center justify-center"
-                      style={{
-                        background: 'linear-gradient(135deg, rgba(56,189,248,0.12) 0%, rgba(129,140,248,0.12) 100%)',
-                      }}
-                    >
-                      <CodeFilled style={{ fontSize: 28, color: '#38bdf8' }} />
-                    </div>
-                    <div className="text-center">
-                      <p style={{ color: 'var(--ant-color-text-secondary)', fontSize: 13, marginBottom: 2 }}>
-                        暂无终端会话
-                      </p>
-                      <p style={{ color: 'var(--ant-color-text-tertiary)', fontSize: 11 }}>
-                        创建一个新会话开始管理你的终端
-                      </p>
-                    </div>
+                  <EmptyState
+                    icon={<CodeFilled style={{ fontSize: 28, color: 'var(--primary)' }} />}
+                    title="暂无终端会话"
+                    description="创建一个新会话开始管理你的终端"
+                  >
                     <Space>
                       <Dropdown menu={{ items: quickCreateItems as MenuProps['items'] }} trigger={['click']}>
                         <Button type="primary" icon={<PlusCircleFilled />} size="small">
@@ -636,7 +583,7 @@ function App() {
                         详细配置
                       </Button>
                     </Space>
-                  </>
+                  </EmptyState>
                 ) : (
                   <div className="text-center">
                     <p style={{ color: 'var(--ant-color-text-secondary)', fontSize: 13 }}>
