@@ -1,6 +1,6 @@
 {
   "name": "tcommander",
-  "version": "0.1.1",
+  "version": "0.1.0",
   "description": "TCommander - Multi-terminal session manager for developers",
   "main": "./out/main/index.js",
   "author": "",
@@ -34,7 +34,8 @@
     "@vitejs/plugin-react": "^4.2.0",
     "autoprefixer": "^10.4.0",
     "electron": "^29.0.0",
-    "electron-builder": "^24.13.0",
+    "electron-builder": "^25.1.8",
+    "electron-packager": "^17.1.2",
     "postcss": "^8.4.0",
     "tailwindcss": "^3.4.0",
     "typescript": "^5.3.0",
@@ -47,12 +48,16 @@
     "productName": "TCommander",
     "copyright": "Copyright © 2024",
     "directories": {
-      "output": "release"
+      "output": "release_optimized"
     },
     "files": [
       "out/**/*",
       "dist/**/*",
       "package.json"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "**/*.node"
     ],
     "win": {
       "target": [
@@ -65,6 +70,7 @@
       ],
       "icon": "build/icon.ico"
     },
+    "afterPack": "./scripts/afterPack.js",
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,

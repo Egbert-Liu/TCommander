@@ -15,7 +15,7 @@ export default defineConfig({
         },
         vite: {
           build: {
-            sourcemap: true,
+            sourcemap: false,
             outDir: 'out/main',
             rollupOptions: {
               external: ['electron', 'node-pty', 'electron-store']
@@ -30,14 +30,21 @@ export default defineConfig({
         },
         vite: {
           build: {
-            sourcemap: true,
+            sourcemap: false,
             outDir: 'out/preload'
           }
         }
       }
     ]),
-    renderer()
+    renderer({
+      optimizeDeps: {
+        exclude: ['node-pty']
+      }
+    })
   ],
+  build: {
+    sourcemap: false
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src/renderer/src')
