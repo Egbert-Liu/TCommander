@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { ConfigProvider, theme, Button, Checkbox, Space, Popconfirm, Dropdown, Input } from 'antd'
+import { ConfigProvider, theme, Button, Checkbox, Space, Popconfirm, Dropdown, Input, Select } from 'antd'
 import type { MenuProps } from 'antd'
 import { PlusCircleFilled, CodeFilled, DeleteOutlined, CloseOutlined, SettingFilled, SearchOutlined } from '@ant-design/icons'
 import { useAppStore } from './store'
@@ -68,6 +68,8 @@ function App() {
   const setDarkMode = useAppStore((s) => s.setDarkMode)
   const setRules = useAppStore((s) => s.setRules)
   const removeSession = useAppStore((s) => s.removeSession)
+  const previewLineCount = useAppStore((s) => s.previewLineCount)
+  const setPreviewLineCount = useAppStore((s) => s.setPreviewLineCount)
 
   const [showNewSession, setShowNewSession] = useState(false)
   const [showPresets, setShowPresets] = useState(false)
@@ -452,7 +454,7 @@ function App() {
               background: 'var(--ant-color-bg-container)',
             }}
           >
-            {/* 筛选栏：搜索 + 当前激活的筛选条件 */}
+            {/* 筛选栏：搜索 + 预览行数 + 当前激活的筛选条件 */}
             <div className="mb-4 flex items-center gap-3 flex-wrap">
               <Input
                 placeholder="搜索会话名称/内容..."
@@ -462,6 +464,19 @@ function App() {
                 allowClear
                 size="small"
                 style={{ width: 220 }}
+              />
+
+              <Select
+                value={previewLineCount}
+                onChange={setPreviewLineCount}
+                size="small"
+                style={{ width: 80 }}
+                options={[
+                  { value: 5, label: '5行预览' },
+                  { value: 10, label: '10行预览' },
+                  { value: 15, label: '15行预览' },
+                  { value: 20, label: '20行预览' },
+                ]}
               />
 
               {statusFilter && (

@@ -48,16 +48,17 @@
     "productName": "TCommander",
     "copyright": "Copyright © 2024",
     "directories": {
-      "output": "release_optimized"
+      "output": "release_v4"
     },
     "files": [
       "out/**/*",
       "dist/**/*",
+      "build/**/*",
       "package.json"
     ],
-    "asar": true,
     "asarUnpack": [
-      "**/*.node"
+      "**/*.node",
+      "build/**/*"
     ],
     "win": {
       "target": [

@@ -1,5 +1,5 @@
 import { PlusCircleFilled, CameraFilled, SettingFilled, SunFilled, MoonFilled, HistoryOutlined, SafetyCertificateFilled } from '@ant-design/icons'
-import { Button, Dropdown, Tooltip, Select, message } from 'antd'
+import { Button, Dropdown, Tooltip, message } from 'antd'
 import type { MenuProps } from 'antd'
 import { useAppStore } from '../store'
 import { STATUS_COLORS } from '../utils/statusColors'
@@ -33,8 +33,6 @@ export default function Toolbar({
   statusFilter,
   onStatusFilterChange,
 }: ToolbarProps) {
-  const previewLineCount = useAppStore((s) => s.previewLineCount)
-  const setPreviewLineCount = useAppStore((s) => s.setPreviewLineCount)
   const addSnapshot = useAppStore((s) => s.addSnapshot)
   const darkMode = useAppStore((s) => s.darkMode)
   const toggleDarkMode = useAppStore((s) => s.toggleDarkMode)
@@ -195,21 +193,6 @@ export default function Toolbar({
         // 按钮区域必须设为 no-drag，否则点击会被当作拖拽窗口
         style={{ WebkitAppRegion: 'no-drag' }}
       >
-        <Tooltip title="预览行数">
-          <Select
-            value={previewLineCount}
-            onChange={setPreviewLineCount}
-            size="small"
-            style={{ width: 65 }}
-            options={[
-              { value: 5, label: '5行' },
-              { value: 10, label: '10行' },
-              { value: 15, label: '15行' },
-              { value: 20, label: '20行' },
-            ]}
-          />
-        </Tooltip>
-
         <Dropdown menu={{ items: newSessionItems }} trigger={['click']} placement="bottomLeft">
           <Button type="primary" icon={<PlusCircleFilled />} size="small" style={{ fontSize: 11 }}>
             新建

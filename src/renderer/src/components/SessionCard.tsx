@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo, useCallback } from 'react'
-import { Tag, Button, Input, Space, Popconfirm, Select, Popover, Checkbox, Tooltip, Dropdown, message } from 'antd'
+import { Tag, Button, Input, Checkbox, Tooltip, Dropdown, Popover, message } from 'antd'
 import type { MenuProps } from 'antd'
-import { ExpandOutlined, DeleteFilled, SendOutlined, CheckCircleFilled, CloseCircleFilled, CodeFilled, PlayCircleFilled, EditFilled, StopFilled, EnterOutlined, ArrowUpOutlined, ArrowDownOutlined, SettingOutlined, ReloadOutlined, SafetyCertificateFilled, CopyOutlined, ClearOutlined } from '@ant-design/icons'
+import { ExpandOutlined, DeleteFilled, CheckCircleFilled, CloseCircleFilled, CodeFilled, PlayCircleFilled, EditFilled, SafetyCertificateFilled, CopyOutlined, ClearOutlined, MoreOutlined, CheckOutlined, StopFilled, ArrowUpOutlined, ArrowDownOutlined, SendOutlined, EnterOutlined, SettingOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Session } from '../types'
 import { useAppStore } from '../store'
 import { STATUS_COLORS } from '../utils/statusColors'
@@ -332,54 +332,79 @@ export default function SessionCard({ session, onResetSession, selectable, selec
               </Tag>
             </Tooltip>
           )}
-
-          <Select
-            value={session.groupId || undefined}
-            onChange={handleGroupChange}
-            placeholder="组"
-            allowClear
-            size="small"
-            style={{ minWidth: 70, maxWidth: 70, fontSize: 10 }}
-            dropdownStyle={{ fontSize: 11 }}
-          >
-            {groups.map(g => (
-              <Select.Option key={g.id} value={g.id}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: g.color, display: 'inline-block' }} />
-                  {g.name}
-                </span>
-              </Select.Option>
-            ))}
-          </Select>
         </div>
 
-        <Space size={1} className="flex-shrink-0 ml-1">
-          {statusCfg.glow && (
-            <Tooltip title={`标记为已处理（触发规则: ${session.matchedRuleName || statusCfg.label}）`}>
-              <Button
-                type="text"
-                size="small"
-                icon={<CheckCircleFilled style={{ fontSize: 10 }} />}
-                onClick={handleDismissStatus}
-                aria-label="标记为已处理"
-                style={{ minWidth: 20, width: 20, height: 20, color: statusCfg.color }}
-              />
-            </Tooltip>
-          )}
-          <Button type="text" aria-label="重命名会话" icon={<EditFilled style={{ fontSize: 10 }} />} onClick={() => setEditingName(true)} size="small" style={{ minWidth: 20, width: 20, height: 20 }} />
-          <Button type="text" aria-label="全屏查看" icon={<ExpandOutlined style={{ fontSize: 10 }} />} onClick={handleFullscreen} size="small" style={{ minWidth: 20, width: 20, height: 20 }} />
-          <Popconfirm
-            title="确认删除"
-            description="确定要删除此会话吗？终端进程将被关闭。"
-            onConfirm={handleClose}
-            okText="删除"
-            cancelText="取消"
-            okButtonProps={{ danger: true, size: 'small' }}
-            cancelButtonProps={{ size: 'small' }}
-          >
-            <Button type="text" danger aria-label="删除会话" icon={<DeleteFilled style={{ fontSize: 10 }} />} size="small" style={{ minWidth: 20, width: 20, height: 20 }} />
-          </Popconfirm>
-        </Space>
+        <Dropdown
+          menu={{
+            items: [
+              {
+                key: 'rename',
+                icon: <EditFilled style={{ fontSize: 11 }} />,
+                label: '重命名',
+                onClick: () => setEditingName(true),
+              },
+              {
+                key: 'fullscreen',
+                icon: <ExpandOutlined style={{ fontSize: 11 }} />,
+                label: '全屏查看',
+                onClick: handleFullscreen,
+              },
+              {
+                key: 'copy',
+                icon: <CopyOutlined style={{ fontSize: 11 }} />,
+                label: '复制预览',
+                onClick: handleCopyPreview,
+              },
+              {
+                key: 'clear',
+                icon: <ClearOutlined style={{ fontSize: 11 }} />,
+                label: '清空历史',
+                onClick: handleClearHistory,
+              },
+              {
+                key: 'group',
+                icon: <span style={{ fontSize: 11, width: 11, display: 'inline-flex', justifyContent: 'center' }}>📁</span>,
+                label: '切换分组',
+                children: [
+                  {
+                    key: 'group-none',
+                    icon: <CheckOutlined style={{ fontSize: 10, visibility: session.groupId ? 'hidden' : 'visible' }} />,
+                    label: '无分组',
+                    onClick: () => handleGroupChange(undefined),
+                  },
+                  ...groups.map(g => ({
+                    key: `group-${g.id}`,
+                    icon: <CheckOutlined style={{ fontSize: 10, color: g.color, visibility: session.groupId === g.id ? 'visible' : 'hidden' }} />,
+                    label: (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: g.color, display: 'inline-block' }} />
+                        {g.name}
+                      </span>
+                    ),
+                    onClick: () => handleGroupChange(g.id),
+                  })),
+                ],
+              },
+              { type: 'divider' },
+              {
+                key: 'delete',
+                icon: <DeleteFilled style={{ fontSize: 11 }} />,
+                label: '删除会话',
+                danger: true,
+                onClick: handleClose,
+              },
+            ],
+          }}
+          trigger={['click']}
+          placement="bottomRight"
+        >
+          <Button
+            type="text"
+            icon={<MoreOutlined style={{ fontSize: 14 }} />}
+            size="small"
+            style={{ minWidth: 20, width: 20, height: 20, flexShrink: 0 }}
+          />
+        </Dropdown>
       </div>
 
       <Dropdown menu={{ items: contextMenuItems }} trigger={['contextMenu']}>

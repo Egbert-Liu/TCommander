@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, Menu } from 'electron'
 import path from 'path'
+import { fileURLToPath } from 'url'
 import { createPtyManager } from './pty'
 import { createStorageManager } from './storage'
 
@@ -8,12 +9,31 @@ const storageManager = createStorageManager()
 
 let mainWindow: BrowserWindow | null = null
 
+// 计算项目根目录：dev 模式下为 dist 目录；
+// 打包后，app.asar 作为虚拟目录挂在 process.resourcesPath 下
+function getResourcesPath(): string {
+  if (app.isPackaged) {
+    // 打包后，渲染进程构建产物在 app.asar 内的 dist 目录下
+    // 使用 path.join 确保路径分隔符正确，asar 支持标准路径
+    return path.join(process.resourcesPath, 'app.asar', 'dist')
+  }
+  return path.join(__dirname, '..', '..', 'dist')
+}
+
+function getIconPath(): string {
+  if (app.isPackaged) {
+    // 打包后，build 目录从 asar 中解压出来，路径在 app.asar.unpacked/build
+    return path.join(process.resourcesPath, 'app.asar.unpacked', 'build', 'icon.ico')
+  }
+  return path.join(__dirname, '..', '..', 'build', 'icon.ico')
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     title: 'TCommander',
-    icon: path.join(__dirname, '../../build/icon.ico'),
+    icon: getIconPath(),
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
       nodeIntegration: false,
@@ -39,7 +59,8 @@ function createWindow() {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL)
     mainWindow.webContents.openDevTools()
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../index.html'))
+    // 加载渲染进程构建后的 index.html（位于 dist 目录）
+    mainWindow.loadFile(path.join(getResourcesPath(), 'index.html'))
   }
 }
 
