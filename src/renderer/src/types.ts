@@ -49,6 +49,7 @@ export interface Preset {
 export interface Snapshot {
   id: string
   name: string
+  description?: string
   data: SnapshotData
   createdAt: number
 }

@@ -8,6 +8,9 @@ interface ElectronAPI {
   storageGet: (key: string) => Promise<any>
   storageSet: (key: string, value: any) => Promise<void>
   setTitleBarOverlay: (opts: { color: string; symbolColor: string }) => Promise<void>
+  windowMinimize: () => Promise<void>
+  windowToggleMaximize: () => Promise<void>
+  windowClose: () => Promise<void>
   onSessionOutput: (callback: (sessionId: string, data: string) => void) => () => void
   onSessionExit: (callback: (sessionId: string, exitCode: number) => void) => () => void
 }

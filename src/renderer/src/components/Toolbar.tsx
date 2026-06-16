@@ -1,5 +1,6 @@
 import { PlusCircleFilled, CameraFilled, SettingFilled, SunFilled, MoonFilled, HistoryOutlined, SafetyCertificateFilled } from '@ant-design/icons'
-import { Button, Dropdown, Tooltip, message } from 'antd'
+import { Button, Dropdown, Tooltip, Modal, Input, message } from 'antd'
+import { useState } from 'react'
 import type { MenuProps } from 'antd'
 import { useAppStore } from '../store'
 import { STATUS_COLORS } from '../utils/statusColors'
@@ -37,6 +38,49 @@ export default function Toolbar({
   const darkMode = useAppStore((s) => s.darkMode)
   const toggleDarkMode = useAppStore((s) => s.toggleDarkMode)
 
+  // 保存快照弹框
+  const [snapshotModalOpen, setSnapshotModalOpen] = useState(false)
+  const [snapshotName, setSnapshotName] = useState('')
+  const [snapshotDescription, setSnapshotDescription] = useState('')
+
+  const openSnapshotModal = () => {
+    const sessions = useAppStore.getState().sessions
+    if (sessions.length === 0) {
+      message.warning('当前没有活跃会话，无法创建快照')
+      return
+    }
+    setSnapshotName(`快照 ${new Date().toLocaleString()}`)
+    setSnapshotDescription('')
+    setSnapshotModalOpen(true)
+  }
+
+  const handleSaveSnapshot = () => {
+    const name = snapshotName.trim() || `快照 ${new Date().toLocaleString()}`
+    const description = snapshotDescription.trim() || undefined
+    const sessions = useAppStore.getState().sessions
+    const groups = useAppStore.getState().groups
+    const snapshot = {
+      id: `snapshot-${Date.now()}`,
+      name,
+      description,
+      data: {
+        sessions: sessions.map(s => ({
+          name: s.name,
+          groupId: s.groupId,
+          terminalType: s.terminalType,
+          cwd: s.cwd,
+          initialCommand: s.initialCommand,
+          history: s.history,
+        })),
+        groups,
+      },
+      createdAt: Date.now(),
+    }
+    addSnapshot(snapshot)
+    message.success('快照已保存')
+    setSnapshotModalOpen(false)
+  }
+
   // 快捷创建会话
   const handleQuickCreate = async (terminalType: 'powershell' | 'cmd' | 'bash', name: string) => {
     const session = await createSessionFromConfig({ name, terminalType })
@@ -71,36 +115,6 @@ export default function Toolbar({
       onClick: onNewSession,
     },
   ]
-
-  const handleSnapshot = () => {
-    const sessions = useAppStore.getState().sessions
-    const groups = useAppStore.getState().groups
-
-    if (sessions.length === 0) {
-      message.warning('当前没有活跃会话，无法创建快照')
-      return
-    }
-
-    const snapshot = {
-      id: `snapshot-${Date.now()}`,
-      name: `快照 ${new Date().toLocaleString()}`,
-      data: {
-        sessions: sessions.map(s => ({
-          name: s.name,
-          groupId: s.groupId,
-          terminalType: s.terminalType,
-          cwd: s.cwd,
-          initialCommand: s.initialCommand,
-          history: s.history
-        })),
-        groups
-      },
-      createdAt: Date.now()
-    }
-
-    addSnapshot(snapshot)
-    message.success('快照已保存')
-  }
 
   const menuItems: MenuProps['items'] = [
     {
@@ -202,7 +216,7 @@ export default function Toolbar({
         <Tooltip title="保存快照">
           <Button
             icon={<CameraFilled />}
-            onClick={handleSnapshot}
+            onClick={openSnapshotModal}
             aria-label="保存快照"
             size="small"
             style={{ fontSize: 11 }}
@@ -223,6 +237,50 @@ export default function Toolbar({
           />
         </Tooltip>
       </div>
+
+      <Modal
+        title={
+          <>
+            <CameraFilled style={{ color: 'var(--ant-color-primary)', marginRight: 8 }} />
+            保存快照
+          </>
+        }
+        open={snapshotModalOpen}
+        onOk={handleSaveSnapshot}
+        onCancel={() => setSnapshotModalOpen(false)}
+        okText="保存"
+        cancelText="取消"
+        width={460}
+        destroyOnClose
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 4 }}>
+          <div>
+            <div style={{ fontSize: 12, marginBottom: 4, color: 'var(--ant-color-text-secondary)' }}>
+              快照名称
+            </div>
+            <Input
+              value={snapshotName}
+              onChange={(e) => setSnapshotName(e.target.value)}
+              placeholder="为这个快照起个名字"
+              maxLength={64}
+              autoFocus
+            />
+          </div>
+          <div>
+            <div style={{ fontSize: 12, marginBottom: 4, color: 'var(--ant-color-text-secondary)' }}>
+              描述（可选）
+            </div>
+            <Input.TextArea
+              value={snapshotDescription}
+              onChange={(e) => setSnapshotDescription(e.target.value)}
+              placeholder="比如：部署前的稳定状态、某个调试配置..."
+              autoSize={{ minRows: 3, maxRows: 6 }}
+              maxLength={500}
+              showCount
+            />
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

@@ -80,10 +80,23 @@ export default function SnapshotsDialog({ open, onClose }: SnapshotsDialogProps)
                 justifyContent: 'space-between',
               }}
             >
-              <div>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600, fontSize: 12, color: 'var(--ant-color-text)' }}>
                   {snapshot.name}
                 </div>
+                {snapshot.description && (
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: 'var(--ant-color-text-secondary)',
+                      marginTop: 2,
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {snapshot.description}
+                  </div>
+                )}
                 <div style={{ fontSize: 11, color: 'var(--ant-color-text-tertiary)', marginTop: 2 }}>
                   {snapshot.data.sessions.length} 个会话 · {snapshot.data.groups.length} 个分组
                 </div>

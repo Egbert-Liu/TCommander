@@ -338,6 +338,36 @@ export default function SessionCard({ session, onResetSession, selectable, selec
               </Tag>
             </Tooltip>
           )}
+
+          {statusCfg.glow && (
+            <Button
+              size="small"
+              type="text"
+              icon={<CheckOutlined style={{ fontSize: 11 }} />}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleDismissStatus()
+              }}
+              aria-label="确认恢复"
+              style={{
+                flexShrink: 0,
+                height: 20,
+                padding: '0 6px',
+                fontSize: 11,
+                fontWeight: 500,
+                color: statusCfg.color,
+                background: statusCfg.bg,
+                border: `1px solid ${statusCfg.color}40`,
+                borderRadius: 4,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 2,
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              确认恢复
+            </Button>
+          )}
         </div>
 
         <Dropdown
@@ -367,12 +397,6 @@ export default function SessionCard({ session, onResetSession, selectable, selec
                 label: '清空历史',
                 onClick: handleClearHistory,
               },
-              ...(statusCfg.glow ? [{
-                key: 'dismiss',
-                icon: <CheckOutlined style={{ fontSize: 11 }} />,
-                label: '确认恢复',
-                onClick: handleDismissStatus,
-              }] : []),
               {
                 key: 'group',
                 icon: <span style={{ fontSize: 11, width: 11, display: 'inline-flex', justifyContent: 'center' }}>📁</span>,

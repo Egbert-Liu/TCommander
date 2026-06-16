@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo } from 'react'
+import { useEffect, useRef, useMemo, useCallback } from 'react'
 import { Button, Dropdown, Tooltip, message } from 'antd'
 import type { MenuProps } from 'antd'
 import { ArrowLeftOutlined, CopyOutlined, SunFilled, MoonFilled, CheckOutlined, MinusOutlined, BorderOutlined, CloseOutlined } from '@ant-design/icons'
@@ -27,6 +27,10 @@ export default function FullscreenTerminal() {
   const userScrollingRef = useRef<boolean>(false)
   const resizeTimerRef = useRef<number | null>(null)
   const lastResizeRef = useRef<{ cols: number; rows: number } | null>(null)
+  // 用一个 ref 容器接收 Dropdown / Popover 的 portal 弹出层，
+  // 并把这个容器标为 WebkitAppRegion: no-drag，避免 Electron 拖拽吃掉点击事件
+  const noDragRef = useRef<HTMLDivElement>(null)
+  const getNoDragPopupContainer = useCallback(() => noDragRef.current ?? document.body, [])
 
   const currentSession = sessions.find(s => s.id === activeSessionId)
 
@@ -225,9 +229,15 @@ export default function FullscreenTerminal() {
 
   // Theme-only hot-swap: update colors without recreating the terminal
   useEffect(() => {
-    if (terminalRef.current) {
-      const t = getTerminalTheme(terminalThemeId)
-      terminalRef.current.options.theme = t.colors
+    const t = terminalRef.current
+    if (t) {
+      const theme = getTerminalTheme(terminalThemeId)
+      t.options.theme = theme.colors
+      // xterm 不会自动响应 options.theme 的变更，必须手动刷新已渲染内容
+      try {
+        const end = Math.max(0, (t.buffer.active.length ?? t.rows) - 1)
+        t.refresh(0, end)
+      } catch { /* */ }
     }
   }, [terminalThemeId])
 
@@ -379,6 +389,7 @@ export default function FullscreenTerminal() {
           </span>
         </div>
         <div
+          ref={noDragRef}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -387,7 +398,12 @@ export default function FullscreenTerminal() {
             WebkitAppRegion: 'no-drag',
           }}
         >
-          <Dropdown menu={{ items: themeItems, style: { minWidth: 220 } }} placement="bottomRight" trigger={['click']}>
+          <Dropdown
+            menu={{ items: themeItems, style: { minWidth: 220 } }}
+            placement="bottomRight"
+            trigger={['click']}
+            getPopupContainer={getNoDragPopupContainer}
+          >
             <Button
               type="text"
               style={{ color: 'var(--ant-color-text-secondary)', display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px' }}

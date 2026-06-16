@@ -1,6 +1,5 @@
 import { app, BrowserWindow, ipcMain, Menu } from 'electron'
 import path from 'path'
-import { fileURLToPath } from 'url'
 import { createPtyManager } from './pty'
 import { createStorageManager } from './storage'
 
