@@ -209,7 +209,7 @@ export default function Toolbar({
           />
         </Tooltip>
 
-        <Dropdown menu={{ items: menuItems }} placement="bottomRight">
+        <Dropdown menu={{ items: menuItems }} placement="bottomRight" trigger={['click']}>
           <Button icon={<SettingFilled />} aria-label="管理（预设/快照/规则）" size="small" style={{ fontSize: 11 }} />
         </Dropdown>
 

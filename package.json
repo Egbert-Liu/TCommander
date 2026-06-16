@@ -48,7 +48,7 @@
     "productName": "TCommander",
     "copyright": "Copyright © 2024",
     "directories": {
-      "output": "release_v4"
+      "output": "release_v5"
     },
     "files": [
       "out/**/*",

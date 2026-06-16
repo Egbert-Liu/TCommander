@@ -22,6 +22,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   storageSet: (key: string, value: any) => ipcRenderer.invoke('storage-set', key, value),
   setTitleBarOverlay: (opts: { color: string; symbolColor: string }) =>
     ipcRenderer.invoke('set-title-bar-overlay', opts),
+
+  // 窗口控制
+  windowMinimize: () => ipcRenderer.invoke('window-minimize'),
+  windowToggleMaximize: () => ipcRenderer.invoke('window-toggle-maximize'),
+  windowClose: () => ipcRenderer.invoke('window-close'),
+  onWindowMaximizeChange: (callback: (isMaximized: boolean) => void) => {
+    const handler = (_: any, isMaximized: boolean) => callback(isMaximized)
+    ipcRenderer.on('window-maximize-change', handler)
+    return () => {
+      ipcRenderer.removeListener('window-maximize-change', handler)
+    }
+  },
   
   onSessionOutput: (callback: (sessionId: string, data: string) => void) => {
     outputCallbacks.push(callback)

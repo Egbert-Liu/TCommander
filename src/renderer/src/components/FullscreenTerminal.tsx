@@ -1,10 +1,12 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useMemo } from 'react'
 import { Button, Dropdown, Tooltip, message } from 'antd'
 import type { MenuProps } from 'antd'
-import { ArrowLeftOutlined, CopyOutlined, SunFilled, MoonFilled, CheckOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, CopyOutlined, SunFilled, MoonFilled, CheckOutlined, MinusOutlined, BorderOutlined, CloseOutlined } from '@ant-design/icons'
 import '@xterm/xterm/css/xterm.css'
 import { useAppStore } from '../store'
 import { getTerminalTheme, TERMINAL_THEMES } from '../utils/terminalThemes'
+import { STATUS_COLORS } from '../utils/statusColors'
+import type { SessionStatus } from '../types'
 
 const MAX_REPLAY_SIZE = 512 * 1024
 
@@ -27,6 +29,27 @@ export default function FullscreenTerminal() {
   const lastResizeRef = useRef<{ cols: number; rows: number } | null>(null)
 
   const currentSession = sessions.find(s => s.id === activeSessionId)
+
+  // 其他会话（排除当前全屏会话）
+  const otherSessions = useMemo(() => {
+    // 如果没有激活的会话，返回空数组
+    if (!activeSessionId) return []
+    return sessions.filter(s => s.id !== activeSessionId)
+  }, [sessions, activeSessionId])
+
+  // 切换到其他会话
+  const handleSwitchSession = (sessionId: string) => {
+    setActiveSession(sessionId)
+  }
+
+  // 状态文字映射
+  const statusTextMap: Record<SessionStatus, string> = {
+    running: '运行中',
+    'needs-input': '等待输入',
+    'needs-confirm': '等待确认',
+    error: '错误',
+    idle: '空闲',
+  }
 
   useEffect(() => {
     if (!termRef.current || !activeSessionId || !currentSession) return
@@ -254,6 +277,19 @@ export default function FullscreenTerminal() {
     setActiveSession(null)
   }
 
+  // 窗口控制按钮
+  const handleMinimize = () => {
+    window.electronAPI?.windowMinimize()
+  }
+
+  const handleToggleMaximize = () => {
+    window.electronAPI?.windowToggleMaximize()
+  }
+
+  const handleClose = () => {
+    window.electronAPI?.windowClose()
+  }
+
   const handleCopy = async () => {
     if (terminalRef.current) {
       const selection = terminalRef.current.getSelection()
@@ -389,6 +425,43 @@ export default function FullscreenTerminal() {
           >
             复制
           </Button>
+
+          {/* 窗口控制按钮（最小化/最大化/关闭） */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              marginLeft: 8,
+              borderLeft: '1px solid var(--ant-color-border)',
+              paddingLeft: 8,
+              gap: 2,
+            }}
+          >
+            <Button
+              type="text"
+              icon={<MinusOutlined style={{ fontSize: 12 }} />}
+              onClick={handleMinimize}
+              size="small"
+              style={{ width: 28, height: 28, minWidth: 28, color: 'var(--ant-color-text-secondary)' }}
+              title="最小化"
+            />
+            <Button
+              type="text"
+              icon={<BorderOutlined style={{ fontSize: 12 }} />}
+              onClick={handleToggleMaximize}
+              size="small"
+              style={{ width: 28, height: 28, minWidth: 28, color: 'var(--ant-color-text-secondary)' }}
+              title="最大化"
+            />
+            <Button
+              type="text"
+              icon={<CloseOutlined style={{ fontSize: 12 }} />}
+              onClick={handleClose}
+              size="small"
+              style={{ width: 28, height: 28, minWidth: 28, color: 'var(--ant-color-text-secondary)' }}
+              title="关闭"
+            />
+          </div>
         </div>
       </div>
 
@@ -401,6 +474,109 @@ export default function FullscreenTerminal() {
           overflow: 'hidden',
         }}
       />
+
+      {/* 底部会话状态指示条 */}
+      {otherSessions.length > 0 && (
+        <div
+          style={{
+            height: 36,
+            background: 'var(--ant-color-bg-layout)',
+            borderTop: '1px solid var(--ant-color-border)',
+            padding: '0 12px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            flexShrink: 0,
+            position: 'relative',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              overflowX: 'auto',
+              flex: 1,
+              paddingBottom: 2,
+            }}
+            className="hide-scrollbar"
+          >
+            {otherSessions.map((session) => {
+              const statusColor = STATUS_COLORS[session.status]?.color || STATUS_COLORS.idle.color
+              const statusText = statusTextMap[session.status] || '空闲'
+              const displayName = session.name.length > 8 ? session.name.slice(0, 8) + '...' : session.name
+              const previewLines = session.previewText.split('\n').slice(-2).join('\n')
+
+              return (
+                <Tooltip
+                  key={session.id}
+                  title={
+                    <div style={{ fontSize: 12 }}>
+                      <div style={{ fontWeight: 500, marginBottom: 4 }}>{session.name}</div>
+                      <div style={{ opacity: 0.85 }}>状态: {statusText}</div>
+                      {previewLines && (
+                        <div style={{ marginTop: 4, opacity: 0.75, whiteSpace: 'pre-wrap', maxWidth: 300 }}>
+                          {previewLines}
+                        </div>
+                      )}
+                    </div>
+                  }
+                  placement="top"
+                >
+                  <div
+                    onClick={() => handleSwitchSession(session.id)}
+                    style={{
+                      height: 24,
+                      padding: '0 8px',
+                      borderRadius: 12,
+                      background: 'var(--ant-color-bg-container)',
+                      border: '1px solid var(--ant-color-border)',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      transition: 'all 0.2s',
+                      whiteSpace: 'nowrap',
+                      flexShrink: 0,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'var(--ant-color-bg-text-hover)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'var(--ant-color-bg-container)'
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background: statusColor,
+                        display: 'inline-block',
+                        animation: session.status !== 'idle' ? 'pulse 1.5s ease-in-out infinite' : 'none',
+                      }}
+                    />
+                    <span style={{ color: 'var(--ant-color-text)' }}>{displayName}</span>
+                  </div>
+                </Tooltip>
+              )
+            })}
+          </div>
+          {otherSessions.length > 5 && (
+            <div
+              style={{
+                fontSize: 11,
+                color: 'var(--ant-color-text-tertiary)',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+              }}
+            >
+              共 {otherSessions.length} 个
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

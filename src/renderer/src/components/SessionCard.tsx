@@ -361,6 +361,12 @@ export default function SessionCard({ session, onResetSession, selectable, selec
                 label: '清空历史',
                 onClick: handleClearHistory,
               },
+              ...(statusCfg.glow ? [{
+                key: 'dismiss',
+                icon: <CheckOutlined style={{ fontSize: 11 }} />,
+                label: '确认恢复',
+                onClick: handleDismissStatus,
+              }] : []),
               {
                 key: 'group',
                 icon: <span style={{ fontSize: 11, width: 11, display: 'inline-flex', justifyContent: 'center' }}>📁</span>,

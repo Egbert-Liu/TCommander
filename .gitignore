@@ -26,7 +26,24 @@ dist-ssr
 # Electron
 out/
 release/
+release_*/
 *.tsbuildinfo
+
+# 打包安装包输出
+TCommander-*-Setup.exe
+TCommander Setup*.exe
+
+# 临时文件
+_repack.asar
+_repack_tmp/
+_test_extract/
+app.asar
+app/
+
+# 构建辅助工具
+scripts/SevenZaWrapper.cs
+scripts/compile-wrapper.ps1
+scripts/bin/
 
 # Environment variables
 .env

@@ -23,6 +23,9 @@ export default function PresetForm({ open, onClose, editingPreset }: PresetFormP
       } else {
         form.resetFields()
       }
+    } else {
+      // 关闭时重置表单，确保下次打开时是干净的
+      form.resetFields()
     }
   }, [open, editingPreset, form])
 
