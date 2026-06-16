@@ -37,6 +37,8 @@ TCommander Setup*.exe
 _repack.asar
 _repack_tmp/
 _test_extract/
+_check_v*/
+_old_*/
 app.asar
 app/
 
