@@ -88,19 +88,38 @@ body {
 
 /* 状态脉冲：对左侧色条 ::before 做 opacity 动画（合成层友好，替代 box-shadow 重绘） */
 @keyframes status-pulse {
-  0%, 100% { opacity: 0.5; }
+  0%, 100% { opacity: 0.55; }
   50% { opacity: 1; }
 }
 
+/* glow：卡片整体 + 左侧细条同步呼吸，提示「需要关注」 */
 .card-status-error,
 .card-status-needs-confirm,
 .card-status-needs-input {
   position: relative;
+  border-color: var(--card-glow-color, var(--ant-color-border)) !important;
+  box-shadow:
+    0 0 0 1px var(--card-glow-color, transparent) inset,
+    0 0 0 4px var(--card-glow-soft, transparent);
+  animation: card-glow 2.4s ease-in-out infinite;
 }
 
-.card-status-error { border: 2px solid color-mix(in srgb, var(--status-error) 40%, transparent) !important; }
-.card-status-needs-confirm { border: 2px solid color-mix(in srgb, var(--status-needs-confirm) 40%, transparent) !important; }
-.card-status-needs-input { border: 2px solid color-mix(in srgb, var(--status-needs-input) 40%, transparent) !important; }
+.card-status-error          { --card-glow-color: var(--status-error);          --card-glow-soft: rgba(248, 113, 113, 0.10); }
+.card-status-needs-confirm  { --card-glow-color: var(--status-needs-confirm);  --card-glow-soft: rgba(251, 191, 36, 0.10); }
+.card-status-needs-input    { --card-glow-color: var(--status-needs-input);    --card-glow-soft: rgba(56, 189, 248, 0.10); }
+
+@keyframes card-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px var(--card-glow-color, transparent) inset,
+      0 0 0 2px var(--card-glow-soft, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px var(--card-glow-color, transparent) inset,
+      0 0 0 5px var(--card-glow-soft, transparent);
+  }
+}
 
 .card-status-error::before,
 .card-status-needs-confirm::before,
@@ -108,16 +127,15 @@ body {
   content: '';
   position: absolute;
   left: 0;
-  top: 0;
-  bottom: 0;
+  top: 6px;
+  bottom: 6px;
   width: 3px;
-  border-radius: 3px 0 0 3px;
-  animation: status-pulse 2s ease-in-out infinite;
+  border-radius: 0 3px 3px 0;
+  background: var(--card-glow-color, transparent);
+  box-shadow: 0 0 8px var(--card-glow-color, transparent);
+  pointer-events: none;
+  animation: status-pulse 2.4s ease-in-out infinite;
 }
-
-.card-status-error::before { background: var(--status-error); }
-.card-status-needs-confirm::before { background: var(--status-needs-confirm); }
-.card-status-needs-input::before { background: var(--status-needs-input); }
 
 .animate-fade-in {
   animation: fadeIn 0.2s ease-out;
@@ -132,19 +150,47 @@ body {
   }
 }
 
-/* 会话卡片 hover 效果 */
+/* 会话卡片：默认浮起，hover 上抬，状态卡片 glow 由上述 keyframes 接管 */
 .session-card {
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 .session-card:hover {
   border-color: var(--ant-color-primary) !important;
   box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 .session-card:hover .session-card-preview {
   background: var(--ant-color-fill-quaternary) !important;
 }
 .session-card-preview {
   transition: background 0.2s ease;
+  /* 卡片预览区：用户反馈「滚动条丑」，按需求统一隐藏。
+     保留内容自动换行（pre 已设 whitespace-pre-wrap） */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  overflow: hidden;
+  position: relative;
+}
+.session-card-preview::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+/* 预览区底部加一层淡出遮罩，提示「这里被截断、可以双击复制/单击全屏」 */
+.session-card-preview::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 14px;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--ant-color-fill)
+  );
 }
 
 /* 侧边栏交互元素：hover 态由 CSS 接管（替代命令式 onMouseEnter/Leave）。

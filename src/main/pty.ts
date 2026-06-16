@@ -47,7 +47,11 @@ export function createPtyManager() {
 
     const id = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     const shell = getShellPath(config.terminalType)
-    const cwd = config.cwd || os.homedir()
+    // 兜底：把空、纯 '~'、相对路径 '~' 统一归到用户主目录，
+    // 防止 Windows 下 pty.spawn 因为 '~' 不存在而抛 ENOENT。
+    let cwd = config.cwd && config.cwd.trim() && config.cwd !== '~'
+      ? config.cwd
+      : os.homedir()
     
     const ptyProcess = pty.spawn(shell, [], {
       name: 'xterm-256color',

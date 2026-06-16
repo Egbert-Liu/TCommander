@@ -38,6 +38,7 @@ _repack.asar
 _repack_tmp/
 _test_extract/
 _check_v*/
+_check_release/
 _old_*/
 app.asar
 app/
@@ -46,6 +47,10 @@ app/
 scripts/SevenZaWrapper.cs
 scripts/compile-wrapper.ps1
 scripts/bin/
+
+# 本地打包发布脚本（不进 Git）
+docs/release-scripts.md
+docs/release-local.ps1
 
 # Environment variables
 .env

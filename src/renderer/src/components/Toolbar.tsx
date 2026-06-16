@@ -39,7 +39,7 @@ export default function Toolbar({
 
   // 快捷创建会话
   const handleQuickCreate = async (terminalType: 'powershell' | 'cmd' | 'bash', name: string) => {
-    const session = await createSessionFromConfig({ name, terminalType, cwd: '~' })
+    const session = await createSessionFromConfig({ name, terminalType })
     if (!session) {
       message.error('创建会话失败')
       return

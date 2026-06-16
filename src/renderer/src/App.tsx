@@ -113,9 +113,9 @@ function App() {
 
   // 空状态快速创建菜单
   const quickCreateItems = [
-    { key: 'powershell', label: 'PowerShell', onClick: () => createSessionFromConfig({ name: 'PowerShell', terminalType: 'powershell', cwd: '~' }) },
-    { key: 'cmd', label: 'CMD', onClick: () => createSessionFromConfig({ name: 'CMD', terminalType: 'cmd', cwd: '~' }) },
-    { key: 'bash', label: 'Bash', onClick: () => createSessionFromConfig({ name: 'Bash', terminalType: 'bash', cwd: '~' }) },
+    { key: 'powershell', label: 'PowerShell', onClick: () => createSessionFromConfig({ name: 'PowerShell', terminalType: 'powershell' }) },
+    { key: 'cmd', label: 'CMD', onClick: () => createSessionFromConfig({ name: 'CMD', terminalType: 'cmd' }) },
+    { key: 'bash', label: 'Bash', onClick: () => createSessionFromConfig({ name: 'Bash', terminalType: 'bash' }) },
   ]
 
   useEffect(() => {
@@ -542,7 +542,7 @@ function App() {
             )}
 
             {filteredSessions.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
                 {filteredSessions.map((session, index) => (
                   <div key={session.id} className="animate-fade-in" style={{ animationDelay: `${index * 50}ms` }}>
                     <SessionCard

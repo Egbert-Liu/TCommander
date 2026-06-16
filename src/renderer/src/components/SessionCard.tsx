@@ -207,15 +207,21 @@ export default function SessionCard({ session, onResetSession, selectable, selec
 
   return (
     <div
-      className={`session-card rounded-xl overflow-hidden flex flex-col ${statusClass}`}
+      className={`session-card flex flex-col ${statusClass}`}
       style={{
         background: 'var(--ant-color-bg-container)',
         border: '1px solid var(--ant-color-border)',
+        borderRadius: 10,
+        overflow: 'hidden',
       }}
     >
       <div
-        className="flex items-center justify-between px-3 py-2"
-        style={{ borderBottom: '1px solid var(--ant-color-border)' }}
+        className="flex items-center justify-between"
+        style={{
+          padding: '8px 10px',
+          borderBottom: '1px solid var(--ant-color-border)',
+          background: 'var(--ant-color-bg-container)',
+        }}
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {selectable && (
@@ -415,7 +421,7 @@ export default function SessionCard({ session, onResetSession, selectable, selec
 
       <Dropdown menu={{ items: contextMenuItems }} trigger={['contextMenu']}>
         <div
-          className="session-card-preview overflow-auto px-2.5 py-1.5"
+          className="session-card-preview px-2.5 py-1.5"
           style={{
             height: previewLineCount * 16,
             minHeight: 48,
@@ -426,6 +432,7 @@ export default function SessionCard({ session, onResetSession, selectable, selec
             color: 'var(--ant-color-text)',
             cursor: 'pointer',
             userSelect: 'text',
+            overflow: 'hidden',
           }}
           onClick={handleFullscreen}
           onDoubleClick={(e) => {
@@ -439,14 +446,18 @@ export default function SessionCard({ session, onResetSession, selectable, selec
 
       <div
         className="px-2 flex items-center gap-1"
-        style={{ borderTop: '1px solid var(--ant-color-border)', height: 28 }}
+        style={{
+          borderTop: '1px solid var(--ant-color-border)',
+          height: 32,
+          background: 'var(--ant-color-bg-container)',
+        }}
       >
         {quickActions.includes('Y') && (
           <Button
             type="primary"
             size="small"
             onClick={handleQuickConfirm}
-            style={{ fontSize: 11, fontWeight: 700, width: 22, height: 20, minWidth: 22, padding: 0, borderRadius: 3 }}
+            style={{ fontSize: 11, fontWeight: 700, width: 24, height: 22, minWidth: 24, padding: 0, borderRadius: 4 }}
           >
             Y
           </Button>
@@ -456,7 +467,7 @@ export default function SessionCard({ session, onResetSession, selectable, selec
             danger
             size="small"
             onClick={handleQuickDeny}
-            style={{ fontSize: 11, fontWeight: 700, width: 22, height: 20, minWidth: 22, padding: 0, borderRadius: 3 }}
+            style={{ fontSize: 11, fontWeight: 700, width: 24, height: 22, minWidth: 24, padding: 0, borderRadius: 4 }}
           >
             N
           </Button>
@@ -468,7 +479,7 @@ export default function SessionCard({ session, onResetSession, selectable, selec
               onClick={handleCtrlC}
               aria-label="Ctrl+C"
               icon={<StopFilled style={{ fontSize: 11 }} />}
-              style={{ width: 22, height: 20, minWidth: 22, padding: 0, borderRadius: 3 }}
+              style={{ width: 24, height: 22, minWidth: 24, padding: 0, borderRadius: 4 }}
             />
           </Tooltip>
         )}
@@ -479,7 +490,7 @@ export default function SessionCard({ session, onResetSession, selectable, selec
               onClick={handleArrowUp}
               aria-label="上箭头"
               icon={<ArrowUpOutlined style={{ fontSize: 11 }} />}
-              style={{ width: 20, height: 20, minWidth: 20, padding: 0, borderRadius: 3 }}
+              style={{ width: 22, height: 22, minWidth: 22, padding: 0, borderRadius: 4 }}
             />
           </Tooltip>
         )}
@@ -490,7 +501,7 @@ export default function SessionCard({ session, onResetSession, selectable, selec
               onClick={handleArrowDown}
               aria-label="下箭头"
               icon={<ArrowDownOutlined style={{ fontSize: 11 }} />}
-              style={{ width: 20, height: 20, minWidth: 20, padding: 0, borderRadius: 3 }}
+              style={{ width: 22, height: 22, minWidth: 22, padding: 0, borderRadius: 4 }}
             />
           </Tooltip>
         )}
@@ -502,21 +513,21 @@ export default function SessionCard({ session, onResetSession, selectable, selec
             onKeyDown={handleKeyDown}
             placeholder="输入… Enter发送"
             autoSize={{ minRows: 1, maxRows: 2 }}
-            style={{ flex: 1, fontSize: 10, lineHeight: '18px', height: 20, maxHeight: 44, padding: '1px 6px', borderRadius: 3, resize: 'none', overflow: 'auto' }}
+            style={{ flex: 1, fontSize: 10, lineHeight: '20px', height: 22, maxHeight: 44, padding: '1px 6px', borderRadius: 4, resize: 'none', overflow: 'hidden' }}
           />
         )}
         {quickActions.includes('Send') && (
           <Tooltip title="发送">
-            <Button type="primary" aria-label="发送" icon={<SendOutlined style={{ fontSize: 11 }} />} onClick={handleSendInput} size="small" style={{ width: 22, height: 20, minWidth: 22, padding: 0, borderRadius: 3 }} />
+            <Button type="primary" aria-label="发送" icon={<SendOutlined style={{ fontSize: 11 }} />} onClick={handleSendInput} size="small" style={{ width: 24, height: 22, minWidth: 24, padding: 0, borderRadius: 4 }} />
           </Tooltip>
         )}
         {quickActions.includes('Enter') && (
           <Tooltip title="Enter">
-            <Button size="small" aria-label="Enter" icon={<EnterOutlined style={{ fontSize: 11 }} />} onClick={handleEnter} style={{ width: 20, height: 20, minWidth: 20, padding: 0, borderRadius: 3 }} />
+            <Button size="small" aria-label="Enter" icon={<EnterOutlined style={{ fontSize: 11 }} />} onClick={handleEnter} style={{ width: 22, height: 22, minWidth: 22, padding: 0, borderRadius: 4 }} />
           </Tooltip>
         )}
         <Popover content={settingsContent} title="快捷操作显示设置" trigger="click" placement="topRight">
-          <Button type="text" aria-label="快捷操作设置" icon={<SettingOutlined style={{ fontSize: 10 }} />} size="small" style={{ width: 20, height: 20, minWidth: 20, padding: 0, flexShrink: 0 }} title="快捷操作设置" />
+          <Button type="text" aria-label="快捷操作设置" icon={<SettingOutlined style={{ fontSize: 11 }} />} size="small" style={{ width: 22, height: 22, minWidth: 22, padding: 0, flexShrink: 0, borderRadius: 4 }} title="快捷操作设置" />
         </Popover>
       </div>
     </div>
