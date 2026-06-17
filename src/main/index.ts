@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu } from 'electron'
 import path from 'path'
 import { createPtyManager } from './pty'
 import { createStorageManager } from './storage'
@@ -9,6 +9,8 @@ const storageManager = createStorageManager()
 let mainWindow: BrowserWindow | null = null
 // 标记：用户已确认关闭后置 true，跳过后续的确认弹窗
 let userConfirmedClose = false
+// 渲染进程对关闭确认弹框的响应 resolver；主进程 await 它来等待用户选择
+let closeConfirmResolver: ((confirmed: boolean) => void) | null = null
 
 // 计算项目根目录：dev 模式下为 dist 目录；
 // 打包后，app.asar 作为虚拟目录挂在 process.resourcesPath 下
@@ -63,10 +65,10 @@ function createWindow() {
     mainWindow = null
   })
 
-  // ========== 拦截原生右上角关闭按钮：弹确认对话框 ==========
+  // ========== 拦截原生右上角关闭按钮：弹自定义确认对话框 ==========
   // 用户希望直接在原生的 X 按钮上做确认，所以走主进程拦截 `close` 事件。
-  // 第一次点 X：preventDefault + 弹模态确认；用户选「确认关闭」后置 userConfirmedClose=true，
-  // 下次再触发 `close` 就能直接通过。
+  // 但原生 dialog.showMessageBox 样式很丑，改为：preventDefault 后通过 IPC 通知
+  // 渲染进程弹出 antd 自定义 Modal，主进程 await 渲染进程回传的结果。
   mainWindow.on('close', async (event) => {
     if (userConfirmedClose) return
     if (!mainWindow) return
@@ -79,20 +81,18 @@ function createWindow() {
     }
 
     event.preventDefault()
-    const result = await dialog.showMessageBox(mainWindow, {
-      type: 'warning',
-      title: '关闭应用',
-      message: '确认要关闭 TCommander 吗？',
-      detail: '将关闭所有会话并释放 PTY 资源。',
-      buttons: ['确认关闭', '取消'],
-      defaultId: 1,   // 默认聚焦「取消」，防误关
-      cancelId: 1,
-      noLink: true,
+    // 通知渲染进程弹出自定义确认框，等待用户选择
+    const confirmed = await new Promise<boolean>((resolve) => {
+      closeConfirmResolver = resolve
+      try {
+        mainWindow?.webContents.send('request-close-confirm', hasActiveSessions)
+      } catch { /* 窗口已销毁 */ resolve(false) }
     })
+    closeConfirmResolver = null
 
-    if (result.response === 0) {
+    if (confirmed && mainWindow) {
       userConfirmedClose = true
-      // 通知渲染进程显示 loading 蒙板（可选，但能给用户即时反馈）
+      // 通知渲染进程显示 loading 蒙板，给用户即时反馈
       try {
         mainWindow.webContents.send('app-closing')
       } catch { /* 窗口已销毁 */ }
@@ -151,6 +151,12 @@ app.whenReady().then(() => {
   })
   ipcMain.handle('window-close', () => {
     if (isWindowValid()) mainWindow?.close()
+  })
+
+  // 关闭确认弹框的响应：渲染进程用户选择后回传 confirmed，唤醒 close 事件里的 await
+  ipcMain.handle('close-confirm-response', (_, confirmed: boolean) => {
+    closeConfirmResolver?.(confirmed)
+    closeConfirmResolver = null
   })
 
   // 监听窗口最大化状态变化，通知渲染进程

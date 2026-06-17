@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 let outputCallbacks: Array<(sessionId: string, data: string) => void> = []
 let exitCallbacks: Array<(sessionId: string, exitCode: number) => void> = []
 let appClosingCallbacks: Array<() => void> = []
+let closeConfirmCallbacks: Array<(hasActiveSessions: boolean) => void> = []
 
 ipcRenderer.on('session-output', (_, sessionId, data) => {
   outputCallbacks.forEach(cb => cb(sessionId, data))
@@ -14,6 +15,11 @@ ipcRenderer.on('session-exit', (_, sessionId, exitCode) => {
 
 ipcRenderer.on('app-closing', () => {
   appClosingCallbacks.forEach(cb => cb())
+})
+
+// 主进程要求弹出关闭确认框（用户点了原生 X 按钮）
+ipcRenderer.on('request-close-confirm', (_, hasActiveSessions: boolean) => {
+  closeConfirmCallbacks.forEach(cb => cb(hasActiveSessions))
 })
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -47,6 +53,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
       appClosingCallbacks = appClosingCallbacks.filter(cb => cb !== callback)
     }
   },
+
+  // 关闭确认：主进程拦截原生 X 后请求渲染进程弹自定义 Modal；
+  // 用户选择后通过 closeConfirmResponse 回传结果给主进程。
+  onRequestCloseConfirm: (callback: (hasActiveSessions: boolean) => void) => {
+    closeConfirmCallbacks.push(callback)
+    return () => {
+      closeConfirmCallbacks = closeConfirmCallbacks.filter(cb => cb !== callback)
+    }
+  },
+  closeConfirmResponse: (confirmed: boolean) =>
+    ipcRenderer.invoke('close-confirm-response', confirmed),
 
   onSessionOutput: (callback: (sessionId: string, data: string) => void) => {
     outputCallbacks.push(callback)

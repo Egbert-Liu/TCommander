@@ -13,7 +13,8 @@ import SnapshotsDialog from './components/SnapshotsDialog'
 import RulesDialog from './components/RulesDialog'
 import EmptyState from './components/EmptyState'
 import LoadingMask from './components/LoadingMask'
-import { cleanTerminalOutputKeepColor, detectStatusWithRules, truncateHistory } from './utils/statusDetector'
+import CloseConfirmDialog from './components/CloseConfirmDialog'
+import { cleanTerminalOutputKeepColor, detectStatusWithRules, truncateHistory, hasStatus, IDLE_THRESHOLD_MS, statusPriority } from './utils/statusDetector'
 import { STATUS_COLORS } from './utils/statusColors'
 import { createSessionFromConfig } from './utils/sessionActions'
 
@@ -79,6 +80,8 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [resetTarget, setResetTarget] = useState<import('./types').Session | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  // 关闭应用确认框：主进程拦截原生 X 后通过 IPC 请求弹出
+  const [closeConfirm, setCloseConfirm] = useState<{ open: boolean; sessionCount: number }>({ open: false, sessionCount: 0 })
 
   // 计算各状态数量
   const statusCounts = useMemo(() => {
@@ -149,7 +152,12 @@ function App() {
       const setGlobalLoading = useAppStore.getState().setGlobalLoading
       setGlobalLoading(true, '正在关闭应用并释放所有会话资源...')
     })
-    return () => { unsubClosing() }
+    // 监听主进程发来的「请求关闭确认」事件（用户点了原生 X），
+    // 弹出自定义 antd Modal 替代丑陋的原生 dialog。
+    const unsubCloseConfirm = window.electronAPI.onRequestCloseConfirm((hasActiveSessions) => {
+      setCloseConfirm({ open: true, sessionCount: hasActiveSessions ? useAppStore.getState().sessions.length : 0 })
+    })
+    return () => { unsubClosing(); unsubCloseConfirm() }
   }, [])
 
   const pendingBufferRef = useRef<Record<string, string[]>>({})
@@ -157,14 +165,14 @@ function App() {
   const batchTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   // 渲染进程批队列字节上限：每会话 128 KB；超过则从头丢弃旧块
   const BATCH_QUEUE_BYTE_LIMIT = 128 * 1024
-  // 3 秒无匹配自动回退到 idle 的定时器
-  const statusFallbackTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
-  const STATUS_FALLBACK_MS = 3000
 
   // ========== flushSession：抽出为稳定 useCallback，消除两处重复实现 ==========
-  // 之前在「订阅 PTY 输出」effect 和「进入全屏立即 flush」effect 中各写了一份 ~50 行相同逻辑，
-  // 这里统一为一个函数，两处都调用它，避免逻辑漂移。
-  // 只读取 refs + store.getState()，依赖数组为空 → 引用永远稳定。
+  // 状态判定新逻辑（用户要求）：
+  //   1. 「有输出就不可能是空闲」——空闲只由时间维度判定（见下方空闲检测定时器），不靠规则。
+  //   2. 命中规则      -> 应用该状态（error/needs-confirm/needs-input）
+  //   3. 未命中但有新输出 -> 会话仍在活动：若之前是「有状态」但新输出不再匹配，立即清除回 running。
+  //      这样用户继续操作、错误信息被新输出冲走后，状态会自动消失。
+  //   4. 不再有「3 秒无匹配回退」计时器——idle 完全由空闲定时器负责。
   const flushSession = useCallback((sessionId: string) => {
     const state = useAppStore.getState()
     const session = state.sessions.find(s => s.id === sessionId)
@@ -186,12 +194,8 @@ function App() {
     const cleanText = cleanTerminalOutputKeepColor(fullRaw)
     const detectResult = detectStatusWithRules(fullRaw, state.rules)
 
-    // 3 秒无匹配回退逻辑：
-    //   - 命中规则  -> 立即应用，清除回退 timer
-    //   - 未命中    -> 不立即回退 running，而是维持当前状态 3s，3s 内再无匹配才回退到 idle
     if (detectResult.matched) {
-      const t = statusFallbackTimers.current[sessionId]
-      if (t) { clearTimeout(t); delete statusFallbackTimers.current[sessionId] }
+      // 命中规则：应用新状态（可能是 error/needs-confirm/needs-input）
       state.updateSession(sessionId, {
         history: newHistory,
         previewText: cleanText,
@@ -200,24 +204,17 @@ function App() {
         lastActivityAt: Date.now()
       })
     } else {
-      // 没匹配：保存新的 history/preview，但不动 status
+      // 未命中但有新输出：会话在活动。
+      // 关键：若之前处于「有状态」(error/needs-confirm/needs-input)，新输出已不再匹配，
+      // 说明触发条件已过（例如错误被后续输出覆盖），立即清除状态回到 running。
+      const prevHadStatus = hasStatus(session.status)
       state.updateSession(sessionId, {
         history: newHistory,
         previewText: cleanText,
+        status: 'running',
+        matchedRuleName: prevHadStatus ? undefined : session.matchedRuleName,
         lastActivityAt: Date.now()
       })
-      if (!statusFallbackTimers.current[sessionId]) {
-        statusFallbackTimers.current[sessionId] = setTimeout(() => {
-          delete statusFallbackTimers.current[sessionId]
-          const s = useAppStore.getState()
-          const sess = s.sessions.find(x => x.id === sessionId)
-          if (!sess) return
-          // 只有当前仍非 idle 时才回退，避免回退抖动
-          if (sess.status !== 'idle') {
-            s.updateSession(sessionId, { status: 'idle', matchedRuleName: undefined })
-          }
-        }, STATUS_FALLBACK_MS)
-      }
     }
   }, [])
 
@@ -264,9 +261,6 @@ function App() {
         clearTimeout(timer)
         delete batchTimerRef.current[sessionId]
       }
-      // 进程退出时也要清掉回退 timer
-      const fb = statusFallbackTimers.current[sessionId]
-      if (fb) { clearTimeout(fb); delete statusFallbackTimers.current[sessionId] }
 
       const state = useAppStore.getState()
       const session = state.sessions.find(s => s.id === sessionId)
@@ -304,8 +298,6 @@ function App() {
       batchTimerRef.current = {}
       batchQueueRef.current = {}
       pendingBufferRef.current = {}
-      Object.values(statusFallbackTimers.current).forEach(t => clearTimeout(t))
-      statusFallbackTimers.current = {}
     }
   }, [flushSession])
 
@@ -326,19 +318,35 @@ function App() {
     }
   }, [isFs, activeId, flushSession])
 
+  // ========== 空闲检测定时器（用户要求：空闲 = 长期无输出） ==========
+  // 「有输出就不可能是空闲」。每秒扫描一次所有会话：
+  //   - 处于 running 且距 lastActivityAt 超过 IDLE_THRESHOLD_MS(10s) -> 标记为 idle
+  //   - 有状态(error/needs-confirm/needs-input) 的会话不被动到（用户需关注的异常保持高亮）
+  // 这样 idle 完全由时间维度驱动，不再依赖任何输出内容规则。
+  useEffect(() => {
+    const IDLE_CHECK_INTERVAL = 1000
+    const interval = setInterval(() => {
+      const state = useAppStore.getState()
+      const now = Date.now()
+      let changed = false
+      for (const s of state.sessions) {
+        // 只对「无状态且正在运行」的会话做空闲回落
+        if (s.status === 'running' && now - s.lastActivityAt > IDLE_THRESHOLD_MS) {
+          state.updateSession(s.id, { status: 'idle' })
+          changed = true
+        }
+      }
+      // updateSession 已触发 store 通知，无需额外动作
+      void changed
+    }, IDLE_CHECK_INTERVAL)
+    return () => clearInterval(interval)
+  }, [])
+
   // 搜索关键词用 useDeferredValue 延迟：输入框立即响应（store 即时更新），
   // 但昂贵的 filter+sort 放到低优先级 transition 里，避免大列表下输入卡顿。
   const deferredSearch = useDeferredValue(searchQuery)
 
   const filteredSessions = useMemo(() => {
-    const STATUS_PRIORITY: Record<string, number> = {
-      'error': 0,
-      'needs-confirm': 1,
-      'needs-input': 2,
-      'running': 3,
-      'idle': 4,
-    }
-
     let filtered = [...sessions]
 
     if (deferredSearch) {
@@ -356,11 +364,27 @@ function App() {
       filtered = filtered.filter(s => s.status === statusFilter)
     }
 
+    // 排序规则（用户要求）：
+    //   1. 「有状态」(error/needs-confirm/needs-input) 的会话永远排最前，
+    //      组内按严重程度排：error < needs-confirm < needs-input。
+    //   2. 「无状态」(running/idle) 的会话排在所有有状态会话之后，
+    //      组内按最后输出时间(lastActivityAt)倒序——最近活动的在前，
+    //      长期无输出的(idle)自然沉底。
     return filtered.sort((a, b) => {
-      const pa = STATUS_PRIORITY[a.status] ?? 5
-      const pb = STATUS_PRIORITY[b.status] ?? 5
-      if (pa !== pb) return pa - pb
-      // 使用 createdAt + id 确保排序稳定，避免相同状态卡片位置跳动
+      const aHas = hasStatus(a.status)
+      const bHas = hasStatus(b.status)
+      if (aHas && bHas) {
+        // 两组都有状态：按严重程度
+        const diff = statusPriority(a.status) - statusPriority(b.status)
+        if (diff !== 0) return diff
+      }
+      if (aHas !== bHas) {
+        // 有状态的排前面
+        return aHas ? -1 : 1
+      }
+      // 同为无状态，或同为有状态且优先级相同：按最后输出时间倒序（新的在前）
+      if (a.lastActivityAt !== b.lastActivityAt) return b.lastActivityAt - a.lastActivityAt
+      // 时间也相同：用 createdAt + id 兜底，保证排序稳定，避免卡片位置跳动
       if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt
       return a.id.localeCompare(b.id)
     })
@@ -465,6 +489,20 @@ function App() {
       >
         <ThemeSync />
         <FullscreenTerminal />
+        {/* 全屏模式下也要挂载关闭确认框与 loading 蒙板，否则点 X 时主进程会一直 await */}
+        <LoadingMask />
+        <CloseConfirmDialog
+          open={closeConfirm.open}
+          sessionCount={closeConfirm.sessionCount}
+          onCancel={() => {
+            setCloseConfirm({ open: false, sessionCount: 0 })
+            window.electronAPI.closeConfirmResponse(false)
+          }}
+          onConfirm={() => {
+            setCloseConfirm({ open: false, sessionCount: 0 })
+            window.electronAPI.closeConfirmResponse(true)
+          }}
+        />
       </ConfigProvider>
     )
   }
@@ -681,6 +719,19 @@ function App() {
         />
 
         <LoadingMask />
+
+        <CloseConfirmDialog
+          open={closeConfirm.open}
+          sessionCount={closeConfirm.sessionCount}
+          onCancel={() => {
+            setCloseConfirm({ open: false, sessionCount: 0 })
+            window.electronAPI.closeConfirmResponse(false)
+          }}
+          onConfirm={() => {
+            setCloseConfirm({ open: false, sessionCount: 0 })
+            window.electronAPI.closeConfirmResponse(true)
+          }}
+        />
       </div>
     </ConfigProvider>
   )

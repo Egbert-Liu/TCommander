@@ -101,17 +101,10 @@ export const DEFAULT_SYSTEM_RULES: TriggerRule[] = [
     caseSensitive: false,
     description: '检测末尾以 ? 或 : 结尾的输入提示',
   },
-  {
-    id: 'sys-idle-prompt',
-    name: '空闲提示符',
-    triggerType: 'regex',
-    pattern: '[#>$]\\s*$',
-    status: 'idle',
-    enabled: true,
-    isSystem: true,
-    caseSensitive: false,
-    description: '检测命令行提示符（$、>、#）',
-  },
+  // 注意：不再有 sys-idle-prompt 规则。
+  // 旧逻辑用 `[#>$]\s*$` 把「有提示符输出」判成 idle，但这违背了
+  // 「有输出就不可能是空闲」的语义 —— 空闲的本质是「长期无输出」，
+  // 应该由时间维度判定（见 App.tsx 的空闲检测定时器），而不是靠规则匹配。
 ]
 
 const STATUS_PRIORITY: Record<string, number> = {
@@ -120,6 +113,23 @@ const STATUS_PRIORITY: Record<string, number> = {
   'needs-input': 2,
   'running': 3,
   'idle': 4,
+}
+
+/**
+ * 「有状态」= error / needs-confirm / needs-input
+ * 这三种是需要用户关注的异常状态，排序时永远排在最前。
+ * running / idle 是中性状态，按时间维度排序。
+ */
+export function hasStatus(s: string): boolean {
+  return s === 'error' || s === 'needs-confirm' || s === 'needs-input'
+}
+
+/** 空闲判定阈值：超过此毫秒数没有新输出，会话从 running 回落到 idle。 */
+export const IDLE_THRESHOLD_MS = 10_000
+
+/** 排序用的状态优先级（仅用于「有状态」组内部排序）。 */
+export function statusPriority(s: string): number {
+  return STATUS_PRIORITY[s] ?? 5
 }
 
 function testRule(cleanLine: string, _rawLine: string, rule: TriggerRule): boolean {
