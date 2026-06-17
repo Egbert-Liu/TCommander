@@ -13,7 +13,7 @@ import SnapshotsDialog from './components/SnapshotsDialog'
 import RulesDialog from './components/RulesDialog'
 import EmptyState from './components/EmptyState'
 import LoadingMask from './components/LoadingMask'
-import { cleanTerminalOutput, detectStatusWithRules, truncateHistory } from './utils/statusDetector'
+import { cleanTerminalOutputKeepColor, detectStatusWithRules, truncateHistory } from './utils/statusDetector'
 import { STATUS_COLORS } from './utils/statusColors'
 import { createSessionFromConfig } from './utils/sessionActions'
 
@@ -183,7 +183,7 @@ function App() {
     const rawHistory = [...session.history, ...chunks]
     const newHistory = truncateHistory(rawHistory)
     const fullRaw = newHistory.join('')
-    const cleanText = cleanTerminalOutput(fullRaw)
+    const cleanText = cleanTerminalOutputKeepColor(fullRaw)
     const detectResult = detectStatusWithRules(fullRaw, state.rules)
 
     // 3 秒无匹配回退逻辑：
@@ -255,7 +255,7 @@ function App() {
       }
       batchTimerRef.current[sessionId] = setTimeout(() => {
         flushSession(sessionId)
-      }, 30)
+      }, 16)
     }
 
     const handleExit = (sessionId: string, exitCode: number) => {
@@ -281,7 +281,7 @@ function App() {
         const exitMsg = `\r\n\x1b[33m[进程已退出，退出码: ${exitCode}]\x1b[0m\r\n`
         const newHistory = [...session.history, ...allChunks, exitMsg]
         const fullRaw = newHistory.join('')
-        const cleanText = cleanTerminalOutput(fullRaw)
+        const cleanText = cleanTerminalOutputKeepColor(fullRaw)
 
         state.updateSession(sessionId, {
           history: newHistory,

@@ -269,6 +269,96 @@ export function cleanTerminalOutput(raw: string): string {
   return deduped.join('\n')
 }
 
+/**
+ * 保留 ANSI 颜色的终端输出清洗。
+ *
+ * 与 cleanTerminalOutput 的差异：
+ *   - cleanTerminalOutput 会 stripAnsi，导致所有颜色丢失（卡片预览看不到彩色）。
+ *   - 本函数只剥离非 SGR（光标移动/擦除/OSC 等）序列，保留 \x1b[...m 颜色码，
+ *     交由渲染层 (ansiToHtml) 还原颜色。
+ *   - 同样处理 \r 回车覆盖语义、过滤控制字符、连续空行去重，
+ *     保证预览「格式与命令行一致」。
+ *
+ * 用于：卡片预览区 previewText 的存储。
+ */
+export function cleanTerminalOutputKeepColor(raw: string): string {
+  if (!raw) return ''
+  // 1. 剥离 OSC（设置窗口标题等）
+  let s = raw.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
+  // 2. 剥离所有 CSI，但保留以 'm' 结尾的 SGR 序列（颜色/样式）
+  s = s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, (m) => (m.endsWith('m') ? m : ''))
+  // 3. 剥离其它单字节转义（字符集切换等）
+  s = s.replace(/\x1b[()*+]/g, '')
+
+  // 4. 逐行处理 \r 覆盖：保留每个 cell 的「当前 SGR 样式」
+  const lines = s.split('\n')
+  const outLines: string[] = []
+
+  for (const line of lines) {
+    // 每个 cell: { ch, ansi(此 cell 当前的样式串) }
+    const cells: { ch: string; ansi: string }[] = []
+    const segments = line.split('\r')
+    for (const seg of segments) {
+      let col = 0
+      let curAnsi = ''
+      let i = 0
+      while (i < seg.length) {
+        if (seg.charCodeAt(i) === 0x1b) {
+          const m = /^\x1b\[[0-9;]*m/.exec(seg.slice(i))
+          if (m) {
+            // 遇到 reset(0) 清空累积样式；其它追加
+            if (m[0] === '\x1b[0m' || m[0] === '\x1b[m') {
+              curAnsi = ''
+            } else {
+              curAnsi += m[0]
+            }
+            i += m[0].length
+            continue
+          }
+          i++
+          continue
+        }
+        const code = seg.charCodeAt(i)
+        if (code < 0x20) {
+          // 跳过控制字符（\r 已被 split 消化）
+          i++
+          continue
+        }
+        const ch = seg[i]
+        while (cells.length <= col) cells.push({ ch: ' ', ansi: '' })
+        cells[col] = { ch, ansi: curAnsi }
+        col++
+        i++
+      }
+    }
+
+    // 重构该行：相邻相同样式合并，末尾 reset
+    let result = ''
+    let lastAnsi = '__none__'
+    for (const c of cells) {
+      const a = c.ansi || ''
+      if (a !== lastAnsi) {
+        result += a
+        lastAnsi = a
+      }
+      result += c.ch
+    }
+    if (result.trim().length > 0) {
+      if (lastAnsi !== '__none__' && lastAnsi !== '') result += '\x1b[0m'
+      outLines.push(result.trimEnd())
+    }
+  }
+
+  // 5. 连续空行去重（与 cleanTerminalOutput 行为对齐）
+  const deduped: string[] = []
+  for (const line of outLines) {
+    if (line.length === 0) continue
+    if (deduped.length > 0 && stripAnsi(deduped[deduped.length - 1]) === stripAnsi(line)) continue
+    deduped.push(line)
+  }
+  return deduped.join('\n')
+}
+
 /** 渲染进程每会话历史缓存上限：512 KB（按字符串长度估算） */
 export const RENDER_HISTORY_BYTE_LIMIT = 512 * 1024
 /** 渲染进程每会话历史行数上限 */

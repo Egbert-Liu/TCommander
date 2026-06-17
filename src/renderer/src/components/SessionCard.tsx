@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo, memo } from 'react'
-import { Tag, Button, Input, Checkbox, Tooltip, Dropdown, Modal, message } from 'antd'
+import { Tag, Button, Input, Checkbox, Tooltip, Dropdown, Modal } from 'antd'
 import {
   DeleteFilled, EditFilled,
   MoreOutlined, CheckOutlined,
@@ -9,6 +9,8 @@ import {
 import { Session } from '../types'
 import { useAppStore } from '../store'
 import { STATUS_COLORS } from '../utils/statusColors'
+import { ansiToHtml } from '../utils/ansiToHtml'
+import { getTerminalTheme } from '../utils/terminalThemes'
 
 interface SessionCardProps {
   session: Session
@@ -48,6 +50,7 @@ function SessionCardImpl(props: SessionCardProps) {
   const setIsFullscreen = useAppStore((s) => s.setIsFullscreen)
   const groups = useAppStore((s) => s.groups)
   const previewLineCount = useAppStore((s) => s.previewLineCount)
+  const terminalThemeId = useAppStore((s) => s.terminalTheme)
 
   const [input, setInput] = useState('')
   const [editingName, setEditingName] = useState(false)
@@ -61,6 +64,14 @@ function SessionCardImpl(props: SessionCardProps) {
     const lines = session.previewText.split('\n')
     return lines.slice(-previewLineCount).join('\n')
   }, [session.previewText, previewLineCount])
+
+  // 将带 ANSI SGR 转义的预览文本渲染为带内联颜色的 HTML，使用当前终端主题调色板，
+  // 让卡片预览的配色与 xterm.js 全屏终端完全一致（解决用户反馈「外面看没有颜色」）。
+  // ansiToHtml 内部已对纯文本做 escapeHtml，再通过 dangerouslySetInnerHTML 注入是安全的。
+  const previewHtml = useMemo(() => {
+    if (!session.previewText) return ''
+    return ansiToHtml(preview, getTerminalTheme(terminalThemeId))
+  }, [preview, terminalThemeId, session.previewText])
 
   const handleSendInput = async () => {
     if (input.trim()) {
@@ -117,21 +128,6 @@ function SessionCardImpl(props: SessionCardProps) {
     }
   }
 
-  // 重置会话：会清空历史 + 状态回退 idle
-  const handleResetConfirm = () => {
-    if (onResetSession) {
-      onResetSession(session)
-    } else {
-      updateSession(session.id, {
-        history: [],
-        previewText: '',
-        status: 'idle',
-        matchedRuleName: undefined,
-      })
-      message.success('会话已重置')
-    }
-  }
-
   // 二次确认删除：用 Modal.confirm 替代受控 Popconfirm，避免菜单点击穿透与 trigger 定位问题
   const handleDeleteClick = () => {
     Modal.confirm({
@@ -142,19 +138,6 @@ function SessionCardImpl(props: SessionCardProps) {
       okButtonProps: { danger: true },
       cancelButtonProps: {},
       onOk: handleClose,
-    })
-  }
-
-  // 二次确认重置
-  const handleResetClick = () => {
-    Modal.confirm({
-      title: '重置会话',
-      content: '清空历史与状态，重新开始。PTY 进程不会被关闭。',
-      okText: '重置',
-      cancelText: '取消',
-      okButtonProps: {},
-      cancelButtonProps: {},
-      onOk: handleResetConfirm,
     })
   }
 
@@ -439,7 +422,10 @@ function SessionCardImpl(props: SessionCardProps) {
                 key: 'reset',
                 icon: <ReloadOutlined style={{ fontSize: 11 }} />,
                 label: '重置会话',
-                onClick: handleResetClick,
+                // 直接打开「重置会话」对话框（NewSessionDialog 的 reset 模式），
+                // 不再额外弹 Modal.confirm —— 用户反馈那个小确认框是多余的，
+                // 因为重置会话本身就会弹出一个带配置项的中型对话框让用户确认。
+                onClick: () => onResetSession?.(session),
               },
               {
                 key: 'group',
@@ -517,7 +503,11 @@ function SessionCardImpl(props: SessionCardProps) {
           // 右上角悬浮按钮提供更明显的「全屏」入口（ExpandAltOutlined）。
           onDoubleClick={handleFullscreen}
         >
-          <pre className="whitespace-pre-wrap m-0" style={{ pointerEvents: 'none' }}>{preview || '等待输出...'}</pre>
+          <pre
+            className="whitespace-pre-wrap m-0"
+            style={{ pointerEvents: 'none' }}
+            dangerouslySetInnerHTML={session.previewText ? { __html: previewHtml } : undefined}
+          >{session.previewText ? '' : (preview || '等待输出...')}</pre>
           {/* 悬浮的「全屏」入口按钮：默认隐藏，hover 时显示，避免抢占文本选择 */}
           <Tooltip title="双击或点击全屏查看">
             <Button
@@ -582,7 +572,7 @@ function SessionCardImpl(props: SessionCardProps) {
               size="small"
               onClick={handleCtrlC}
               aria-label="Ctrl+C"
-              // ^C 是终端中断信号的标准 caret 表示（跨平台），不再使用 Mac 专用的 ⌘ 符号
+              // Unicode 命令符号 ⌘ + 字母 C，红底白字（用户指定样式）
               style={{
                 width: 32,
                 height: 22,
@@ -597,12 +587,12 @@ function SessionCardImpl(props: SessionCardProps) {
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: 0,
+                gap: 1,
                 lineHeight: 1,
-                fontFamily: "'JetBrains Mono', monospace",
               }}
             >
-              <span style={{ fontSize: 12 }}>^C</span>
+              <span style={{ fontSize: 12 }}>⌘</span>
+              <span style={{ fontSize: 11 }}>C</span>
             </Button>
           </Tooltip>
         )}
