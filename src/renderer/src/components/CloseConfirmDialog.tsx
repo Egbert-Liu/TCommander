@@ -88,7 +88,7 @@ export default function CloseConfirmDialog({ open, sessionCount, onConfirm, onCa
             关闭后将释放所有 PTY 进程与终端资源。
             {sessionCount > 0 && (
               <span style={{ display: 'block', marginTop: 6, color: '#fbbf24' }}>
-                当前有 {sessionCount} 个活跃会话正在运行
+                当前有 {sessionCount} 个会话
               </span>
             )}
           </div>

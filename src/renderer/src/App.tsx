@@ -154,8 +154,9 @@ function App() {
     })
     // 监听主进程发来的「请求关闭确认」事件（用户点了原生 X），
     // 弹出自定义 antd Modal 替代丑陋的原生 dialog。
-    const unsubCloseConfirm = window.electronAPI.onRequestCloseConfirm((hasActiveSessions) => {
-      setCloseConfirm({ open: true, sessionCount: hasActiveSessions ? useAppStore.getState().sessions.length : 0 })
+    // 会话数直接从 store 读取（含已退出的卡片记录），保证 PTY 退出后仍能弹框。
+    const unsubCloseConfirm = window.electronAPI.onRequestCloseConfirm(() => {
+      setCloseConfirm({ open: true, sessionCount: useAppStore.getState().sessions.length })
     })
     return () => { unsubClosing(); unsubCloseConfirm() }
   }, [])

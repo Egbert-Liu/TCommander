@@ -13,7 +13,7 @@ interface ElectronAPI {
   windowClose: () => Promise<void>
   onWindowMaximizeChange: (callback: (isMaximized: boolean) => void) => () => void
   onAppClosing: (callback: () => void) => () => void
-  onRequestCloseConfirm: (callback: (hasActiveSessions: boolean) => void) => () => void
+  onRequestCloseConfirm: (callback: () => void) => () => void
   closeConfirmResponse: (confirmed: boolean) => Promise<void>
   onSessionOutput: (callback: (sessionId: string, data: string) => void) => () => void
   onSessionExit: (callback: (sessionId: string, exitCode: number) => void) => () => void

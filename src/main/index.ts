@@ -69,36 +69,38 @@ function createWindow() {
   // 用户希望直接在原生的 X 按钮上做确认，所以走主进程拦截 `close` 事件。
   // 但原生 dialog.showMessageBox 样式很丑，改为：preventDefault 后通过 IPC 通知
   // 渲染进程弹出 antd 自定义 Modal，主进程 await 渲染进程回传的结果。
-  mainWindow.on('close', async (event) => {
+  //
+  // 注意：不再用 ptyManager.listSessions() 提前判断「是否有活跃会话」。
+  // 因为 PTY 进程退出后即从 Map 移除，但 UI 卡片记录仍在，会导致该弹框时不弹、直接关闭。
+  // 改为始终走 IPC 弹框，由渲染进程依据 store 里的会话数决定提示文案。
+  mainWindow.on('close', (event) => {
     if (userConfirmedClose) return
     if (!mainWindow) return
 
-    // 还有活跃会话时才弹确认；空会话直接放行
-    const hasActiveSessions = ptyManager.listSessions().length > 0
-    if (!hasActiveSessions) {
-      userConfirmedClose = true
-      return
-    }
-
     event.preventDefault()
     // 通知渲染进程弹出自定义确认框，等待用户选择
-    const confirmed = await new Promise<boolean>((resolve) => {
+    if (closeConfirmResolver) {
+      // 上一次的确认框还没关闭（理论上不会发生，防御性处理）：直接按取消
+      closeConfirmResolver(false)
+      closeConfirmResolver = null
+    }
+    new Promise<boolean>((resolve) => {
       closeConfirmResolver = resolve
       try {
-        mainWindow?.webContents.send('request-close-confirm', hasActiveSessions)
+        mainWindow?.webContents.send('request-close-confirm')
       } catch { /* 窗口已销毁 */ resolve(false) }
+    }).then((confirmed) => {
+      closeConfirmResolver = null
+      if (confirmed && mainWindow) {
+        userConfirmedClose = true
+        // 通知渲染进程显示 loading 蒙板，给用户即时反馈
+        try {
+          mainWindow.webContents.send('app-closing')
+        } catch { /* 窗口已销毁 */ }
+        mainWindow.close()
+      }
+      // 选「取消」则不关闭
     })
-    closeConfirmResolver = null
-
-    if (confirmed && mainWindow) {
-      userConfirmedClose = true
-      // 通知渲染进程显示 loading 蒙板，给用户即时反馈
-      try {
-        mainWindow.webContents.send('app-closing')
-      } catch { /* 窗口已销毁 */ }
-      mainWindow.close()
-    }
-    // 选「取消」则不关闭
   })
 
   // F11 切换全屏

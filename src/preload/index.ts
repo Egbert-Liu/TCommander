@@ -56,7 +56,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // 关闭确认：主进程拦截原生 X 后请求渲染进程弹自定义 Modal；
   // 用户选择后通过 closeConfirmResponse 回传结果给主进程。
-  onRequestCloseConfirm: (callback: (hasActiveSessions: boolean) => void) => {
+  // 会话数由渲染进程自行从 store 读取，主进程不再判断。
+  onRequestCloseConfirm: (callback: () => void) => {
     closeConfirmCallbacks.push(callback)
     return () => {
       closeConfirmCallbacks = closeConfirmCallbacks.filter(cb => cb !== callback)
