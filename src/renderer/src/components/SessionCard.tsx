@@ -503,11 +503,15 @@ function SessionCardImpl(props: SessionCardProps) {
           // 右上角悬浮按钮提供更明显的「全屏」入口（ExpandAltOutlined）。
           onDoubleClick={handleFullscreen}
         >
-          <pre
-            className="whitespace-pre-wrap m-0"
-            style={{ pointerEvents: 'none' }}
-            dangerouslySetInnerHTML={session.previewText ? { __html: previewHtml } : undefined}
-          >{session.previewText ? '' : (preview || '等待输出...')}</pre>
+          {session.previewText ? (
+            <pre
+              className="whitespace-pre-wrap m-0"
+              style={{ pointerEvents: 'none' }}
+              dangerouslySetInnerHTML={{ __html: previewHtml }}
+            />
+          ) : (
+            <pre className="whitespace-pre-wrap m-0" style={{ pointerEvents: 'none' }}>等待输出...</pre>
+          )}
           {/* 悬浮的「全屏」入口按钮：默认隐藏，hover 时显示，避免抢占文本选择 */}
           <Tooltip title="双击或点击全屏查看">
             <Button
