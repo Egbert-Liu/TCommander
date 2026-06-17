@@ -16,7 +16,16 @@ export const DEFAULT_SYSTEM_RULES: TriggerRule[] = [
     id: 'sys-confirm-yn',
     name: '确认提示 (Y/N)',
     triggerType: 'regex',
-    pattern: '\\[y\\/n\\]|\\(y\\/n\\)|\\[yes\\/no\\]|\\(yes\\/no\\)|\\(y\\/n\\/[a-z]\\)|\\[y\\/n\\/[a-z]\\]',
+    // 覆盖主流 Y/N 提示格式：方括号/圆括号、单/双字符、y/N 各种大小写组合
+    pattern:
+      '\\[\\s*y\\s*\\/\\s*n\\s*\\]|' +
+      '\\[\\s*yes\\s*\\/\\s*no\\s*\\]|' +
+      '\\[\\s*y\\/N\\s*\\]|' +
+      '\\[\\s*Y\\/n\\s*\\]|' +
+      '\\(\\s*y\\s*\\/\\s*n\\s*\\)|' +
+      '\\(\\s*yes\\s*\\/\\s*no\\s*\\)|' +
+      '\\[\\s*y\\/n\\/c\\s*\\]|' +
+      '\\(Y\\/N\\/C\\)',
     status: 'needs-confirm',
     enabled: true,
     isSystem: true,
@@ -27,7 +36,19 @@ export const DEFAULT_SYSTEM_RULES: TriggerRule[] = [
     id: 'sys-confirm-question',
     name: '确认提示 (Do you want)',
     triggerType: 'regex',
-    pattern: 'do you want to|are you sure|would you like|confirm\\?|press\\s+[yYnN]\\s+to',
+    // 扩展：do you want / are you sure / would you like / Proceed? / Continue? / Apply? / Press Y to ...
+    pattern:
+      'do you want to|' +
+      'are you sure|' +
+      'would you like|' +
+      'do you wish to|' +
+      'proceed\\s*\\?|' +
+      'continue\\s*\\?|' +
+      'apply\\s*\\?|' +
+      'overwrite\\s*\\?|' +
+      'replace\\s*\\?|' +
+      'delete\\s*\\?|' +
+      'press\\s+[yYnN]\\s+to',
     status: 'needs-confirm',
     enabled: true,
     isSystem: true,
@@ -38,23 +59,36 @@ export const DEFAULT_SYSTEM_RULES: TriggerRule[] = [
     id: 'sys-confirm-choice',
     name: '选择菜单',
     triggerType: 'regex',
-    pattern: '❯\\s*\\d+\\.|\\d+\\.\\s*(?:Yes|No|yes|no)\\b',
+    // 扩展：❯ 1. / > 1. / * 1. / [1] / 1) / 1: / 1. Yes / 1. No
+    pattern:
+      '\\u276F\\s*\\d+\\.|' +
+      '>\\s*\\d+\\.\\s|' +
+      '\\*\\s*\\d+\\.\\s|' +
+      '\\[\\s*\\d+\\s*\\]\\s|' +
+      '\\d+\\)\\s|' +
+      '\\d+:\\s|' +
+      '\\d+\\.\\s*(?:Yes|No|yes|no|Y|N)\\b',
     status: 'needs-confirm',
     enabled: true,
     isSystem: true,
     caseSensitive: false,
-    description: '检测编号选择菜单（如 ❯ 1. Yes）',
+    description: '检测编号选择菜单（❯ 1. / > 1. / [1] / 1) / 1. Yes）',
   },
   {
     id: 'sys-trust-folder',
     name: '信任文件夹',
     triggerType: 'regex',
-    pattern: '\\btrust\\b.*\\bfolder\\b|\\b(accept|reject)\\b',
+    // 扩展：trust the authors / do you trust / trust this folder / accept incoming
+    pattern:
+      '\\btrust\\b.*\\bfolder\\b|' +
+      '\\btrust\\b.*\\bauthors?\\b|' +
+      '\\bdo you trust\\b|' +
+      '\\b(accept|reject)\\b.*\\b(folder|connection|incoming)\\b',
     status: 'needs-confirm',
     enabled: true,
     isSystem: true,
     caseSensitive: false,
-    description: '检测"是否信任此文件夹"提示',
+    description: '检测"是否信任此文件夹 / 作者"提示',
   },
   {
     id: 'sys-needs-input',

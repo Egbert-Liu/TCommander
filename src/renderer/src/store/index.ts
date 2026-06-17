@@ -52,6 +52,10 @@ interface AppState {
   setPresets: (presets: Preset[]) => void
   setGroups: (groups: Group[]) => void
   setSnapshots: (snapshots: Snapshot[]) => void
+
+  // 全局 loading 蒙板：用于关闭应用/关闭会话等需要等待 PTY 资源释放的场景
+  globalLoading: { open: boolean; text: string }
+  setGlobalLoading: (open: boolean, text?: string) => void
 }
 
 /** 按当前明暗主题同步原生窗口控制按钮（最小化/最大化/关闭）的底色与符号色 */
@@ -214,8 +218,8 @@ export const useAppStore = create<AppState>((set) => ({
   },
 
   setPresets: (presets) => set({ presets }),
-
   setGroups: (groups) => set({ groups }),
-
   setSnapshots: (snapshots) => set({ snapshots }),
+  globalLoading: { open: false, text: '' },
+  setGlobalLoading: (open, text = '') => set({ globalLoading: { open, text } }),
 }))

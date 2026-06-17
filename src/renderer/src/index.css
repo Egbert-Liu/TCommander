@@ -97,7 +97,8 @@ body {
    - needs-confirm（黄/橙）1s
    - error           （红）   0.5s
    - needs-input    （蓝）  2s
-   关键帧复用 card-glow，避免三份几乎一样的 keyframes。 */
+   关键帧复用 card-glow，避免三份几乎一样的 keyframes。
+   外圈光圈 6px / 8px（用户要求"更粗一点"），呼吸峰值 12px 强化视觉冲击。 */
 .card-status-error,
 .card-status-needs-confirm,
 .card-status-needs-input {
@@ -105,23 +106,23 @@ body {
   border-color: var(--card-glow-color, var(--ant-color-border)) !important;
   box-shadow:
     0 0 0 1px var(--card-glow-color, transparent) inset,
-    0 0 0 4px var(--card-glow-soft, transparent);
+    0 0 0 6px var(--card-glow-soft, transparent);
 }
 
-.card-status-error          { --card-glow-color: var(--status-error);          --card-glow-soft: rgba(248, 113, 113, 0.10); animation: card-glow 0.5s ease-in-out infinite; }
-.card-status-needs-confirm  { --card-glow-color: var(--status-needs-confirm);  --card-glow-soft: rgba(251, 191, 36, 0.10); animation: card-glow 1s   ease-in-out infinite; }
-.card-status-needs-input    { --card-glow-color: var(--status-needs-input);    --card-glow-soft: rgba(56, 189, 248, 0.10); animation: card-glow 2s   ease-in-out infinite; }
+.card-status-error          { --card-glow-color: var(--status-error);          --card-glow-soft: rgba(248, 113, 113, 0.12); animation: card-glow 0.5s ease-in-out infinite; }
+.card-status-needs-confirm  { --card-glow-color: var(--status-needs-confirm);  --card-glow-soft: rgba(251, 191, 36, 0.12); animation: card-glow 1s   ease-in-out infinite; }
+.card-status-needs-input    { --card-glow-color: var(--status-needs-input);    --card-glow-soft: rgba(56, 189, 248, 0.12); animation: card-glow 2s   ease-in-out infinite; }
 
 @keyframes card-glow {
   0%, 100% {
     box-shadow:
       0 0 0 1px var(--card-glow-color, transparent) inset,
-      0 0 0 2px var(--card-glow-soft, transparent);
+      0 0 0 3px var(--card-glow-soft, transparent);
   }
   50% {
     box-shadow:
       0 0 0 1px var(--card-glow-color, transparent) inset,
-      0 0 0 5px var(--card-glow-soft, transparent);
+      0 0 0 8px var(--card-glow-soft, transparent);
   }
 }
 

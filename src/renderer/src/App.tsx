@@ -12,6 +12,7 @@ import PresetsDialog from './components/PresetsDialog'
 import SnapshotsDialog from './components/SnapshotsDialog'
 import RulesDialog from './components/RulesDialog'
 import EmptyState from './components/EmptyState'
+import LoadingMask from './components/LoadingMask'
 import { cleanTerminalOutput, detectStatusWithRules, truncateHistory } from './utils/statusDetector'
 import { STATUS_COLORS } from './utils/statusColors'
 import { createSessionFromConfig } from './utils/sessionActions'
@@ -521,7 +522,9 @@ function App() {
               background: 'var(--ant-color-bg-container)',
             }}
           >
-            {/* 筛选栏：搜索 + 预览行数 + 当前激活的筛选条件 */}
+            {/* 筛选栏：搜索 + 预览行数 + 当前激活的筛选条件
+                高度与左侧 Sidebar 顶部 header (32px) 对齐，
+                height 32 + 移除默认 size="small" 的 24 高度，使页面更协调。 */}
             <div className="mb-4 flex items-center gap-3 flex-wrap">
               <Input
                 placeholder="搜索会话名称/内容..."
@@ -529,15 +532,15 @@ function App() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 prefix={<SearchOutlined style={{ color: 'var(--ant-color-text-tertiary)', fontSize: 12 }} />}
                 allowClear
-                size="small"
-                style={{ width: 220 }}
+                size="middle"
+                style={{ width: 220, height: 32 }}
               />
 
               <Select
                 value={previewLineCount}
                 onChange={setPreviewLineCount}
-                size="small"
-                style={{ width: 80 }}
+                size="middle"
+                style={{ width: 120, height: 32 }}
                 options={[
                   { value: 5, label: '5行预览' },
                   { value: 10, label: '10行预览' },
@@ -698,6 +701,8 @@ function App() {
           open={showRules}
           onClose={() => setShowRules(false)}
         />
+
+        <LoadingMask />
       </div>
     </ConfigProvider>
   )

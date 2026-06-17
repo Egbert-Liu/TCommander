@@ -1,7 +1,11 @@
 import { useState, useRef, useMemo, useCallback } from 'react'
-import { Tag, Button, Input, Checkbox, Tooltip, Dropdown, Popover, message } from 'antd'
-import type { MenuProps } from 'antd'
-import { ExpandOutlined, DeleteFilled, CheckCircleFilled, CloseCircleFilled, CodeFilled, PlayCircleFilled, EditFilled, SafetyCertificateFilled, CopyOutlined, ClearOutlined, MoreOutlined, CheckOutlined, StopFilled, ArrowUpOutlined, ArrowDownOutlined, SendOutlined, EnterOutlined, SettingOutlined, ReloadOutlined } from '@ant-design/icons'
+import { Tag, Button, Input, Checkbox, Tooltip, Dropdown, Popconfirm, message } from 'antd'
+import {
+  DeleteFilled, EditFilled,
+  MoreOutlined, CheckOutlined,
+  ArrowUpOutlined, ArrowDownOutlined, SendOutlined, EnterOutlined,
+  ReloadOutlined, CloseSquareFilled, SafetyCertificateFilled
+} from '@ant-design/icons'
 import { Session } from '../types'
 import { useAppStore } from '../store'
 import { STATUS_COLORS } from '../utils/statusColors'
@@ -14,26 +18,27 @@ interface SessionCardProps {
   onSelect?: (id: string, selected: boolean) => void
 }
 
-const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string; glow: boolean; icon: React.ReactNode }> = {
-  'needs-confirm': { ...STATUS_COLORS['needs-confirm'], label: '需确认', glow: true, icon: <CheckCircleFilled /> },
-  'needs-input':   { ...STATUS_COLORS['needs-input'], label: '待输入', glow: true, icon: <PlayCircleFilled /> },
-  'error':         { ...STATUS_COLORS['error'], label: '错误', glow: true, icon: <CloseCircleFilled /> },
-  'running':       { ...STATUS_COLORS['running'], label: '运行中', glow: false, icon: <PlayCircleFilled /> },
-  'idle':          { ...STATUS_COLORS['idle'], label: '空闲', glow: false, icon: <CodeFilled /> },
+const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string; glow: boolean }> = {
+  'needs-confirm': { ...STATUS_COLORS['needs-confirm'], label: '需确认', glow: true },
+  'needs-input':   { ...STATUS_COLORS['needs-input'], label: '待输入', glow: true },
+  'error':         { ...STATUS_COLORS['error'], label: '错误', glow: true },
+  'running':       { ...STATUS_COLORS['running'], label: '运行中', glow: false },
+  'idle':          { ...STATUS_COLORS['idle'], label: '空闲', glow: false },
 }
 
-const ALL_QUICK_ACTIONS = ['Y', 'N', 'CtrlC', 'Up', 'Down', 'Input', 'Send', 'Enter']
+// 已从 UI 移除（用户要求"代码保留"）
+// const ALL_QUICK_ACTIONS = ['Y', 'N', 'CtrlC', 'Up', 'Down', 'Input', 'Send', 'Enter']
 
-const ACTION_LABELS: Record<string, string> = {
-  'Y': 'Y',
-  'N': 'N',
-  'CtrlC': 'Ctrl+C',
-  'Up': '↑ 上箭头',
-  'Down': '↓ 下箭头',
-  'Input': '输入框',
-  'Send': '发送',
-  'Enter': 'Enter',
-}
+// const ACTION_LABELS: Record<string, string> = {
+//   'Y': 'Y',
+//   'N': 'N',
+//   'CtrlC': 'Ctrl+C',
+//   'Up': '↑ 上箭头',
+//   'Down': '↓ 下箭头',
+//   'Input': '输入框',
+//   'Send': '发送',
+//   'Enter': 'Enter',
+// }
 
 export default function SessionCard({ session, onResetSession, selectable, selected, onSelect }: SessionCardProps) {
   const removeSession = useAppStore((s) => s.removeSession)
@@ -46,6 +51,9 @@ export default function SessionCard({ session, onResetSession, selectable, selec
   const [input, setInput] = useState('')
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState(session.name)
+  // 受控的删除/重置 Popconfirm：菜单点击只打开弹层，确认/取消再关闭
+  const [deletePopOpen, setDeletePopOpen] = useState(false)
+  const [resetPopOpen, setResetPopOpen] = useState(false)
   const nameInputRef = useRef<any>(null)
 
   const quickActions = session.quickActions
@@ -101,8 +109,30 @@ export default function SessionCard({ session, onResetSession, selectable, selec
   }
 
   const handleClose = async () => {
-    await window.electronAPI.closeSession(session.id)
-    removeSession(session.id)
+    const setGlobalLoading = useAppStore.getState().setGlobalLoading
+    setGlobalLoading(true, '正在关闭会话并清理 PTY 资源...')
+    try {
+      await window.electronAPI.closeSession(session.id)
+      removeSession(session.id)
+    } finally {
+      setGlobalLoading(false)
+    }
+  }
+
+  // 重置会话：会清空历史 + 状态回退 idle
+  const handleResetConfirm = () => {
+    setResetPopOpen(false)
+    if (onResetSession) {
+      onResetSession(session)
+    } else {
+      updateSession(session.id, {
+        history: [],
+        previewText: '',
+        status: 'idle',
+        matchedRuleName: undefined,
+      })
+      message.success('会话已重置')
+    }
   }
 
   const handleFullscreen = () => {
@@ -123,13 +153,14 @@ export default function SessionCard({ session, onResetSession, selectable, selec
     updateSession(session.id, { groupId })
   }
 
-  const handleToggleQuickAction = (key: string) => {
-    const currentActions = session.quickActions
-    const newActions = currentActions.includes(key)
-      ? currentActions.filter((a: string) => a !== key)
-      : [...currentActions, key]
-    updateSession(session.id, { quickActions: newActions })
-  }
+  // 已从 UI 移除（用户要求"代码保留"）
+  // const handleToggleQuickAction = (key: string) => {
+  //   const currentActions = session.quickActions
+  //   const newActions = currentActions.includes(key)
+  //     ? currentActions.filter((a: string) => a !== key)
+  //     : [...currentActions, key]
+  //   updateSession(session.id, { quickActions: newActions })
+  // }
 
   const handleDismissStatus = () => {
     updateSession(session.id, {
@@ -146,64 +177,66 @@ export default function SessionCard({ session, onResetSession, selectable, selec
     }
   }, [session.previewText, preview])
 
-  const handleClearHistory = () => {
-    updateSession(session.id, {
-      history: [],
-      previewText: '',
-    })
-  }
+  // 已从 UI 移除（用户要求"代码保留"）
+  // const handleClearHistory = () => {
+  //   updateSession(session.id, {
+  //     history: [],
+  //     previewText: '',
+  //   })
+  // }
 
-  // 右键菜单
-  const contextMenuItems: MenuProps['items'] = [
-    {
-      key: 'copy',
-      icon: <CopyOutlined style={{ fontSize: 11 }} />,
-      label: '复制预览内容',
-      onClick: handleCopyPreview,
-    },
-    {
-      key: 'fullscreen',
-      icon: <ExpandOutlined style={{ fontSize: 11 }} />,
-      label: '全屏查看',
-      onClick: handleFullscreen,
-    },
-    { type: 'divider' },
-    {
-      key: 'clear',
-      icon: <ClearOutlined style={{ fontSize: 11 }} />,
-      label: '清空历史',
-      danger: true,
-      onClick: handleClearHistory,
-    },
-  ]
+  // 右键菜单 — 已从 UI 移除（用户要求"代码保留"）
+  // const contextMenuItems: MenuProps['items'] = [
+  //   {
+  //     key: 'copy',
+  //     icon: <CopyOutlined style={{ fontSize: 11 }} />,
+  //     label: '复制预览内容',
+  //     onClick: handleCopyPreview,
+  //   },
+  //   {
+  //     key: 'fullscreen',
+  //     icon: <ExpandOutlined style={{ fontSize: 11 }} />,
+  //     label: '全屏查看',
+  //     onClick: handleFullscreen,
+  //   },
+  //   { type: 'divider' },
+  //   {
+  //     key: 'clear',
+  //     icon: <ClearOutlined style={{ fontSize: 11 }} />,
+  //     label: '清空历史',
+  //     danger: true,
+  //     onClick: handleClearHistory,
+  //   },
+  // ]
+
+  // 快捷操作显示设置弹窗内容 — 已从 UI 移除（用户要求"代码保留"）
+  // const settingsContent = (
+  //   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 140 }}>
+  //     {ALL_QUICK_ACTIONS.map(key => (
+  //       <Checkbox
+  //         key={key}
+  //         checked={quickActions.includes(key)}
+  //         onChange={() => handleToggleQuickAction(key)}
+  //         style={{ fontSize: 11 }}
+  //       >
+  //         {ACTION_LABELS[key]}
+  //       </Checkbox>
+  //     ))}
+  //     <div style={{ height: 1, background: 'var(--ant-color-border)', margin: '4px 0' }} />
+  //     <Button
+  //       size="small"
+  //       icon={<ReloadOutlined style={{ fontSize: 11 }} />}
+  //       onClick={() => onResetSession?.(session)}
+  //       style={{ fontSize: 11, justifyContent: 'flex-start', height: 26 }}
+  //     >
+  //       重置会话
+  //     </Button>
+  //   </div>
+  // )
 
   const statusCfg = STATUS_CONFIG[session.status] || STATUS_CONFIG.idle
   const sessionGroup = groups.find(g => g.id === session.groupId)
   const statusClass = statusCfg.glow ? `card-status-${session.status}` : ''
-
-  const settingsContent = (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 140 }}>
-      {ALL_QUICK_ACTIONS.map(key => (
-        <Checkbox
-          key={key}
-          checked={quickActions.includes(key)}
-          onChange={() => handleToggleQuickAction(key)}
-          style={{ fontSize: 11 }}
-        >
-          {ACTION_LABELS[key]}
-        </Checkbox>
-      ))}
-      <div style={{ height: 1, background: 'var(--ant-color-border)', margin: '4px 0' }} />
-      <Button
-        size="small"
-        icon={<ReloadOutlined style={{ fontSize: 11 }} />}
-        onClick={() => onResetSession?.(session)}
-        style={{ fontSize: 11, justifyContent: 'flex-start', height: 26 }}
-      >
-        重置会话
-      </Button>
-    </div>
-  )
 
   return (
     <div
@@ -235,12 +268,8 @@ export default function SessionCard({ session, onResetSession, selectable, selec
               style={{ flexShrink: 0 }}
             />
           )}
-          <div
-            className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0"
-            style={{ background: statusCfg.bg }}
-          >
-            <span style={{ color: statusCfg.color, fontSize: 10 }}>{statusCfg.icon}</span>
-          </div>
+
+          {/* 名称前小图标已移除 — 后面已经有 status-pill 文字说明 */}
 
           {editingName ? (
             <Input
@@ -382,22 +411,10 @@ export default function SessionCard({ session, onResetSession, selectable, selec
                 onClick: () => setEditingName(true),
               },
               {
-                key: 'fullscreen',
-                icon: <ExpandOutlined style={{ fontSize: 11 }} />,
-                label: '全屏查看',
-                onClick: handleFullscreen,
-              },
-              {
-                key: 'copy',
-                icon: <CopyOutlined style={{ fontSize: 11 }} />,
-                label: '复制预览',
-                onClick: handleCopyPreview,
-              },
-              {
-                key: 'clear',
-                icon: <ClearOutlined style={{ fontSize: 11 }} />,
-                label: '清空历史',
-                onClick: handleClearHistory,
+                key: 'reset',
+                icon: <ReloadOutlined style={{ fontSize: 11 }} />,
+                label: '重置会话',
+                onClick: () => setResetPopOpen(true),
               },
               {
                 key: 'group',
@@ -429,7 +446,7 @@ export default function SessionCard({ session, onResetSession, selectable, selec
                 icon: <DeleteFilled style={{ fontSize: 11 }} />,
                 label: '删除会话',
                 danger: true,
-                onClick: handleClose,
+                onClick: () => setDeletePopOpen(true),
               },
             ],
           }}
@@ -445,15 +462,50 @@ export default function SessionCard({ session, onResetSession, selectable, selec
         </Dropdown>
       </div>
 
-      <Dropdown menu={{ items: contextMenuItems }} trigger={['contextMenu']}>
-        <div
-          className="session-card-preview px-2.5 py-1.5"
+      {/* 删除/重置会话的二次确认 Popconfirm（受控 open 模式）
+          放在头部之后，弹出位置跟随默认（卡片中心偏上），不影响布局。 */}
+      <Popconfirm
+        title="删除会话"
+        description="确定要删除该会话吗？会关闭对应的 PTY 进程并清空所有历史。"
+        open={deletePopOpen}
+        onConfirm={() => { setDeletePopOpen(false); handleClose() }}
+        onCancel={() => setDeletePopOpen(false)}
+        okText="删除"
+        cancelText="取消"
+        okButtonProps={{ danger: true, size: 'small' }}
+        cancelButtonProps={{ size: 'small' }}
+        placement="top"
+      >
+        <span style={{ display: 'none' }} />
+      </Popconfirm>
+      <Popconfirm
+        title="重置会话"
+        description="清空历史与状态，重新开始。PTY 进程不会被关闭。"
+        open={resetPopOpen}
+        onConfirm={handleResetConfirm}
+        onCancel={() => setResetPopOpen(false)}
+        okText="重置"
+        cancelText="取消"
+        okButtonProps={{ size: 'small' }}
+        cancelButtonProps={{ size: 'small' }}
+        placement="top"
+      >
+        <span style={{ display: 'none' }} />
+      </Popconfirm>
+
+      {/* 右键菜单 — 已从 UI 移除（用户要求"代码保留"）
+          <Dropdown menu={{ items: contextMenuItems }} trigger={['contextMenu']}>
+      */}
+      <div
+        className="session-card-preview px-2.5 py-1.5"
           style={{
-            height: previewLineCount * 16,
-            minHeight: 48,
+            // 高度按行数自适应：每行 18px（比之前 16px 略高，更舒服）+ 上下 padding 12 = 12 + N * 18
+            // 5 行 = 102px, 10 行 = 192px, 15 行 = 282px, 20 行 = 372px
+            minHeight: 102,
+            height: 12 + previewLineCount * 18,
             background: 'var(--ant-color-fill)',
             fontFamily: "'JetBrains Mono', monospace",
-            fontSize: 10,
+            fontSize: 11,
             lineHeight: 1.6,
             color: 'var(--ant-color-text)',
             cursor: 'pointer',
@@ -468,7 +520,7 @@ export default function SessionCard({ session, onResetSession, selectable, selec
         >
           <pre className="whitespace-pre-wrap m-0">{preview || '等待输出...'}</pre>
         </div>
-      </Dropdown>
+      {/* </Dropdown> — 右键菜单已从 UI 移除（用户要求"代码保留"） */}
 
       <div
         className="px-2 flex items-center gap-1"
@@ -478,7 +530,8 @@ export default function SessionCard({ session, onResetSession, selectable, selec
           background: 'var(--ant-color-bg-container)',
         }}
       >
-        {quickActions.includes('Y') && (
+        {/* Y / N 仅在「需确认」状态下出现，平常隐藏，避免噪声 */}
+        {quickActions.includes('Y') && session.status === 'needs-confirm' && (
           <Button
             type="primary"
             size="small"
@@ -488,7 +541,7 @@ export default function SessionCard({ session, onResetSession, selectable, selec
             Y
           </Button>
         )}
-        {quickActions.includes('N') && (
+        {quickActions.includes('N') && session.status === 'needs-confirm' && (
           <Button
             danger
             size="small"
@@ -499,12 +552,13 @@ export default function SessionCard({ session, onResetSession, selectable, selec
           </Button>
         )}
         {quickActions.includes('CtrlC') && (
-          <Tooltip title="Ctrl+C">
+          <Tooltip title="Ctrl+C 中断">
             <Button
               size="small"
               onClick={handleCtrlC}
               aria-label="Ctrl+C"
-              icon={<StopFilled style={{ fontSize: 11 }} />}
+              danger
+              icon={<CloseSquareFilled style={{ fontSize: 11 }} />}
               style={{ width: 24, height: 22, minWidth: 24, padding: 0, borderRadius: 4 }}
             />
           </Tooltip>
@@ -552,9 +606,12 @@ export default function SessionCard({ session, onResetSession, selectable, selec
             <Button size="small" aria-label="Enter" icon={<EnterOutlined style={{ fontSize: 11 }} />} onClick={handleEnter} style={{ width: 22, height: 22, minWidth: 22, padding: 0, borderRadius: 4 }} />
           </Tooltip>
         )}
-        <Popover content={settingsContent} title="快捷操作显示设置" trigger="click" placement="topRight">
-          <Button type="text" aria-label="快捷操作设置" icon={<SettingOutlined style={{ fontSize: 11 }} />} size="small" style={{ width: 22, height: 22, minWidth: 22, padding: 0, flexShrink: 0, borderRadius: 4 }} title="快捷操作设置" />
-        </Popover>
+        {/* 快捷操作显示设置按钮 — 临时从 UI 移除（用户要求"代码保留"）
+            如需恢复，取消下面这段注释即可：
+            <Popover content={settingsContent} title="快捷操作显示设置" trigger="click" placement="topRight">
+              <Button type="text" aria-label="快捷操作设置" icon={<SettingOutlined style={{ fontSize: 11 }} />} size="small" style={{ width: 22, height: 22, minWidth: 22, padding: 0, flexShrink: 0, borderRadius: 4 }} title="快捷操作设置" />
+            </Popover>
+        */}
       </div>
     </div>
   )
