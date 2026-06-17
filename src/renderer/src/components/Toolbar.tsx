@@ -138,20 +138,19 @@ export default function Toolbar({
   ]
 
   // 状态计数按钮：点击切换筛选
+  // 用 .status-pill 统一胶囊样式 + data-active 控制放大（控制栏放大动效）
   const renderStatusBtn = (key: string, label: string, count: number, color: string) => {
     const active = statusFilter === key
     return (
       <button
         key={key}
+        data-active={active}
+        className="status-pill"
         onClick={() => onStatusFilterChange(active ? null : key)}
-        className="flex items-center gap-1 px-2 rounded-md transition-colors"
         style={{
-          height: 22,
-          background: active ? `${color}26` : `${color}14`,
+          background: active ? `${color}33` : `${color}14`,
           border: `1px solid ${active ? color : `${color}40`}`,
           color,
-          fontSize: 10,
-          cursor: 'pointer',
         }}
         title={active ? `点击清除「${label}」筛选` : `只看「${label}」的会话`}
       >

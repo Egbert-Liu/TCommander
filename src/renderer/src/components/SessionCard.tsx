@@ -295,6 +295,8 @@ export default function SessionCard({ session, onResetSession, selectable, selec
           )}
 
           <Tag
+            className="status-pill"
+            data-active={statusCfg.glow}
             color={statusCfg.color}
             style={{
               margin: 0,

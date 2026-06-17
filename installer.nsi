@@ -1,7 +1,7 @@
 !include "MUI2.nsh"
 
 !define APP_NAME "TCommander"
-!define APP_VERSION "0.4.0"
+!define APP_VERSION "0.4.1"
 !define APP_PUBLISHER "TCommander"
 !define APP_DIR "TCommander"
 !define EXE_NAME "TCommander.exe"

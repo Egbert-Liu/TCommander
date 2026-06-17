@@ -116,6 +116,14 @@ function testRule(cleanLine: string, _rawLine: string, rule: TriggerRule): boole
 export interface DetectResult {
   status: SessionStatus
   matchedRuleName?: string
+  /**
+   * 是否有任何规则在尾部行上命中。
+   * - true  => 调用方应立即应用新状态（或者维持），并清掉「3 秒无匹配回退」计时器
+   * - false => 尾部未命中任何规则。调用方应启动回退计时器，3s 内若仍无匹配则回退到 idle
+   *
+   * 区分这两种情况是为了让"没有任何状态特征"和"命中了 idle 规则"语义不同。
+   */
+  matched: boolean
 }
 
 export function detectStatusWithRules(
@@ -124,7 +132,7 @@ export function detectStatusWithRules(
 ): DetectResult {
   const cleanOutput = stripAnsi(rawOutput)
   const lines = cleanOutput.split('\n').filter(l => l.trim())
-  if (lines.length === 0) return { status: 'running' }
+  if (lines.length === 0) return { status: 'running', matched: false }
 
   const tailLines = lines.slice(-8)
   const tailText = tailLines.join('\n')
@@ -150,10 +158,11 @@ export function detectStatusWithRules(
     return {
       status: matches[0].status,
       matchedRuleName: matches[0].ruleName,
+      matched: true,
     }
   }
 
-  return { status: 'running' }
+  return { status: 'running', matched: false }
 }
 
 export function detectStatus(rawOutput: string): DetectResult {
@@ -226,7 +235,37 @@ export function cleanTerminalOutput(raw: string): string {
   return deduped.join('\n')
 }
 
-export function truncateHistory(history: string[], maxLines: number = 200): string[] {
-  if (history.length <= maxLines) return history
-  return history.slice(-maxLines)
+/** 渲染进程每会话历史缓存上限：512 KB（按字符串长度估算） */
+export const RENDER_HISTORY_BYTE_LIMIT = 512 * 1024
+/** 渲染进程每会话历史行数上限 */
+export const RENDER_HISTORY_LINE_LIMIT = 400
+
+/**
+ * 在保留尾部的同时，截断到行数 + 字符数双上限。
+ * - 行数上限：`maxLines`（默认 400 行）
+ * - 字节上限：`maxBytes`（默认 512 KB）
+ *
+ * 两道门槛都过：避免「很多短行 + 极少字节」或「少量长行 + 极多字节」两种极端。
+ * 任何一项越界都从头开始 pop，直到两者都满足。
+ */
+export function truncateHistory(
+  history: string[],
+  maxLines: number = RENDER_HISTORY_LINE_LIMIT,
+  maxBytes: number = RENDER_HISTORY_BYTE_LIMIT
+): string[] {
+  let trimmed = history
+  if (trimmed.length > maxLines) {
+    trimmed = trimmed.slice(-maxLines)
+  }
+  // 累计字节判断（仅做一次 O(n) 扫描）
+  let total = 0
+  for (let i = trimmed.length - 1; i >= 0; i--) {
+    total += trimmed[i].length
+    if (total > maxBytes) {
+      // i 之前的所有元素都丢掉
+      trimmed = trimmed.slice(i + 1)
+      break
+    }
+  }
+  return trimmed
 }

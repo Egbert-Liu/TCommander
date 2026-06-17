@@ -147,6 +147,11 @@ function App() {
   const pendingBufferRef = useRef<Record<string, string[]>>({})
   const batchQueueRef = useRef<Record<string, string[]>>({})
   const batchTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  // 渲染进程批队列字节上限：每会话 128 KB；超过则从头丢弃旧块
+  const BATCH_QUEUE_BYTE_LIMIT = 128 * 1024
+  // 3 秒无匹配自动回退到 idle 的定时器
+  const statusFallbackTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const STATUS_FALLBACK_MS = 3000
 
   useEffect(() => {
     const flushSession = (sessionId: string) => {
@@ -170,13 +175,39 @@ function App() {
       const cleanText = cleanTerminalOutput(fullRaw)
       const detectResult = detectStatusWithRules(fullRaw, state.rules)
 
-      state.updateSession(sessionId, {
-        history: newHistory,
-        previewText: cleanText,
-        status: detectResult.status,
-        matchedRuleName: detectResult.matchedRuleName,
-        lastActivityAt: Date.now()
-      })
+      // 3 秒无匹配回退逻辑：
+      //   - 命中规则  -> 立即应用，清除回退 timer
+      //   - 未命中    -> 不立即回退 running，而是维持当前状态 3s，3s 内再无匹配才回退到 idle
+      if (detectResult.matched) {
+        const t = statusFallbackTimers.current[sessionId]
+        if (t) { clearTimeout(t); delete statusFallbackTimers.current[sessionId] }
+        state.updateSession(sessionId, {
+          history: newHistory,
+          previewText: cleanText,
+          status: detectResult.status,
+          matchedRuleName: detectResult.matchedRuleName,
+          lastActivityAt: Date.now()
+        })
+      } else {
+        // 没匹配：保存新的 history/preview，但不动 status
+        state.updateSession(sessionId, {
+          history: newHistory,
+          previewText: cleanText,
+          lastActivityAt: Date.now()
+        })
+        if (!statusFallbackTimers.current[sessionId]) {
+          statusFallbackTimers.current[sessionId] = setTimeout(() => {
+            delete statusFallbackTimers.current[sessionId]
+            const s = useAppStore.getState()
+            const sess = s.sessions.find(x => x.id === sessionId)
+            if (!sess) return
+            // 只有当前仍非 idle 时才回退，避免回退抖动
+            if (sess.status !== 'idle') {
+              s.updateSession(sessionId, { status: 'idle', matchedRuleName: undefined })
+            }
+          }, STATUS_FALLBACK_MS)
+        }
+      }
     }
 
     const handleOutput = (sessionId: string, data: string) => {
@@ -194,7 +225,18 @@ function App() {
       if (!batchQueueRef.current[sessionId]) {
         batchQueueRef.current[sessionId] = []
       }
-      batchQueueRef.current[sessionId].push(data)
+      const queue = batchQueueRef.current[sessionId]
+      queue.push(data)
+
+      // 字节上限：累计估算，若超过则从头丢弃旧块（保留最新 128 KB）
+      let bytes = 0
+      for (let i = queue.length - 1; i >= 0; i--) {
+        bytes += queue[i].length
+        if (bytes > BATCH_QUEUE_BYTE_LIMIT) {
+          batchQueueRef.current[sessionId] = queue.slice(i + 1)
+          break
+        }
+      }
 
       if (batchTimerRef.current[sessionId]) {
         clearTimeout(batchTimerRef.current[sessionId])
@@ -210,6 +252,9 @@ function App() {
         clearTimeout(timer)
         delete batchTimerRef.current[sessionId]
       }
+      // 进程退出时也要清掉回退 timer
+      const fb = statusFallbackTimers.current[sessionId]
+      if (fb) { clearTimeout(fb); delete statusFallbackTimers.current[sessionId] }
 
       const state = useAppStore.getState()
       const session = state.sessions.find(s => s.id === sessionId)
@@ -247,6 +292,8 @@ function App() {
       batchTimerRef.current = {}
       batchQueueRef.current = {}
       pendingBufferRef.current = {}
+      Object.values(statusFallbackTimers.current).forEach(t => clearTimeout(t))
+      statusFallbackTimers.current = {}
     }
   }, [])
 
@@ -279,13 +326,33 @@ function App() {
           const fullRaw = newHistory.join('')
           const cleanText = cleanTerminalOutput(fullRaw)
           const detectResult = detectStatusWithRules(fullRaw, state.rules)
-          state.updateSession(activeId, {
-            history: newHistory,
-            previewText: cleanText,
-            status: detectResult.status,
-            matchedRuleName: detectResult.matchedRuleName,
-            lastActivityAt: Date.now()
-          })
+          if (detectResult.matched) {
+            const t = statusFallbackTimers.current[activeId]
+            if (t) { clearTimeout(t); delete statusFallbackTimers.current[activeId] }
+            state.updateSession(activeId, {
+              history: newHistory,
+              previewText: cleanText,
+              status: detectResult.status,
+              matchedRuleName: detectResult.matchedRuleName,
+              lastActivityAt: Date.now()
+            })
+          } else {
+            state.updateSession(activeId, {
+              history: newHistory,
+              previewText: cleanText,
+              lastActivityAt: Date.now()
+            })
+            if (!statusFallbackTimers.current[activeId]) {
+              statusFallbackTimers.current[activeId] = setTimeout(() => {
+                delete statusFallbackTimers.current[activeId]
+                const s = useAppStore.getState()
+                const sess = s.sessions.find(x => x.id === activeId)
+                if (sess && sess.status !== 'idle') {
+                  s.updateSession(activeId, { status: 'idle', matchedRuleName: undefined })
+                }
+              }, STATUS_FALLBACK_MS)
+            }
+          }
         }
       }
     }
