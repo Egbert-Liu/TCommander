@@ -220,7 +220,13 @@ body {
   width: 0;
   height: 0;
 }
-/* 预览区底部加一层淡出遮罩，提示「这里被截断、可以双击复制/单击全屏」 */
+
+/* hover 卡片时显示预览区右上角的「全屏」按钮 */
+.session-card:hover .session-card-preview-expand {
+  opacity: 1 !important;
+}
+/* 预览区底部淡出遮罩：与深色背景 rgba(0,0,0,0.25) 协调，
+   渐变到接近不透明黑，让「被截断」感更柔和。 */
 .session-card-preview::after {
   content: '';
   position: absolute;
@@ -232,7 +238,7 @@ body {
   background: linear-gradient(
     to bottom,
     transparent,
-    var(--ant-color-fill)
+    rgba(0, 0, 0, 0.32)
   );
 }
 

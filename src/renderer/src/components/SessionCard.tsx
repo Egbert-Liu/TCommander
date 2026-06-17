@@ -1,10 +1,10 @@
-import { useState, useRef, useMemo, useCallback } from 'react'
+import { useState, useRef, useMemo, memo } from 'react'
 import { Tag, Button, Input, Checkbox, Tooltip, Dropdown, Modal, message } from 'antd'
 import {
   DeleteFilled, EditFilled,
   MoreOutlined, CheckOutlined,
   ArrowUpOutlined, ArrowDownOutlined, SendOutlined, EnterOutlined,
-  ReloadOutlined, SafetyCertificateFilled
+  ReloadOutlined, SafetyCertificateFilled, ExpandAltOutlined
 } from '@ant-design/icons'
 import { Session } from '../types'
 import { useAppStore } from '../store'
@@ -40,7 +40,8 @@ const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string; 
 //   'Enter': 'Enter',
 // }
 
-export default function SessionCard({ session, onResetSession, selectable, selected, onSelect }: SessionCardProps) {
+function SessionCardImpl(props: SessionCardProps) {
+  const { session, onResetSession, selectable, selected, onSelect } = props
   const removeSession = useAppStore((s) => s.removeSession)
   const updateSession = useAppStore((s) => s.updateSession)
   const setActiveSession = useAppStore((s) => s.setActiveSession)
@@ -191,13 +192,15 @@ export default function SessionCard({ session, onResetSession, selectable, selec
     })
   }
 
-  const handleCopyPreview = useCallback(async () => {
-    const text = session.previewText || preview
-    if (text) {
-      await navigator.clipboard.writeText(text)
-      message.success('已复制到剪贴板')
-    }
-  }, [session.previewText, preview])
+  // 已从 UI 移除（用户要求"代码保留"）：handleCopyPreview 在右键菜单被注释后不再被引用，
+  // 为保持代码可恢复性，这里也注释掉函数本身，避免 TS6133「声明但未使用」报错。
+  // const handleCopyPreview = useCallback(async () => {
+  //   const text = session.previewText || preview
+  //   if (text) {
+  //     await navigator.clipboard.writeText(text)
+  //     message.success('已复制到剪贴板')
+  //   }
+  // }, [session.previewText, preview])
 
   // 已从 UI 移除（用户要求"代码保留"）
   // const handleClearHistory = () => {
@@ -502,19 +505,45 @@ export default function SessionCard({ session, onResetSession, selectable, selec
             fontSize: 11,
             lineHeight: 1.6,
             color: 'var(--ant-color-text)',
-            cursor: 'pointer',
+            cursor: 'text',
             userSelect: 'text',
             overflow: 'hidden',
             borderTop: '1px solid var(--ant-color-border)',
             borderBottom: '1px solid var(--ant-color-border)',
+            position: 'relative',
           }}
-          onClick={handleFullscreen}
-          onDoubleClick={(e) => {
-            e.stopPropagation()
-            handleCopyPreview()
-          }}
+          // 单击不再触发全屏（与文本选择 + 双击复制冲突）。
+          // 改为：双击进入全屏（更符合终端类应用的「展开」直觉）。
+          // 右上角悬浮按钮提供更明显的「全屏」入口（ExpandAltOutlined）。
+          onDoubleClick={handleFullscreen}
         >
-          <pre className="whitespace-pre-wrap m-0">{preview || '等待输出...'}</pre>
+          <pre className="whitespace-pre-wrap m-0" style={{ pointerEvents: 'none' }}>{preview || '等待输出...'}</pre>
+          {/* 悬浮的「全屏」入口按钮：默认隐藏，hover 时显示，避免抢占文本选择 */}
+          <Tooltip title="双击或点击全屏查看">
+            <Button
+              type="text"
+              size="small"
+              onClick={handleFullscreen}
+              icon={<ExpandAltOutlined style={{ fontSize: 12 }} />}
+              aria-label="全屏查看"
+              style={{
+                position: 'absolute',
+                top: 6,
+                right: 6,
+                width: 22,
+                height: 22,
+                minWidth: 22,
+                padding: 0,
+                background: 'rgba(0, 0, 0, 0.45)',
+                color: 'var(--ant-color-text-secondary)',
+                borderRadius: 4,
+                opacity: 0,
+                transition: 'opacity 0.15s ease',
+                zIndex: 2,
+              }}
+              className="session-card-preview-expand"
+            />
+          </Tooltip>
         </div>
       {/* </Dropdown> — 右键菜单已从 UI 移除（用户要求"代码保留"） */}
 
@@ -553,11 +582,11 @@ export default function SessionCard({ session, onResetSession, selectable, selec
               size="small"
               onClick={handleCtrlC}
               aria-label="Ctrl+C"
-              // Unicode 命令符号 ⌘ + 字母 C，红底白字
+              // ^C 是终端中断信号的标准 caret 表示（跨平台），不再使用 Mac 专用的 ⌘ 符号
               style={{
-                width: 28,
+                width: 32,
                 height: 22,
-                minWidth: 28,
+                minWidth: 32,
                 padding: 0,
                 borderRadius: 4,
                 background: 'var(--ant-color-error)',
@@ -568,12 +597,12 @@ export default function SessionCard({ session, onResetSession, selectable, selec
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: 1,
+                gap: 0,
                 lineHeight: 1,
+                fontFamily: "'JetBrains Mono', monospace",
               }}
             >
-              <span style={{ fontSize: 10, opacity: 0.85 }}>⌘</span>
-              <span style={{ fontSize: 11 }}>C</span>
+              <span style={{ fontSize: 12 }}>^C</span>
             </Button>
           </Tooltip>
         )}
@@ -630,3 +659,8 @@ export default function SessionCard({ session, onResetSession, selectable, selec
     </div>
   )
 }
+
+// memo 默认浅比较：session 引用不变 + 父级 useCallback 稳定的回调 → 不会重渲染
+// 这对 SessionGrid 渲染 N 张卡片的场景非常关键（搜索/darkMode 切换时不再波及所有卡片）
+const SessionCard = memo(SessionCardImpl)
+export default SessionCard

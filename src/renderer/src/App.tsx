@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback, useDeferredValue } from 'react'
 import { ConfigProvider, theme, Button, Checkbox, Space, Popconfirm, Dropdown, Input, Select } from 'antd'
 import type { MenuProps } from 'antd'
 import { PlusCircleFilled, CodeFilled, DeleteOutlined, CloseOutlined, SettingFilled, SearchOutlined } from '@ant-design/icons'
@@ -161,63 +161,67 @@ function App() {
   const statusFallbackTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const STATUS_FALLBACK_MS = 3000
 
-  useEffect(() => {
-    const flushSession = (sessionId: string) => {
-      const state = useAppStore.getState()
-      const session = state.sessions.find(s => s.id === sessionId)
-      if (!session) return
+  // ========== flushSession：抽出为稳定 useCallback，消除两处重复实现 ==========
+  // 之前在「订阅 PTY 输出」effect 和「进入全屏立即 flush」effect 中各写了一份 ~50 行相同逻辑，
+  // 这里统一为一个函数，两处都调用它，避免逻辑漂移。
+  // 只读取 refs + store.getState()，依赖数组为空 → 引用永远稳定。
+  const flushSession = useCallback((sessionId: string) => {
+    const state = useAppStore.getState()
+    const session = state.sessions.find(s => s.id === sessionId)
+    if (!session) return
 
-      const pending = pendingBufferRef.current[sessionId]
-      const batched = batchQueueRef.current[sessionId]
-      pendingBufferRef.current[sessionId] = []
-      batchQueueRef.current[sessionId] = []
+    const pending = pendingBufferRef.current[sessionId]
+    const batched = batchQueueRef.current[sessionId]
+    pendingBufferRef.current[sessionId] = []
+    batchQueueRef.current[sessionId] = []
 
-      const chunks: string[] = []
-      if (pending && pending.length > 0) chunks.push(...pending)
-      if (batched && batched.length > 0) chunks.push(...batched)
-      if (chunks.length === 0) return
+    const chunks: string[] = []
+    if (pending && pending.length > 0) chunks.push(...pending)
+    if (batched && batched.length > 0) chunks.push(...batched)
+    if (chunks.length === 0) return
 
-      const rawHistory = [...session.history, ...chunks]
-      const newHistory = truncateHistory(rawHistory)
-      const fullRaw = newHistory.join('')
-      const cleanText = cleanTerminalOutput(fullRaw)
-      const detectResult = detectStatusWithRules(fullRaw, state.rules)
+    const rawHistory = [...session.history, ...chunks]
+    const newHistory = truncateHistory(rawHistory)
+    const fullRaw = newHistory.join('')
+    const cleanText = cleanTerminalOutput(fullRaw)
+    const detectResult = detectStatusWithRules(fullRaw, state.rules)
 
-      // 3 秒无匹配回退逻辑：
-      //   - 命中规则  -> 立即应用，清除回退 timer
-      //   - 未命中    -> 不立即回退 running，而是维持当前状态 3s，3s 内再无匹配才回退到 idle
-      if (detectResult.matched) {
-        const t = statusFallbackTimers.current[sessionId]
-        if (t) { clearTimeout(t); delete statusFallbackTimers.current[sessionId] }
-        state.updateSession(sessionId, {
-          history: newHistory,
-          previewText: cleanText,
-          status: detectResult.status,
-          matchedRuleName: detectResult.matchedRuleName,
-          lastActivityAt: Date.now()
-        })
-      } else {
-        // 没匹配：保存新的 history/preview，但不动 status
-        state.updateSession(sessionId, {
-          history: newHistory,
-          previewText: cleanText,
-          lastActivityAt: Date.now()
-        })
-        if (!statusFallbackTimers.current[sessionId]) {
-          statusFallbackTimers.current[sessionId] = setTimeout(() => {
-            delete statusFallbackTimers.current[sessionId]
-            const s = useAppStore.getState()
-            const sess = s.sessions.find(x => x.id === sessionId)
-            if (!sess) return
-            // 只有当前仍非 idle 时才回退，避免回退抖动
-            if (sess.status !== 'idle') {
-              s.updateSession(sessionId, { status: 'idle', matchedRuleName: undefined })
-            }
-          }, STATUS_FALLBACK_MS)
-        }
+    // 3 秒无匹配回退逻辑：
+    //   - 命中规则  -> 立即应用，清除回退 timer
+    //   - 未命中    -> 不立即回退 running，而是维持当前状态 3s，3s 内再无匹配才回退到 idle
+    if (detectResult.matched) {
+      const t = statusFallbackTimers.current[sessionId]
+      if (t) { clearTimeout(t); delete statusFallbackTimers.current[sessionId] }
+      state.updateSession(sessionId, {
+        history: newHistory,
+        previewText: cleanText,
+        status: detectResult.status,
+        matchedRuleName: detectResult.matchedRuleName,
+        lastActivityAt: Date.now()
+      })
+    } else {
+      // 没匹配：保存新的 history/preview，但不动 status
+      state.updateSession(sessionId, {
+        history: newHistory,
+        previewText: cleanText,
+        lastActivityAt: Date.now()
+      })
+      if (!statusFallbackTimers.current[sessionId]) {
+        statusFallbackTimers.current[sessionId] = setTimeout(() => {
+          delete statusFallbackTimers.current[sessionId]
+          const s = useAppStore.getState()
+          const sess = s.sessions.find(x => x.id === sessionId)
+          if (!sess) return
+          // 只有当前仍非 idle 时才回退，避免回退抖动
+          if (sess.status !== 'idle') {
+            s.updateSession(sessionId, { status: 'idle', matchedRuleName: undefined })
+          }
+        }, STATUS_FALLBACK_MS)
       }
     }
+  }, [])
 
+  useEffect(() => {
     const handleOutput = (sessionId: string, data: string) => {
       const state = useAppStore.getState()
       const session = state.sessions.find(s => s.id === sessionId)
@@ -303,7 +307,7 @@ function App() {
       Object.values(statusFallbackTimers.current).forEach(t => clearTimeout(t))
       statusFallbackTimers.current = {}
     }
-  }, [])
+  }, [flushSession])
 
   // ========== 修复: 进入全屏时立即 flush 当前会话的批处理数据 ==========
   // 确保 FullscreenTerminal 的 replay 包含最新的数据，不会丢失最近 30ms 的输出
@@ -317,54 +321,14 @@ function App() {
         clearTimeout(timer)
         delete batchTimerRef.current[activeId]
       }
-      // 手动 flush 一次（复用同一逻辑）
-      const state = useAppStore.getState()
-      const session = state.sessions.find((s: any) => s.id === activeId)
-      if (session) {
-        const pending = pendingBufferRef.current[activeId]
-        const batched = batchQueueRef.current[activeId]
-        const chunks: string[] = []
-        if (pending && pending.length > 0) chunks.push(...pending)
-        if (batched && batched.length > 0) chunks.push(...batched)
-        if (chunks.length > 0) {
-          pendingBufferRef.current[activeId] = []
-          batchQueueRef.current[activeId] = []
-          const rawHistory = [...session.history, ...chunks]
-          const newHistory = truncateHistory(rawHistory)
-          const fullRaw = newHistory.join('')
-          const cleanText = cleanTerminalOutput(fullRaw)
-          const detectResult = detectStatusWithRules(fullRaw, state.rules)
-          if (detectResult.matched) {
-            const t = statusFallbackTimers.current[activeId]
-            if (t) { clearTimeout(t); delete statusFallbackTimers.current[activeId] }
-            state.updateSession(activeId, {
-              history: newHistory,
-              previewText: cleanText,
-              status: detectResult.status,
-              matchedRuleName: detectResult.matchedRuleName,
-              lastActivityAt: Date.now()
-            })
-          } else {
-            state.updateSession(activeId, {
-              history: newHistory,
-              previewText: cleanText,
-              lastActivityAt: Date.now()
-            })
-            if (!statusFallbackTimers.current[activeId]) {
-              statusFallbackTimers.current[activeId] = setTimeout(() => {
-                delete statusFallbackTimers.current[activeId]
-                const s = useAppStore.getState()
-                const sess = s.sessions.find(x => x.id === activeId)
-                if (sess && sess.status !== 'idle') {
-                  s.updateSession(activeId, { status: 'idle', matchedRuleName: undefined })
-                }
-              }, STATUS_FALLBACK_MS)
-            }
-          }
-        }
-      }
+      // 直接调用统一的 flushSession，无需再重复 ~50 行实现
+      flushSession(activeId)
     }
-  }, [isFs, activeId])
+  }, [isFs, activeId, flushSession])
+
+  // 搜索关键词用 useDeferredValue 延迟：输入框立即响应（store 即时更新），
+  // 但昂贵的 filter+sort 放到低优先级 transition 里，避免大列表下输入卡顿。
+  const deferredSearch = useDeferredValue(searchQuery)
 
   const filteredSessions = useMemo(() => {
     const STATUS_PRIORITY: Record<string, number> = {
@@ -377,8 +341,8 @@ function App() {
 
     let filtered = [...sessions]
 
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
+    if (deferredSearch) {
+      const query = deferredSearch.toLowerCase()
       filtered = filtered.filter(s =>
         s.name.toLowerCase().includes(query)
       )
@@ -400,11 +364,25 @@ function App() {
       if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt
       return a.id.localeCompare(b.id)
     })
-  }, [sessions, searchQuery, selectedGroupId, statusFilter])
+  }, [sessions, deferredSearch, selectedGroupId, statusFilter])
 
-  const handleResetSession = (oldSession: import('./types').Session) => {
+  // useCallback 包装：保证 SessionCard (React.memo) 的 props 引用稳定，
+  // 父组件因 searchQuery/darkMode 等变化重渲染时不会波及所有卡片
+  const handleResetSession = useCallback((oldSession: import('./types').Session) => {
     setResetTarget(oldSession)
-  }
+  }, [])
+
+  // 批量选择的 toggle：用 functional setState 避免依赖 selectedIds，保持引用稳定
+  const handleSelectToggle = useCallback((id: string, sel: boolean) => {
+    setSelectedIds(prev => {
+      if (sel) {
+        return new Set([...prev, id])
+      }
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
+  }, [])
 
   // 全局快捷键支持
   useEffect(() => {
@@ -561,11 +539,12 @@ function App() {
                   onClick={() => setStatusFilter(null)}
                   className="flex items-center gap-1 px-2 rounded-md transition-colors"
                   style={{
-                    height: 22,
+                    // 与搜索框/下拉框对齐：高度 28px，字号 11
+                    height: 28,
                     background: 'var(--ant-color-fill-quaternary)',
                     border: '1px solid var(--ant-color-border)',
                     color: 'var(--ant-color-text-secondary)',
-                    fontSize: 10,
+                    fontSize: 11,
                     cursor: 'pointer',
                   }}
                 >
@@ -627,15 +606,7 @@ function App() {
                       onResetSession={handleResetSession}
                       selectable={true}
                       selected={selectedIds.has(session.id)}
-                      onSelect={(id, sel) => {
-                        if (sel) {
-                          setSelectedIds(new Set([...selectedIds, id]))
-                        } else {
-                          const newSet = new Set(selectedIds)
-                          newSet.delete(id)
-                          setSelectedIds(newSet)
-                        }
-                      }}
+                      onSelect={handleSelectToggle}
                     />
                   </div>
                 ))}
