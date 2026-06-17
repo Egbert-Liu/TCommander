@@ -18,27 +18,36 @@ export default function SnapshotsDialog({ open, onClose }: SnapshotsDialogProps)
     const snapshot = snapshots.find(s => s.id === snapshotId)
     if (!snapshot) return
 
-    const existingGroups = useAppStore.getState().groups
-    const newGroups = [...existingGroups]
-    for (const g of snapshot.data.groups) {
-      if (!newGroups.some(eg => eg.id === g.id)) {
-        newGroups.push(g)
+    const setGlobalLoading = useAppStore.getState().setGlobalLoading
+    setGlobalLoading(true, `正在从快照恢复 ${snapshot.data.sessions.length} 个会话...`)
+    try {
+      const existingGroups = useAppStore.getState().groups
+      const newGroups = [...existingGroups]
+      for (const g of snapshot.data.groups) {
+        if (!newGroups.some(eg => eg.id === g.id)) {
+          newGroups.push(g)
+        }
       }
-    }
-    setGroups(newGroups)
+      setGroups(newGroups)
 
-    for (const sessionData of snapshot.data.sessions) {
-      await createSessionFromConfig({
-        name: sessionData.name,
-        terminalType: sessionData.terminalType as 'powershell' | 'cmd' | 'bash',
-        cwd: sessionData.cwd,
-        initialCommand: sessionData.initialCommand,
-        groupId: sessionData.groupId,
-      })
-    }
+      for (const sessionData of snapshot.data.sessions) {
+        await createSessionFromConfig({
+          name: sessionData.name,
+          terminalType: sessionData.terminalType as 'powershell' | 'cmd' | 'bash',
+          cwd: sessionData.cwd,
+          initialCommand: sessionData.initialCommand,
+          groupId: sessionData.groupId,
+        })
+      }
 
-    message.success(`已从快照恢复 ${snapshot.data.sessions.length} 个会话`)
-    onClose()
+      message.success(`已从快照恢复 ${snapshot.data.sessions.length} 个会话`)
+      onClose()
+    } catch (e) {
+      message.error('快照恢复失败，请重试')
+      console.error('snapshot restore failed:', e)
+    } finally {
+      setGlobalLoading(false)
+    }
   }
 
   const handleDelete = (snapshotId: string) => {

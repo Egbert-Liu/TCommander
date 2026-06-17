@@ -11,6 +11,7 @@ interface ElectronAPI {
   windowMinimize: () => Promise<void>
   windowToggleMaximize: () => Promise<void>
   windowClose: () => Promise<void>
+  onAppClosing: (callback: () => void) => () => void
   onSessionOutput: (callback: (sessionId: string, data: string) => void) => () => void
   onSessionExit: (callback: (sessionId: string, exitCode: number) => void) => () => void
 }

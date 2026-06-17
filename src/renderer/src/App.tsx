@@ -143,6 +143,13 @@ function App() {
       }
     }
     loadPersistedData()
+
+    // 监听主进程发来的「用户已确认关闭」事件，展示 loading 蒙板给用户即时反馈
+    const unsubClosing = window.electronAPI.onAppClosing(() => {
+      const setGlobalLoading = useAppStore.getState().setGlobalLoading
+      setGlobalLoading(true, '正在关闭应用并释放所有会话资源...')
+    })
+    return () => { unsubClosing() }
   }, [])
 
   const pendingBufferRef = useRef<Record<string, string[]>>({})
@@ -524,7 +531,7 @@ function App() {
           >
             {/* 筛选栏：搜索 + 预览行数 + 当前激活的筛选条件
                 高度与左侧 Sidebar 顶部 header (32px) 对齐，
-                height 32 + 移除默认 size="small" 的 24 高度，使页面更协调。 */}
+                height 28 + 移除默认 size="small" 的 24 高度，使页面更协调。 */}
             <div className="mb-4 flex items-center gap-3 flex-wrap">
               <Input
                 placeholder="搜索会话名称/内容..."
@@ -532,15 +539,15 @@ function App() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 prefix={<SearchOutlined style={{ color: 'var(--ant-color-text-tertiary)', fontSize: 12 }} />}
                 allowClear
-                size="middle"
-                style={{ width: 220, height: 32 }}
+                size="small"
+                style={{ width: 220, height: 28 }}
               />
 
               <Select
                 value={previewLineCount}
                 onChange={setPreviewLineCount}
-                size="middle"
-                style={{ width: 120, height: 32 }}
+                size="small"
+                style={{ width: 120, height: 28 }}
                 options={[
                   { value: 5, label: '5行预览' },
                   { value: 10, label: '10行预览' },

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, dialog } from 'electron'
 import path from 'path'
 import { createPtyManager } from './pty'
 import { createStorageManager } from './storage'
@@ -7,6 +7,8 @@ const ptyManager = createPtyManager()
 const storageManager = createStorageManager()
 
 let mainWindow: BrowserWindow | null = null
+// 标记：用户已确认关闭后置 true，跳过后续的确认弹窗
+let userConfirmedClose = false
 
 // 计算项目根目录：dev 模式下为 dist 目录；
 // 打包后，app.asar 作为虚拟目录挂在 process.resourcesPath 下
@@ -59,6 +61,44 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null
+  })
+
+  // ========== 拦截原生右上角关闭按钮：弹确认对话框 ==========
+  // 用户希望直接在原生的 X 按钮上做确认，所以走主进程拦截 `close` 事件。
+  // 第一次点 X：preventDefault + 弹模态确认；用户选「确认关闭」后置 userConfirmedClose=true，
+  // 下次再触发 `close` 就能直接通过。
+  mainWindow.on('close', async (event) => {
+    if (userConfirmedClose) return
+    if (!mainWindow) return
+
+    // 还有活跃会话时才弹确认；空会话直接放行
+    const hasActiveSessions = ptyManager.listSessions().length > 0
+    if (!hasActiveSessions) {
+      userConfirmedClose = true
+      return
+    }
+
+    event.preventDefault()
+    const result = await dialog.showMessageBox(mainWindow, {
+      type: 'warning',
+      title: '关闭应用',
+      message: '确认要关闭 TCommander 吗？',
+      detail: '将关闭所有会话并释放 PTY 资源。',
+      buttons: ['确认关闭', '取消'],
+      defaultId: 1,   // 默认聚焦「取消」，防误关
+      cancelId: 1,
+      noLink: true,
+    })
+
+    if (result.response === 0) {
+      userConfirmedClose = true
+      // 通知渲染进程显示 loading 蒙板（可选，但能给用户即时反馈）
+      try {
+        mainWindow.webContents.send('app-closing')
+      } catch { /* 窗口已销毁 */ }
+      mainWindow.close()
+    }
+    // 选「取消」则不关闭
   })
 
   // F11 切换全屏

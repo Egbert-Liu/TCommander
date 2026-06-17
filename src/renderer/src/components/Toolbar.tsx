@@ -1,5 +1,5 @@
-import { PlusCircleFilled, CameraFilled, SettingFilled, SunFilled, MoonFilled, HistoryOutlined, SafetyCertificateFilled, PoweroffOutlined } from '@ant-design/icons'
-import { Button, Dropdown, Tooltip, Modal, Input, message, Popconfirm } from 'antd'
+import { PlusCircleFilled, CameraFilled, SettingFilled, SunFilled, MoonFilled, HistoryOutlined, SafetyCertificateFilled } from '@ant-design/icons'
+import { Button, Dropdown, Tooltip, Modal, Input, message } from 'antd'
 import { useState } from 'react'
 import type { MenuProps } from 'antd'
 import { useAppStore } from '../store'
@@ -91,20 +91,8 @@ export default function Toolbar({
     message.success(`已创建 ${name} 会话`)
   }
 
-  // 关闭应用：弹 Popconfirm 二次确认，确认后启动 loading 蒙板，通知主进程关闭窗口
-  // （主进程会负责清理所有 PTY 进程与会话资源）
-  const handleCloseApp = async () => {
-    const setGlobalLoading = useAppStore.getState().setGlobalLoading
-    setGlobalLoading(true, '正在关闭应用并释放所有会话资源...')
-    try {
-      // 给主进程一点时间在窗口销毁前清理 PTY；loading 蒙板期间阻塞用户进一步操作
-      await window.electronAPI.windowClose()
-    } catch (e) {
-      setGlobalLoading(false)
-      message.error('关闭应用失败，请重试')
-      console.error('windowClose failed:', e)
-    }
-  }
+  // 关闭应用：拦截在主进程（main/index.ts 的 `close` 事件），
+  // 这里不再提供 UI 按钮，避免与原生右上角关闭按钮重复。
 
   const newSessionItems: MenuProps['items'] = [
     {
@@ -251,27 +239,9 @@ export default function Toolbar({
           />
         </Tooltip>
 
-        {/* 关闭应用：Popconfirm 二次确认后启动 loading 蒙板，通知主进程释放 PTY 资源并关闭窗口 */}
-        <Popconfirm
-          title="关闭应用"
-          description="将关闭所有会话并释放 PTY 资源，确认要退出吗？"
-          onConfirm={handleCloseApp}
-          okText="退出"
-          cancelText="取消"
-          okButtonProps={{ danger: true, size: 'small' }}
-          cancelButtonProps={{ size: 'small' }}
-          placement="bottomRight"
-        >
-          <Tooltip title="关闭应用">
-            <Button
-              danger
-              icon={<PoweroffOutlined />}
-              aria-label="关闭应用"
-              size="small"
-              style={{ fontSize: 11 }}
-            />
-          </Tooltip>
-        </Popconfirm>
+        {/* 关闭应用按钮：已移除（用户原意是原生右上角的 X 关闭按钮做确认，
+            现在由主进程的 `close` 事件拦截 + 二次确认对话框承担。
+            Toolbar 内不再单独提供电源按钮，避免与原生按钮重复。 */}
       </div>
 
       <Modal

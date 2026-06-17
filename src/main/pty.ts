@@ -175,6 +175,10 @@ export function createPtyManager() {
     }
   }
 
+  function listSessions(): string[] {
+    return Array.from(sessions.keys())
+  }
+
   function resizeSession(sessionId: string, cols: number, rows: number): void {
     if (disposed) return
     const session = sessions.get(sessionId)
@@ -226,6 +230,7 @@ export function createPtyManager() {
     createSession,
     sendInput,
     closeSession,
+    listSessions,
     resizeSession,
     closeAllSessions,
     onOutput,

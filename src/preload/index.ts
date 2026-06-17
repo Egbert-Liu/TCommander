@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 
 let outputCallbacks: Array<(sessionId: string, data: string) => void> = []
 let exitCallbacks: Array<(sessionId: string, exitCode: number) => void> = []
+let appClosingCallbacks: Array<() => void> = []
 
 ipcRenderer.on('session-output', (_, sessionId, data) => {
   outputCallbacks.forEach(cb => cb(sessionId, data))
@@ -9,6 +10,10 @@ ipcRenderer.on('session-output', (_, sessionId, data) => {
 
 ipcRenderer.on('session-exit', (_, sessionId, exitCode) => {
   exitCallbacks.forEach(cb => cb(sessionId, exitCode))
+})
+
+ipcRenderer.on('app-closing', () => {
+  appClosingCallbacks.forEach(cb => cb())
 })
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -34,7 +39,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.removeListener('window-maximize-change', handler)
     }
   },
-  
+
+  // 应用关闭事件：主进程在用户确认关闭后通知渲染进程，渲染进程显示 loading 蒙板
+  onAppClosing: (callback: () => void) => {
+    appClosingCallbacks.push(callback)
+    return () => {
+      appClosingCallbacks = appClosingCallbacks.filter(cb => cb !== callback)
+    }
+  },
+
   onSessionOutput: (callback: (sessionId: string, data: string) => void) => {
     outputCallbacks.push(callback)
     return () => {

@@ -98,7 +98,9 @@ body {
    - error           （红）   0.5s
    - needs-input    （蓝）  2s
    关键帧复用 card-glow，避免三份几乎一样的 keyframes。
-   外圈光圈 6px / 8px（用户要求"更粗一点"），呼吸峰值 12px 强化视觉冲击。 */
+   外圈光圈 6px / 8px（用户要求"更粗一点"），呼吸峰值 12px 强化视觉冲击。
+   颜色加深：soft 透明度从 0.12 → 0.18，让 glow 更醒目。
+   注意：状态切换时**不再缩小预览区**，避免「内容被截断感」。 */
 .card-status-error,
 .card-status-needs-confirm,
 .card-status-needs-input {
@@ -109,9 +111,9 @@ body {
     0 0 0 6px var(--card-glow-soft, transparent);
 }
 
-.card-status-error          { --card-glow-color: var(--status-error);          --card-glow-soft: rgba(248, 113, 113, 0.12); animation: card-glow 0.5s ease-in-out infinite; }
-.card-status-needs-confirm  { --card-glow-color: var(--status-needs-confirm);  --card-glow-soft: rgba(251, 191, 36, 0.12); animation: card-glow 1s   ease-in-out infinite; }
-.card-status-needs-input    { --card-glow-color: var(--status-needs-input);    --card-glow-soft: rgba(56, 189, 248, 0.12); animation: card-glow 2s   ease-in-out infinite; }
+.card-status-error          { --card-glow-color: var(--status-error);          --card-glow-soft: rgba(248, 113, 113, 0.20); animation: card-glow 0.5s ease-in-out infinite; }
+.card-status-needs-confirm  { --card-glow-color: var(--status-needs-confirm);  --card-glow-soft: rgba(251, 191, 36, 0.20); animation: card-glow 1s   ease-in-out infinite; }
+.card-status-needs-input    { --card-glow-color: var(--status-needs-input);    --card-glow-soft: rgba(56, 189, 248, 0.20); animation: card-glow 2s   ease-in-out infinite; }
 
 @keyframes card-glow {
   0%, 100% {
@@ -201,22 +203,17 @@ body {
   z-index: 1;
 }
 
-/* 卡片预览区：状态 glow 时收缩高度，强化「该关注」的视觉信号
-   默认 max-height 120px；状态时收敛到 72px，让头部 / 控制栏占据更多视觉空间。 */
+/* 卡片预览区：状态 glow 时**不再收缩高度**，避免「该关注」状态把内容截掉
+   保留 max-height 上限仅用于限制卡片最大高度（防止意外过长）。 */
 .session-card-preview {
-  max-height: 120px;
+  max-height: 600px;
   /* 卡片预览区：用户反馈「滚动条丑」，按需求统一隐藏。
      保留内容自动换行（pre 已设 whitespace-pre-wrap） */
   scrollbar-width: none;
   -ms-overflow-style: none;
   overflow: hidden;
   position: relative;
-  transition: max-height var(--dur-base) var(--ease-out), background 0.2s ease;
-}
-.card-status-error .session-card-preview,
-.card-status-needs-confirm .session-card-preview,
-.card-status-needs-input .session-card-preview {
-  max-height: 72px;
+  transition: background 0.2s ease;
 }
 .session-card-preview::-webkit-scrollbar {
   display: none;

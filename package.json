@@ -1,6 +1,6 @@
 {
   "name": "tcommander",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "TCommander - Multi-terminal session manager for developers",
   "main": "./out/main/index.js",
   "author": "",

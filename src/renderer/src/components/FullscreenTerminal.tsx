@@ -1,7 +1,7 @@
 import { useEffect, useRef, useMemo, useCallback } from 'react'
 import { Button, Dropdown, Tooltip, message } from 'antd'
 import type { MenuProps } from 'antd'
-import { ArrowLeftOutlined, CopyOutlined, SunFilled, MoonFilled, CheckOutlined, MinusOutlined, BorderOutlined, CloseOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, CopyOutlined, SunFilled, MoonFilled, CheckOutlined } from '@ant-design/icons'
 import '@xterm/xterm/css/xterm.css'
 import { useAppStore } from '../store'
 import { getTerminalTheme, TERMINAL_THEMES } from '../utils/terminalThemes'
@@ -287,18 +287,8 @@ export default function FullscreenTerminal() {
     setActiveSession(null)
   }
 
-  // 窗口控制按钮
-  const handleMinimize = () => {
-    window.electronAPI?.windowMinimize()
-  }
-
-  const handleToggleMaximize = () => {
-    window.electronAPI?.windowToggleMaximize()
-  }
-
-  const handleClose = () => {
-    window.electronAPI?.windowClose()
-  }
+  // 窗口控制按钮已移除：原代码自带的「最小化/最大化/关闭」三按钮与原生标题栏的
+  // 窗口控制按钮重复。用户反馈「右上角多出一套窗口控制按钮」，故统一交回原生层。
 
   const handleCopy = async () => {
     if (terminalRef.current) {
@@ -441,43 +431,6 @@ export default function FullscreenTerminal() {
           >
             复制
           </Button>
-
-          {/* 窗口控制按钮（最小化/最大化/关闭） */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              marginLeft: 8,
-              borderLeft: '1px solid var(--ant-color-border)',
-              paddingLeft: 8,
-              gap: 2,
-            }}
-          >
-            <Button
-              type="text"
-              icon={<MinusOutlined style={{ fontSize: 12 }} />}
-              onClick={handleMinimize}
-              size="small"
-              style={{ width: 28, height: 28, minWidth: 28, color: 'var(--ant-color-text-secondary)' }}
-              title="最小化"
-            />
-            <Button
-              type="text"
-              icon={<BorderOutlined style={{ fontSize: 12 }} />}
-              onClick={handleToggleMaximize}
-              size="small"
-              style={{ width: 28, height: 28, minWidth: 28, color: 'var(--ant-color-text-secondary)' }}
-              title="最大化"
-            />
-            <Button
-              type="text"
-              icon={<CloseOutlined style={{ fontSize: 12 }} />}
-              onClick={handleClose}
-              size="small"
-              style={{ width: 28, height: 28, minWidth: 28, color: 'var(--ant-color-text-secondary)' }}
-              title="关闭"
-            />
-          </div>
         </div>
       </div>
 

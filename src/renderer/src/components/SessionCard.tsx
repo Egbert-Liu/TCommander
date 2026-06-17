@@ -1,10 +1,10 @@
 import { useState, useRef, useMemo, useCallback } from 'react'
-import { Tag, Button, Input, Checkbox, Tooltip, Dropdown, Popconfirm, message } from 'antd'
+import { Tag, Button, Input, Checkbox, Tooltip, Dropdown, Modal, message } from 'antd'
 import {
   DeleteFilled, EditFilled,
   MoreOutlined, CheckOutlined,
   ArrowUpOutlined, ArrowDownOutlined, SendOutlined, EnterOutlined,
-  ReloadOutlined, CloseSquareFilled, SafetyCertificateFilled
+  ReloadOutlined, SafetyCertificateFilled
 } from '@ant-design/icons'
 import { Session } from '../types'
 import { useAppStore } from '../store'
@@ -51,9 +51,6 @@ export default function SessionCard({ session, onResetSession, selectable, selec
   const [input, setInput] = useState('')
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState(session.name)
-  // 受控的删除/重置 Popconfirm：菜单点击只打开弹层，确认/取消再关闭
-  const [deletePopOpen, setDeletePopOpen] = useState(false)
-  const [resetPopOpen, setResetPopOpen] = useState(false)
   const nameInputRef = useRef<any>(null)
 
   const quickActions = session.quickActions
@@ -121,7 +118,6 @@ export default function SessionCard({ session, onResetSession, selectable, selec
 
   // 重置会话：会清空历史 + 状态回退 idle
   const handleResetConfirm = () => {
-    setResetPopOpen(false)
     if (onResetSession) {
       onResetSession(session)
     } else {
@@ -133,6 +129,32 @@ export default function SessionCard({ session, onResetSession, selectable, selec
       })
       message.success('会话已重置')
     }
+  }
+
+  // 二次确认删除：用 Modal.confirm 替代受控 Popconfirm，避免菜单点击穿透与 trigger 定位问题
+  const handleDeleteClick = () => {
+    Modal.confirm({
+      title: '删除会话',
+      content: '确定要删除该会话吗？会关闭对应的 PTY 进程并清空所有历史。',
+      okText: '删除',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      cancelButtonProps: {},
+      onOk: handleClose,
+    })
+  }
+
+  // 二次确认重置
+  const handleResetClick = () => {
+    Modal.confirm({
+      title: '重置会话',
+      content: '清空历史与状态，重新开始。PTY 进程不会被关闭。',
+      okText: '重置',
+      cancelText: '取消',
+      okButtonProps: {},
+      cancelButtonProps: {},
+      onOk: handleResetConfirm,
+    })
   }
 
   const handleFullscreen = () => {
@@ -414,7 +436,7 @@ export default function SessionCard({ session, onResetSession, selectable, selec
                 key: 'reset',
                 icon: <ReloadOutlined style={{ fontSize: 11 }} />,
                 label: '重置会话',
-                onClick: () => setResetPopOpen(true),
+                onClick: handleResetClick,
               },
               {
                 key: 'group',
@@ -446,7 +468,7 @@ export default function SessionCard({ session, onResetSession, selectable, selec
                 icon: <DeleteFilled style={{ fontSize: 11 }} />,
                 label: '删除会话',
                 danger: true,
-                onClick: () => setDeletePopOpen(true),
+                onClick: handleDeleteClick,
               },
             ],
           }}
@@ -462,48 +484,20 @@ export default function SessionCard({ session, onResetSession, selectable, selec
         </Dropdown>
       </div>
 
-      {/* 删除/重置会话的二次确认 Popconfirm（受控 open 模式）
-          放在头部之后，弹出位置跟随默认（卡片中心偏上），不影响布局。 */}
-      <Popconfirm
-        title="删除会话"
-        description="确定要删除该会话吗？会关闭对应的 PTY 进程并清空所有历史。"
-        open={deletePopOpen}
-        onConfirm={() => { setDeletePopOpen(false); handleClose() }}
-        onCancel={() => setDeletePopOpen(false)}
-        okText="删除"
-        cancelText="取消"
-        okButtonProps={{ danger: true, size: 'small' }}
-        cancelButtonProps={{ size: 'small' }}
-        placement="top"
-      >
-        <span style={{ display: 'none' }} />
-      </Popconfirm>
-      <Popconfirm
-        title="重置会话"
-        description="清空历史与状态，重新开始。PTY 进程不会被关闭。"
-        open={resetPopOpen}
-        onConfirm={handleResetConfirm}
-        onCancel={() => setResetPopOpen(false)}
-        okText="重置"
-        cancelText="取消"
-        okButtonProps={{ size: 'small' }}
-        cancelButtonProps={{ size: 'small' }}
-        placement="top"
-      >
-        <span style={{ display: 'none' }} />
-      </Popconfirm>
-
       {/* 右键菜单 — 已从 UI 移除（用户要求"代码保留"）
           <Dropdown menu={{ items: contextMenuItems }} trigger={['contextMenu']}>
       */}
       <div
-        className="session-card-preview px-2.5 py-1.5"
+        className="session-card-preview"
           style={{
-            // 高度按行数自适应：每行 18px（比之前 16px 略高，更舒服）+ 上下 padding 12 = 12 + N * 18
-            // 5 行 = 102px, 10 行 = 192px, 15 行 = 282px, 20 行 = 372px
-            minHeight: 102,
-            height: 12 + previewLineCount * 18,
-            background: 'var(--ant-color-fill)',
+            // 高度按行数自适应：每行 22px（更舒展，字号 11 行高 1.6 ≈ 17.6，按 22 给足）
+            // 上下 padding 16 = 16 + N * 22
+            // 5 行 = 126px, 10 行 = 236px, 15 行 = 346px, 20 行 = 456px
+            // 颜色加深：从 var(--ant-color-fill) 改为深灰底（与卡片容器形成层级感）
+            minHeight: 126,
+            height: 16 + previewLineCount * 22,
+            padding: '10px 12px',
+            background: 'rgba(0, 0, 0, 0.25)',
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: 11,
             lineHeight: 1.6,
@@ -511,6 +505,8 @@ export default function SessionCard({ session, onResetSession, selectable, selec
             cursor: 'pointer',
             userSelect: 'text',
             overflow: 'hidden',
+            borderTop: '1px solid var(--ant-color-border)',
+            borderBottom: '1px solid var(--ant-color-border)',
           }}
           onClick={handleFullscreen}
           onDoubleClick={(e) => {
@@ -557,10 +553,28 @@ export default function SessionCard({ session, onResetSession, selectable, selec
               size="small"
               onClick={handleCtrlC}
               aria-label="Ctrl+C"
-              danger
-              icon={<CloseSquareFilled style={{ fontSize: 11 }} />}
-              style={{ width: 24, height: 22, minWidth: 24, padding: 0, borderRadius: 4 }}
-            />
+              // Unicode 命令符号 ⌘ + 字母 C，红底白字
+              style={{
+                width: 28,
+                height: 22,
+                minWidth: 28,
+                padding: 0,
+                borderRadius: 4,
+                background: 'var(--ant-color-error)',
+                borderColor: 'var(--ant-color-error)',
+                color: '#fff',
+                fontSize: 11,
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 1,
+                lineHeight: 1,
+              }}
+            >
+              <span style={{ fontSize: 10, opacity: 0.85 }}>⌘</span>
+              <span style={{ fontSize: 11 }}>C</span>
+            </Button>
           </Tooltip>
         )}
         {quickActions.includes('Up') && (
