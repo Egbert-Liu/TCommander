@@ -311,10 +311,14 @@ function App() {
 
     const unsubOutput = window.electronAPI.onSessionOutput(handleOutput)
     const unsubExit = window.electronAPI.onSessionExit(handleExit)
+    const unsubConnStatus = window.electronAPI.onSessionConnStatus((sessionId, status) => {
+      useAppStore.getState().updateSession(sessionId, { connectionStatus: status as any })
+    })
 
     return () => {
       unsubOutput()
       unsubExit()
+      unsubConnStatus()
       Object.values(rafIdRef.current).forEach(id => cancelAnimationFrame(id))
       rafIdRef.current = {}
       batchQueueRef.current = {}

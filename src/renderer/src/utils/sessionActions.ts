@@ -124,6 +124,7 @@ async function createSshSession(input: CreateSessionInput): Promise<Session | nu
     lastActivityAt: Date.now(),
     kind: 'ssh',
     sshConfig,
+    connectionStatus: 'connecting',
   }
   useAppStore.getState().addSession(session)
   return session

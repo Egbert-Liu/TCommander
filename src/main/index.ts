@@ -232,6 +232,16 @@ app.whenReady().then(() => {
     }
   })
 
+  // SSH 连接状态推送：connecting → ready/error
+  ptyManager.onConnStatus((sessionId, status) => {
+    if (!isWindowValid()) return
+    try {
+      mainWindow!.webContents.send('session-conn-status', sessionId, status)
+    } catch {
+      // 窗口已被销毁
+    }
+  })
+
   createWindow()
 
   app.on('activate', () => {

@@ -47,6 +47,8 @@ export interface Session {
   kind?: 'local' | 'ssh'
   /** SSH 连接配置（仅 kind==='ssh'）。不含明文密钥，只存 safeStorage 引用。 */
   sshConfig?: SshSessionConfig
+  /** SSH 连接状态：connecting → ready/error。仅 ssh 会话有意义。 */
+  connectionStatus?: 'connecting' | 'ready' | 'error'
 }
 
 export interface Group {

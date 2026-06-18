@@ -5,6 +5,7 @@ let exitCallbacks: Array<(sessionId: string, exitCode: number) => void> = []
 let appClosingCallbacks: Array<() => void> = []
 let closeConfirmCallbacks: Array<(hasActiveSessions: boolean) => void> = []
 let sshAuthPromptCallbacks: Array<(sessionId: string, prompt: string) => void> = []
+let connStatusCallbacks: Array<(sessionId: string, status: string) => void> = []
 
 ipcRenderer.on('session-output', (_, sessionId, data) => {
   outputCallbacks.forEach(cb => cb(sessionId, data))
@@ -26,6 +27,11 @@ ipcRenderer.on('request-close-confirm', (_, hasActiveSessions: boolean) => {
 // 主进程要求弹出 SSH 交互式认证输入框（keyboard-interactive / known_hosts）
 ipcRenderer.on('ssh-auth-prompt', (_, sessionId: string, prompt: string) => {
   sshAuthPromptCallbacks.forEach(cb => cb(sessionId, prompt))
+})
+
+// SSH 连接状态变化：connecting → ready / error
+ipcRenderer.on('session-conn-status', (_, sessionId: string, status: string) => {
+  connStatusCallbacks.forEach(cb => cb(sessionId, status))
 })
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -97,6 +103,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     exitCallbacks.push(callback)
     return () => {
       exitCallbacks = exitCallbacks.filter(cb => cb !== callback)
+    }
+  },
+  onSessionConnStatus: (callback: (sessionId: string, status: string) => void) => {
+    connStatusCallbacks.push(callback)
+    return () => {
+      connStatusCallbacks = connStatusCallbacks.filter(cb => cb !== callback)
     }
   },
 })

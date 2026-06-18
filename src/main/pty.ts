@@ -29,6 +29,7 @@ export function createPtyManager() {
   // 渲染进程再按 sessionId 分发给 N 张卡片订阅（store update -> SessionCard re-render）。
   let outputListeners: Array<(sessionId: string, data: string) => void> = []
   let exitListeners: Array<(sessionId: string, exitCode: number) => void> = []
+  let connStatusListeners: Array<(sessionId: string, status: string) => void> = []
   let disposed = false
   // SSH 交互式认证桥（keyboard-interactive / known_hosts）；
   // 由 main/index.ts 在 app.whenReady 后通过 setSshAuthBridge 注入。
@@ -102,18 +103,25 @@ export function createPtyManager() {
 
     sessions.set(id, session)
 
-    // SSH 异步连接：失败时推一条用户可读的错误文本到预览，再触发 exit
-    // （保持 createSession 同步返回 id，避免 invoke 改 async 的连锁改动）
+    // SSH 异步连接：推送 connecting → ready/error 状态，
+    // 失败时推一条用户可读的错误文本到预览，再触发 exit
     if (starter) {
-      starter().catch((err) => {
-        if (disposed) return
-        const msg = `\r\n[SSH 连接失败] ${(err as Error).message || err}\r\n`
-        session.ringBuf = appendToRing(session.ringBuf, msg, session.ringBufMax)
-        outputListeners.forEach((listener) => listener(id, msg))
-        session.destroyed = true
-        sessions.delete(id)
-        exitListeners.forEach((listener) => listener(id, 1))
-      })
+      connStatusListeners.forEach((l) => l(id, 'connecting'))
+      starter()
+        .then(() => {
+          if (disposed) return
+          connStatusListeners.forEach((l) => l(id, 'ready'))
+        })
+        .catch((err) => {
+          if (disposed) return
+          connStatusListeners.forEach((l) => l(id, 'error'))
+          const msg = `\r\n[SSH 连接失败] ${(err as Error).message || err}\r\n`
+          session.ringBuf = appendToRing(session.ringBuf, msg, session.ringBufMax)
+          outputListeners.forEach((listener) => listener(id, msg))
+          session.destroyed = true
+          sessions.delete(id)
+          exitListeners.forEach((listener) => listener(id, 1))
+        })
     }
 
     if (config.initialCommand) {
@@ -213,10 +221,15 @@ export function createPtyManager() {
     exitListeners.push(listener)
   }
 
+  function onConnStatus(listener: (sessionId: string, status: string) => void): void {
+    connStatusListeners.push(listener)
+  }
+
   function dispose(): void {
     disposed = true
     outputListeners = []
     exitListeners = []
+    connStatusListeners = []
     sessions.forEach((session) => {
       session.destroyed = true
       try {
@@ -237,6 +250,7 @@ export function createPtyManager() {
     closeAllSessions,
     onOutput,
     onExit,
+    onConnStatus,
     dispose,
     getRecentOutput,
     setSshAuthBridge: (bridge: SshAuthBridge | null) => { sshAuthBridge = bridge },

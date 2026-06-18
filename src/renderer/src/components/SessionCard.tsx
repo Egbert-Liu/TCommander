@@ -382,6 +382,24 @@ function SessionCardImpl(props: SessionCardProps) {
             </Tag>
           )}
 
+          {session.connectionStatus === 'connecting' && (
+            <Tag
+              style={{
+                margin: 0,
+                fontSize: 11,
+                lineHeight: '16px',
+                background: 'rgba(96, 165, 250, 0.1)',
+                border: '1px solid rgba(96, 165, 250, 0.25)',
+                color: '#60a5fa',
+                padding: '0 4px',
+                borderRadius: 3,
+                flexShrink: 0,
+              }}
+            >
+              连接中...
+            </Tag>
+          )}
+
           {session.matchedRuleName && statusCfg.glow && (
             <Tooltip title={`触发规则: ${session.matchedRuleName}`}>
               <Tag

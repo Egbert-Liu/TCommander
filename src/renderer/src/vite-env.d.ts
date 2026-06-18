@@ -22,6 +22,7 @@ interface ElectronAPI {
   replySshAuth: (answer: string | null) => Promise<void>
   onSessionOutput: (callback: (sessionId: string, data: string) => void) => () => void
   onSessionExit: (callback: (sessionId: string, exitCode: number) => void) => () => void
+  onSessionConnStatus: (callback: (sessionId: string, status: string) => void) => () => void
 }
 
 // Electron 专用 CSS 属性扩展：-webkit-app-region 用于自定义标题栏拖拽区域
