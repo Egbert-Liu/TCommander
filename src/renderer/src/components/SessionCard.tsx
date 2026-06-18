@@ -358,6 +358,30 @@ function SessionCardImpl(props: SessionCardProps) {
             {statusCfg.label}
           </Tag>
 
+          {session.kind === 'ssh' && session.sshConfig && (
+            <Tag
+              style={{
+                margin: 0,
+                fontSize: 11,
+                lineHeight: '16px',
+                background: 'rgba(34, 197, 94, 0.1)',
+                border: '1px solid rgba(34, 197, 94, 0.25)',
+                color: 'rgba(34, 197, 94, 0.9)',
+                fontFamily: "'JetBrains Mono', monospace",
+                padding: '0 4px',
+                borderRadius: 3,
+                flexShrink: 0,
+                maxWidth: 160,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {session.sshConfig.username}@{session.sshConfig.host}
+              {session.sshConfig.port !== 22 ? `:${session.sshConfig.port}` : ''}
+            </Tag>
+          )}
+
           {session.matchedRuleName && statusCfg.glow && (
             <Tooltip title={`触发规则: ${session.matchedRuleName}`}>
               <Tag
