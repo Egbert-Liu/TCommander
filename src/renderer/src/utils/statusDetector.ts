@@ -297,14 +297,20 @@ export function cleanTerminalOutput(raw: string): string {
 }
 
 /**
- * 保留 ANSI 颜色的终端输出清洗。
+ * 保留 ANSI 颜色的终端输出清洗 —— 模拟终端 cell buffer。
  *
- * 与 cleanTerminalOutput 的差异：
- *   - cleanTerminalOutput 会 stripAnsi，导致所有颜色丢失（卡片预览看不到彩色）。
- *   - 本函数只剥离非 SGR（光标移动/擦除/OSC 等）序列，保留 \x1b[...m 颜色码，
- *     交由渲染层 (ansiToHtml) 还原颜色。
- *   - 同样处理 \r 回车覆盖语义、过滤控制字符、连续空行去重，
- *     保证预览「格式与命令行一致」。
+ * 核心机制：用一个 cells[] 数组模拟终端每一行的字符缓冲区，逐字节处理输入，
+ * 正确模拟以下控制序列的终端效果（而非简单剥离）：
+ *   - \r        回到行首（col=0），后续字符覆盖旧内容
+ *   - \b        光标左移一格
+ *   - \x1b[K    EL 擦除光标到行尾（浏览历史命令时擦除旧字符尾部，关键！）
+ *   - \x1b[<n>C CUF 光标前移
+ *   - \x1b[<n>D CUB 光标后移
+ *   - \x1b[<n>G CHA 光标设到绝对列
+ *   - \x1b[...m SGR 颜色/样式，累积到每个 cell 上，最终输出保留
+ *
+ * 这样 shell（PowerShell/bash/zsh）浏览历史命令、退格编辑等交互产生的
+ * 光标移动 + 行擦除序列都能被正确还原，避免预览文字「纯累积不替换」。
  *
  * 用于：卡片预览区 previewText 的存储。
  */
@@ -312,17 +318,19 @@ export function cleanTerminalOutputKeepColor(raw: string): string {
   if (!raw) return ''
   // 1. 剥离 OSC（设置窗口标题等）
   let s = raw.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
-  // 2. 剥离所有 CSI，但保留以 'm' 结尾的 SGR 序列（颜色/样式）
-  s = s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, (m) => (m.endsWith('m') ? m : ''))
-  // 3. 剥离其它单字节转义（字符集切换等）
+  // 2. 剥离单字节转义（字符集切换等，不影响光标/擦除）
   s = s.replace(/\x1b[()*+]/g, '')
+  // 注意：不再在此处批量剥离 CSI 序列！
+  //   \x1b[K(EL 擦除行)、\x1b[<n>C(CUF 前移)、\x1b[<n>D(CUB 后移)、\x1b[<n>G(CHA 绝对列)
+  //   等控制序列对「行覆盖」语义至关重要，必须在下面的 cell 循环里逐个模拟其效果，
+  //   否则 shell（如 PowerShell/PSReadLine）浏览历史命令时发送的 \r+新命令+\x1b[K 会被
+  //   拆开处理，导致旧命令尾部字符无法被擦除，表现为预览文字「纯累积不替换」。
 
-  // 4. 逐行处理 \r 覆盖：保留每个 cell 的「当前 SGR 样式」
+  // 3. 逐行处理：模拟终端 cell buffer，正确处理 \r 覆盖 + 光标移动 + 行擦除 + SGR 样式
   const lines = s.split('\n')
   const outLines: string[] = []
 
   for (const line of lines) {
-    // 每个 cell: { ch, ansi(此 cell 当前的样式串) }
     const cells: { ch: string; ansi: string }[] = []
     const segments = line.split('\r')
     for (const seg of segments) {
@@ -330,24 +338,76 @@ export function cleanTerminalOutputKeepColor(raw: string): string {
       let curAnsi = ''
       let i = 0
       while (i < seg.length) {
-        if (seg.charCodeAt(i) === 0x1b) {
-          const m = /^\x1b\[[0-9;]*m/.exec(seg.slice(i))
-          if (m) {
-            // 遇到 reset(0) 清空累积样式；其它追加
-            if (m[0] === '\x1b[0m' || m[0] === '\x1b[m') {
-              curAnsi = ''
-            } else {
-              curAnsi += m[0]
-            }
-            i += m[0].length
-            continue
-          }
+        const code = seg.charCodeAt(i)
+
+        // \b backspace：光标左移一格（PowerShell 退格键常用）
+        if (code === 0x08) {
+          if (col > 0) col--
           i++
           continue
         }
-        const code = seg.charCodeAt(i)
+
+        if (code === 0x1b) {
+          // SGR: \x1b[<params>m —— 颜色/样式，累积到 curAnsi
+          const sgr = /^\x1b\[([0-9;]*)m/.exec(seg.slice(i))
+          if (sgr) {
+            if (sgr[1] === '' || sgr[1] === '0') curAnsi = ''
+            else curAnsi += sgr[0]
+            i += sgr[0].length
+            continue
+          }
+          // EL —— Erase in Line: \x1b[K / \x1b[0K / \x1b[1K / \x1b[2K
+          const el = /^\x1b\[([012])?K/.exec(seg.slice(i))
+          if (el) {
+            const mode = el[1] ?? '0'
+            if (mode === '0') {
+              // 擦除从光标到行尾（最常见，浏览历史时清旧字符）
+              if (cells.length > col) cells.length = col
+            } else if (mode === '1') {
+              // 擦除从行首到光标
+              for (let c = 0; c < col && c < cells.length; c++) cells[c] = { ch: ' ', ansi: '' }
+            } else {
+              // 擦除整行
+              cells.length = 0
+              col = 0
+            }
+            i += el[0].length
+            continue
+          }
+          // CUF —— Cursor Forward: \x1b[<n>C
+          const cuf = /^\x1b\[([0-9]*)C/.exec(seg.slice(i))
+          if (cuf) {
+            col += cuf[1] === '' ? 1 : parseInt(cuf[1], 10)
+            i += cuf[0].length
+            continue
+          }
+          // CUB —— Cursor Back: \x1b[<n>D
+          const cub = /^\x1b\[([0-9]*)D/.exec(seg.slice(i))
+          if (cub) {
+            col = Math.max(0, col - (cub[1] === '' ? 1 : parseInt(cub[1], 10)))
+            i += cub[0].length
+            continue
+          }
+          // CHA —— Cursor Horizontal Absolute: \x1b[<n>G（1-based）
+          const cha = /^\x1b\[([0-9]*)G/.exec(seg.slice(i))
+          if (cha) {
+            col = Math.max(0, (cha[1] === '' ? 1 : parseInt(cha[1], 10)) - 1)
+            i += cha[0].length
+            continue
+          }
+          // 其它未识别 CSI，整体跳过
+          const otherCsi = /^\x1b\[[0-9;?!]*[A-Za-z]/.exec(seg.slice(i))
+          if (otherCsi) {
+            i += otherCsi[0].length
+            continue
+          }
+          // 单字节转义，跳过
+          i++
+          continue
+        }
+
         if (code < 0x20) {
-          // 跳过控制字符（\r 已被 split 消化）
+          // 跳过其它控制字符（\r 已被 split 消化）
           i++
           continue
         }
