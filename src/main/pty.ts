@@ -1,17 +1,10 @@
-import * as pty from 'node-pty'
-import os from 'os'
-
-interface SessionConfig {
-  terminalType: 'powershell' | 'cmd' | 'bash'
-  cwd?: string
-  initialCommand?: string
-  cols?: number
-  rows?: number
-}
+import type { SessionConfig, TerminalBackend, SshAuthBridge } from './types'
+import { LocalPtyBackend } from './backends/localPty'
+import { SshBackend } from './backends/sshBackend'
 
 interface PtySession {
   id: string
-  ptyProcess: pty.IPty
+  backend: TerminalBackend
   config: SessionConfig
   destroyed: boolean
   /**
@@ -36,27 +29,11 @@ export function createPtyManager() {
   // 渲染进程再按 sessionId 分发给 N 张卡片订阅（store update -> SessionCard re-render）。
   let outputListeners: Array<(sessionId: string, data: string) => void> = []
   let exitListeners: Array<(sessionId: string, exitCode: number) => void> = []
+  let connStatusListeners: Array<(sessionId: string, status: string) => void> = []
   let disposed = false
-
-  function getShellPath(type: string): string {
-    if (os.platform() === 'win32') {
-      switch (type) {
-        case 'powershell':
-          return 'powershell.exe'
-        case 'cmd':
-          return 'cmd.exe'
-        default:
-          return 'powershell.exe'
-      }
-    } else {
-      switch (type) {
-        case 'bash':
-          return 'bash'
-        default:
-          return process.env.SHELL || 'bash'
-      }
-    }
-  }
+  // SSH 交互式认证桥（keyboard-interactive / known_hosts）；
+  // 由 main/index.ts 在 app.whenReady 后通过 setSshAuthBridge 注入。
+  let sshAuthBridge: SshAuthBridge | null = null
 
   function appendToRing(buf: string, chunk: string, cap: number): string {
     if (cap <= 0) return ''
@@ -66,53 +43,86 @@ export function createPtyManager() {
     return next.slice(next.length - cap)
   }
 
+  /**
+   * 按 config.kind 选择后端实现。
+   * - local：LocalPtyBackend（包 node-pty，行为与重构前完全一致）
+   * - ssh：SshBackend（包 ssh2，异步连接；start() 由 createSession 调用）
+   *
+   * 返回 backend 与（仅 ssh）异步启动函数。local 构造即就绪，无需启动。
+   */
+  function createBackend(config: SessionConfig, sessionId: string): {
+    backend: TerminalBackend
+    starter?: () => Promise<void>
+  } {
+    const kind = config.kind || 'local'
+    if (kind === 'ssh') {
+      if (!config.ssh) {
+        throw new Error('SSH 会话缺少 ssh 配置')
+      }
+      const ssh = new SshBackend(config.ssh, sshAuthBridge || undefined, sessionId)
+      return { backend: ssh, starter: () => ssh.start() }
+    }
+    return {
+      backend: new LocalPtyBackend({
+        terminalType: config.terminalType,
+        cwd: config.cwd,
+        cols: config.cols,
+        rows: config.rows,
+      }),
+    }
+  }
+
   function createSession(config: SessionConfig): string {
     if (disposed) return ''
 
     const id = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    const shell = getShellPath(config.terminalType)
-    // 兜底：把空、纯 '~'、相对路径 '~' 统一归到用户主目录，
-    // 防止 Windows 下 pty.spawn 因为 '~' 不存在而抛 ENOENT。
-    let cwd = config.cwd && config.cwd.trim() && config.cwd !== '~'
-      ? config.cwd
-      : os.homedir()
-
-    const ptyProcess = pty.spawn(shell, [], {
-      name: 'xterm-256color',
-      cols: config.cols || 160,
-      rows: config.rows || 40,
-      cwd,
-      env: {
-        ...process.env,
-        TERM: 'xterm-256color',
-        LANG: 'en_US.UTF-8'
-      }
-    })
+    const { backend, starter } = createBackend(config, id)
 
     const session: PtySession = {
       id,
-      ptyProcess,
+      backend,
       config,
       destroyed: false,
       ringBuf: '',
       ringBufMax: MAIN_RING_BUFFER_MAX,
     }
 
-    ptyProcess.onData((data) => {
+    backend.onData((data) => {
       if (session.destroyed || disposed) return
       // 主进程 ring buffer：append-and-trim，避免内存堆积
       session.ringBuf = appendToRing(session.ringBuf, data, session.ringBufMax)
       outputListeners.forEach((listener) => listener(id, data))
     })
 
-    ptyProcess.onExit(({ exitCode }) => {
+    backend.onExit(() => {
       if (disposed) return
       session.destroyed = true
       sessions.delete(id)
-      exitListeners.forEach((listener) => listener(id, exitCode || 0))
+      exitListeners.forEach((listener) => listener(id, 0))
     })
 
     sessions.set(id, session)
+
+    // SSH 异步连接：推送 connecting → ready/error 状态，
+    // 失败时推一条用户可读的错误文本到预览，再触发 exit
+    if (starter) {
+      connStatusListeners.forEach((l) => l(id, 'connecting'))
+      starter()
+        .then(() => {
+          if (disposed) return
+          connStatusListeners.forEach((l) => l(id, 'ready'))
+        })
+        .catch((err) => {
+          if (disposed) return
+          connStatusListeners.forEach((l) => l(id, 'error'))
+          const msg = `\r\n[SSH 连接失败] ${(err as Error).message || err}\r\n`
+          session.ringBuf = appendToRing(session.ringBuf, msg, session.ringBufMax)
+          outputListeners.forEach((listener) => listener(id, msg))
+          session.destroyed = true
+          sessions.delete(id)
+          exitListeners.forEach((listener) => listener(id, 1))
+        })
+    }
 
     if (config.initialCommand) {
       let sent = false
@@ -120,17 +130,17 @@ export function createPtyManager() {
         if (sent || session.destroyed || disposed) return
         sent = true
         try {
-          ptyProcess.write(config.initialCommand! + '\r')
+          backend.write(config.initialCommand! + '\r')
         } catch {
-          // PTY 可能已被系统回收
+          // 后端可能已关闭
         }
       }
-      const disposable = ptyProcess.onData(() => {
+      const unsubscribe = backend.onData(() => {
         sendCommand()
-        try { disposable.dispose() } catch { /* ignore */ }
+        try { unsubscribe() } catch { /* ignore */ }
       })
       setTimeout(() => {
-        try { disposable.dispose() } catch { /* ignore */ }
+        try { unsubscribe() } catch { /* ignore */ }
         sendCommand()
       }, 2000)
     }
@@ -154,9 +164,9 @@ export function createPtyManager() {
     const session = sessions.get(sessionId)
     if (session && !session.destroyed) {
       try {
-        session.ptyProcess.write(data)
+        session.backend.write(data)
       } catch {
-        // PTY 可能已被系统回收
+        // 后端可能已关闭
       }
     }
   }
@@ -168,9 +178,9 @@ export function createPtyManager() {
       session.destroyed = true
       sessions.delete(sessionId)
       try {
-        session.ptyProcess.kill()
+        session.backend.kill()
       } catch {
-        // PTY 可能已被系统回收
+        // 后端可能已关闭
       }
     }
   }
@@ -184,9 +194,9 @@ export function createPtyManager() {
     const session = sessions.get(sessionId)
     if (session && !session.destroyed) {
       try {
-        session.ptyProcess.resize(cols, rows)
+        session.backend.resize(cols, rows)
       } catch {
-        // PTY 可能已被系统回收
+        // 后端可能已关闭
       }
     }
   }
@@ -195,9 +205,9 @@ export function createPtyManager() {
     sessions.forEach((session) => {
       session.destroyed = true
       try {
-        session.ptyProcess.kill()
+        session.backend.kill()
       } catch {
-        // PTY 可能已被系统回收
+        // 后端可能已关闭
       }
     })
     sessions.clear()
@@ -211,16 +221,21 @@ export function createPtyManager() {
     exitListeners.push(listener)
   }
 
+  function onConnStatus(listener: (sessionId: string, status: string) => void): void {
+    connStatusListeners.push(listener)
+  }
+
   function dispose(): void {
     disposed = true
     outputListeners = []
     exitListeners = []
+    connStatusListeners = []
     sessions.forEach((session) => {
       session.destroyed = true
       try {
-        session.ptyProcess.kill()
+        session.backend.kill()
       } catch {
-        // PTY 可能已被系统回收
+        // 后端可能已关闭
       }
     })
     sessions.clear()
@@ -235,7 +250,9 @@ export function createPtyManager() {
     closeAllSessions,
     onOutput,
     onExit,
+    onConnStatus,
     dispose,
     getRecentOutput,
+    setSshAuthBridge: (bridge: SshAuthBridge | null) => { sshAuthBridge = bridge },
   }
 }

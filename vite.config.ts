@@ -18,7 +18,7 @@ export default defineConfig({
             sourcemap: false,
             outDir: 'out/main',
             rollupOptions: {
-              external: ['electron', 'node-pty', 'electron-store']
+              external: ['electron', 'node-pty', 'electron-store', 'ssh2']
             }
           }
         }

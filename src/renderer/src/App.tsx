@@ -14,6 +14,7 @@ import RulesDialog from './components/RulesDialog'
 import EmptyState from './components/EmptyState'
 import LoadingMask from './components/LoadingMask'
 import CloseConfirmDialog from './components/CloseConfirmDialog'
+import SshAuthDialog from './components/SshAuthDialog'
 import { cleanTerminalOutputKeepColor, detectStatusWithRules, truncateHistory, tailLines, hasStatus, IDLE_THRESHOLD_MS, statusPriority } from './utils/statusDetector'
 import { STATUS_COLORS } from './utils/statusColors'
 import { createSessionFromConfig } from './utils/sessionActions'
@@ -82,6 +83,8 @@ function App() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   // 关闭应用确认框：主进程拦截原生 X 后通过 IPC 请求弹出
   const [closeConfirm, setCloseConfirm] = useState<{ open: boolean; sessionCount: number }>({ open: false, sessionCount: 0 })
+  // SSH 交互式认证输入框：主进程推 prompt 后弹出，用户输入后回传
+  const [sshAuth, setSshAuth] = useState<{ open: boolean; prompt: string; sessionId: string }>({ open: false, prompt: '', sessionId: '' })
 
   // 计算各状态数量
   const statusCounts = useMemo(() => {
@@ -158,7 +161,11 @@ function App() {
     const unsubCloseConfirm = window.electronAPI.onRequestCloseConfirm(() => {
       setCloseConfirm({ open: true, sessionCount: useAppStore.getState().sessions.length })
     })
-    return () => { unsubClosing(); unsubCloseConfirm() }
+    // 监听 SSH 交互式认证请求（keyboard-interactive），弹出密码输入框
+    const unsubSshAuth = window.electronAPI.onSshAuthPrompt((sessionId, prompt) => {
+      setSshAuth({ open: true, prompt, sessionId })
+    })
+    return () => { unsubClosing(); unsubCloseConfirm(); unsubSshAuth() }
   }, [])
 
   const pendingBufferRef = useRef<Record<string, string[]>>({})
@@ -304,10 +311,14 @@ function App() {
 
     const unsubOutput = window.electronAPI.onSessionOutput(handleOutput)
     const unsubExit = window.electronAPI.onSessionExit(handleExit)
+    const unsubConnStatus = window.electronAPI.onSessionConnStatus((sessionId, status) => {
+      useAppStore.getState().updateSession(sessionId, { connectionStatus: status as any })
+    })
 
     return () => {
       unsubOutput()
       unsubExit()
+      unsubConnStatus()
       Object.values(rafIdRef.current).forEach(id => cancelAnimationFrame(id))
       rafIdRef.current = {}
       batchQueueRef.current = {}
@@ -515,6 +526,15 @@ function App() {
           onConfirm={() => {
             setCloseConfirm({ open: false, sessionCount: 0 })
             window.electronAPI.closeConfirmResponse(true)
+          }}
+        />
+        <SshAuthDialog
+          open={sshAuth.open}
+          prompt={sshAuth.prompt}
+          sessionId={sshAuth.sessionId}
+          onReply={(answer) => {
+            setSshAuth({ open: false, prompt: '', sessionId: '' })
+            window.electronAPI.replySshAuth(answer)
           }}
         />
       </ConfigProvider>
@@ -744,6 +764,15 @@ function App() {
           onConfirm={() => {
             setCloseConfirm({ open: false, sessionCount: 0 })
             window.electronAPI.closeConfirmResponse(true)
+          }}
+        />
+        <SshAuthDialog
+          open={sshAuth.open}
+          prompt={sshAuth.prompt}
+          sessionId={sshAuth.sessionId}
+          onReply={(answer) => {
+            setSshAuth({ open: false, prompt: '', sessionId: '' })
+            window.electronAPI.replySshAuth(answer)
           }}
         />
       </div>

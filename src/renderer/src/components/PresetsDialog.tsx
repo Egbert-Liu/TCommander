@@ -42,10 +42,12 @@ export default function PresetsDialog({ open, onClose }: PresetsDialogProps) {
   const handleCreateFromPreset = async (preset: Preset) => {
     const session = await createSessionFromConfig({
       name: preset.name,
+      kind: preset.kind || 'local',
       terminalType: preset.terminalType,
       cwd: preset.cwd,
       initialCommand: preset.initialCommand,
       groupId: preset.groupId,
+      existingSshConfig: preset.sshConfig,
     })
     if (!session) {
       message.error('创建会话失败')
@@ -59,30 +61,42 @@ export default function PresetsDialog({ open, onClose }: PresetsDialogProps) {
       title: '名称',
       dataIndex: 'name',
       key: 'name',
-      render: (name: string) => (
-        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>{name}</span>
+      render: (name: string, record: Preset) => (
+        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+          {record.kind === 'ssh' ? '🔐 ' : ''}{name}
+        </span>
       )
     },
     {
-      title: '终端',
-      dataIndex: 'terminalType',
-      key: 'terminalType',
-      width: 90,
-      render: (type: string) => (
-        <span style={{ 
-          color: 'var(--ant-color-primary)', 
-          fontFamily: "'JetBrains Mono', monospace", 
-          fontSize: 11 
-        }}>
-          {type.toUpperCase()}
-        </span>
-      )
+      title: '连接',
+      key: 'connection',
+      width: 120,
+      render: (_, record: Preset) => {
+        if (record.kind === 'ssh' && record.sshConfig) {
+          return (
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: 'rgba(34, 197, 94, 0.9)' }}>
+              {record.sshConfig.username}@{record.sshConfig.host}
+              {record.sshConfig.port !== 22 ? `:${record.sshConfig.port}` : ''}
+            </span>
+          )
+        }
+        return (
+          <span style={{
+            color: 'var(--ant-color-primary)',
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 11
+          }}>
+            {record.terminalType.toUpperCase()}
+          </span>
+        )
+      }
     },
     {
       title: '工作目录',
       dataIndex: 'cwd',
       key: 'cwd',
       ellipsis: true,
+      render: (cwd: string, record: Preset) => record.kind === 'ssh' ? '-' : cwd,
     },
     {
       title: '初始命令',

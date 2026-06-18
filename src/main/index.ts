@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, Menu } from 'electron'
 import path from 'path'
 import { createPtyManager } from './pty'
 import { createStorageManager } from './storage'
+import { secretStorage } from './secretStorage'
 
 const ptyManager = createPtyManager()
 const storageManager = createStorageManager()
@@ -124,6 +125,27 @@ function isWindowValid(): boolean {
   return mainWindow !== null && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()
 }
 
+// ========== SSH 交互式认证：main→renderer 请求-响应桥 ==========
+// 复用 close-confirm 的范式：主进程把 prompt 推给渲染进程弹框，等用户回答后 resolve。
+let sshAuthResolver: ((answer: string | null) => void) | null = null
+
+async function requestSshAuth(sessionId: string, prompt: string): Promise<string | null> {
+  if (!isWindowValid()) return null
+  // 防御：若上一次询问未关闭（理论上不会），先按取消 resolve
+  if (sshAuthResolver) {
+    sshAuthResolver(null)
+    sshAuthResolver = null
+  }
+  try {
+    mainWindow!.webContents.send('ssh-auth-prompt', sessionId, prompt)
+  } catch {
+    return null
+  }
+  return new Promise<string | null>((resolve) => {
+    sshAuthResolver = resolve
+  })
+}
+
 app.whenReady().then(() => {
   // 移除默认菜单栏（File/Edit/View/Window/Help），保持界面简洁统一
   Menu.setApplicationMenu(null)
@@ -137,6 +159,20 @@ app.whenReady().then(() => {
   
   ipcMain.handle('storage-get', (_, key) => storageManager.get(key))
   ipcMain.handle('storage-set', (_, key, value) => storageManager.set(key, value))
+
+  // 敏感信息（SSH 密码 / 私钥口令）加密封装：底层 safeStorage + electron-store
+  ipcMain.handle('secret-set', (_, key, value) => secretStorage.set(key, value))
+  ipcMain.handle('secret-get', (_, key) => secretStorage.get(key))
+  ipcMain.handle('secret-remove', (_, key) => secretStorage.remove(key))
+
+  // SSH 交互式认证：渲染进程用户输入答案后回传，唤醒 requestSshAuth 里的 await
+  ipcMain.handle('ssh-auth-reply', (_, answer: string | null) => {
+    sshAuthResolver?.(answer)
+    sshAuthResolver = null
+  })
+
+  // 把认证桥注入 ptyManager（SshBackend 通过它询问渲染进程）
+  ptyManager.setSshAuthBridge({ requestAuth: requestSshAuth })
 
   // 窗口控制 IPC
   ipcMain.handle('window-minimize', () => {
@@ -191,6 +227,16 @@ app.whenReady().then(() => {
     if (!isWindowValid()) return
     try {
       mainWindow!.webContents.send('session-exit', sessionId, exitCode)
+    } catch {
+      // 窗口已被销毁
+    }
+  })
+
+  // SSH 连接状态推送：connecting → ready/error
+  ptyManager.onConnStatus((sessionId, status) => {
+    if (!isWindowValid()) return
+    try {
+      mainWindow!.webContents.send('session-conn-status', sessionId, status)
     } catch {
       // 窗口已被销毁
     }
