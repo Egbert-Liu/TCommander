@@ -14,6 +14,21 @@ export interface TriggerRule {
   description?: string
 }
 
+/**
+ * SSH 连接配置（渲染层视图）。
+ * 密码/口令的明文绝不落盘，passwordRef / passphraseRef 是 safeStorage 的查找键。
+ * 用于卡片展示连接信息 + 重连时把引用回传给主进程。
+ */
+export interface SshSessionConfig {
+  host: string
+  port: number
+  username: string
+  authMethod: 'password' | 'privateKey' | 'keyboard-interactive'
+  privateKeyPath?: string
+  passwordRef?: string
+  passphraseRef?: string
+}
+
 export interface Session {
   id: string
   name: string
@@ -28,6 +43,10 @@ export interface Session {
   quickActions: string[]
   createdAt: number
   lastActivityAt: number
+  /** 会话类型：local=本地 PTY，ssh=远程 SSH。缺省按 local 处理（向后兼容）。 */
+  kind?: 'local' | 'ssh'
+  /** SSH 连接配置（仅 kind==='ssh'）。不含明文密钥，只存 safeStorage 引用。 */
+  sshConfig?: SshSessionConfig
 }
 
 export interface Group {
@@ -44,6 +63,8 @@ export interface Preset {
   cwd: string
   initialCommand?: string
   groupId?: string
+  kind?: 'local' | 'ssh'
+  sshConfig?: SshSessionConfig
 }
 
 export interface Snapshot {

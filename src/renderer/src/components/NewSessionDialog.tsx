@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Modal, Form, Input, Select, Button, Space, Checkbox, Divider, Popconfirm, message } from 'antd'
 import { CodeFilled, SaveFilled, ReloadOutlined, ExclamationCircleFilled } from '@ant-design/icons'
 import { useAppStore } from '../store'
-import { Session } from '../types'
+import { Session, Preset } from '../types'
 import { createSessionFromConfig } from '../utils/sessionActions'
 import SessionConfigFields from './SessionConfigFields'
 
@@ -26,12 +26,19 @@ export default function NewSessionDialog({ open, onClose, resetSession }: NewSes
 
   useEffect(() => {
     if (open && resetSession) {
+      const isSsh = resetSession.kind === 'ssh'
       form.setFieldsValue({
         name: resetSession.name,
+        connectionType: isSsh ? 'ssh' : 'local',
         terminalType: resetSession.terminalType,
         cwd: resetSession.cwd,
         initialCommand: resetSession.initialCommand || '',
         groupId: resetSession.groupId || undefined,
+        host: resetSession.sshConfig?.host,
+        port: resetSession.sshConfig?.port || 22,
+        username: resetSession.sshConfig?.username,
+        authMethod: resetSession.sshConfig?.authMethod || 'password',
+        privateKeyPath: resetSession.sshConfig?.privateKeyPath,
       })
     }
     if (!open) {
@@ -46,13 +53,7 @@ export default function NewSessionDialog({ open, onClose, resetSession }: NewSes
       setLoading(true)
       const values = await form.validateFields()
 
-      const session = await createSessionFromConfig({
-        name: values.name,
-        terminalType: values.terminalType,
-        cwd: values.cwd,
-        initialCommand: values.initialCommand,
-        groupId: values.groupId,
-      })
+      const session = await createSessionFromConfig(buildInput(values))
 
       if (!session) {
         message.error('创建会话失败，请重试')
@@ -61,16 +62,7 @@ export default function NewSessionDialog({ open, onClose, resetSession }: NewSes
       }
 
       if (saveAsPreset) {
-        const name = presetName.trim() || values.name
-        addPreset({
-          id: `preset-${Date.now()}`,
-          name,
-          terminalType: values.terminalType,
-          cwd: values.cwd || '~',
-          initialCommand: values.initialCommand || '',
-          groupId: values.groupId || undefined
-        })
-        message.success(`预设"${name}"已保存`)
+        savePresetFromValues(values, session)
       }
 
       form.resetFields()
@@ -93,11 +85,7 @@ export default function NewSessionDialog({ open, onClose, resetSession }: NewSes
       await window.electronAPI.closeSession(resetSession.id)
 
       const session = await createSessionFromConfig({
-        name: values.name,
-        terminalType: values.terminalType,
-        cwd: values.cwd,
-        initialCommand: values.initialCommand,
-        groupId: values.groupId,
+        ...buildInput(values),
         quickActions: resetSession.quickActions,
       })
 
@@ -118,15 +106,84 @@ export default function NewSessionDialog({ open, onClose, resetSession }: NewSes
     }
   }
 
+  function buildInput(values: any) {
+    if (values.connectionType === 'ssh') {
+      return {
+        name: values.name,
+        kind: 'ssh' as const,
+        groupId: values.groupId,
+        initialCommand: values.initialCommand,
+        ssh: {
+          host: values.host,
+          port: values.port || 22,
+          username: values.username,
+          authMethod: values.authMethod || 'password',
+          password: values.password,
+          privateKeyPath: values.privateKeyPath,
+          passphrase: values.passphrase,
+        },
+      }
+    }
+    return {
+      name: values.name,
+      kind: 'local' as const,
+      terminalType: values.terminalType,
+      cwd: values.cwd,
+      initialCommand: values.initialCommand,
+      groupId: values.groupId,
+    }
+  }
+
+  function savePresetFromValues(values: any, session: Session) {
+    const name = presetName.trim() || values.name
+    if (values.connectionType === 'ssh') {
+      const preset: Preset = {
+        id: `preset-${Date.now()}`,
+        name,
+        kind: 'ssh',
+        terminalType: 'bash',
+        cwd: '~',
+        initialCommand: values.initialCommand || '',
+        groupId: values.groupId || undefined,
+        sshConfig: session.sshConfig,
+      }
+      addPreset(preset)
+    } else {
+      addPreset({
+        id: `preset-${Date.now()}`,
+        name,
+        terminalType: values.terminalType,
+        cwd: values.cwd || '~',
+        initialCommand: values.initialCommand || '',
+        groupId: values.groupId || undefined,
+      })
+    }
+    message.success(`预设"${name}"已保存`)
+  }
+
   const handleSelectPreset = (presetId: string) => {
     const preset = presets.find(p => p.id === presetId)
-    if (preset) {
+    if (!preset) return
+    if (preset.kind === 'ssh') {
       form.setFieldsValue({
         name: preset.name,
+        connectionType: 'ssh',
+        host: preset.sshConfig?.host,
+        port: preset.sshConfig?.port || 22,
+        username: preset.sshConfig?.username,
+        authMethod: preset.sshConfig?.authMethod || 'password',
+        privateKeyPath: preset.sshConfig?.privateKeyPath,
+        groupId: preset.groupId || undefined,
+        initialCommand: preset.initialCommand || '',
+      })
+    } else {
+      form.setFieldsValue({
+        name: preset.name,
+        connectionType: 'local',
         terminalType: preset.terminalType,
         cwd: preset.cwd,
         initialCommand: preset.initialCommand || '',
-        groupId: preset.groupId || undefined
+        groupId: preset.groupId || undefined,
       })
     }
   }
@@ -173,7 +230,7 @@ export default function NewSessionDialog({ open, onClose, resetSession }: NewSes
             )}
           </Space>
         }
-        width={480}
+        width={520}
       >
         {isResetMode && (
           <div style={{
@@ -203,14 +260,14 @@ export default function NewSessionDialog({ open, onClose, resetSession }: NewSes
             >
               {presets.map(preset => (
                 <Select.Option key={preset.id} value={preset.id}>
-                  {preset.name}
+                  {preset.kind === 'ssh' ? '🔐 ' : ''}{preset.name}
                 </Select.Option>
               ))}
             </Select>
           </div>
         )}
 
-        <Form form={form} layout="vertical" size="small" initialValues={{ terminalType: 'powershell' }}>
+        <Form form={form} layout="vertical" size="small" initialValues={{ terminalType: 'powershell', connectionType: 'local', authMethod: 'password', port: 22 }}>
           <SessionConfigFields nameLabel="会话名称" namePlaceholder="输入会话名称" />
 
           <Form.Item name="groupId" label="所属分组">
