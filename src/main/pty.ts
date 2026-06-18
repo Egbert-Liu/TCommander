@@ -1,4 +1,4 @@
-import type { SessionConfig, TerminalBackend } from './types'
+import type { SessionConfig, TerminalBackend, SshAuthBridge } from './types'
 import { LocalPtyBackend } from './backends/localPty'
 import { SshBackend } from './backends/sshBackend'
 
@@ -30,6 +30,9 @@ export function createPtyManager() {
   let outputListeners: Array<(sessionId: string, data: string) => void> = []
   let exitListeners: Array<(sessionId: string, exitCode: number) => void> = []
   let disposed = false
+  // SSH 交互式认证桥（keyboard-interactive / known_hosts）；
+  // 由 main/index.ts 在 app.whenReady 后通过 setSshAuthBridge 注入。
+  let sshAuthBridge: SshAuthBridge | null = null
 
   function appendToRing(buf: string, chunk: string, cap: number): string {
     if (cap <= 0) return ''
@@ -46,7 +49,7 @@ export function createPtyManager() {
    *
    * 返回 backend 与（仅 ssh）异步启动函数。local 构造即就绪，无需启动。
    */
-  function createBackend(config: SessionConfig): {
+  function createBackend(config: SessionConfig, sessionId: string): {
     backend: TerminalBackend
     starter?: () => Promise<void>
   } {
@@ -55,7 +58,7 @@ export function createPtyManager() {
       if (!config.ssh) {
         throw new Error('SSH 会话缺少 ssh 配置')
       }
-      const ssh = new SshBackend(config.ssh)
+      const ssh = new SshBackend(config.ssh, sshAuthBridge || undefined, sessionId)
       return { backend: ssh, starter: () => ssh.start() }
     }
     return {
@@ -72,7 +75,7 @@ export function createPtyManager() {
     if (disposed) return ''
 
     const id = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    const { backend, starter } = createBackend(config)
+    const { backend, starter } = createBackend(config, id)
 
     const session: PtySession = {
       id,
@@ -236,5 +239,6 @@ export function createPtyManager() {
     onExit,
     dispose,
     getRecentOutput,
+    setSshAuthBridge: (bridge: SshAuthBridge | null) => { sshAuthBridge = bridge },
   }
 }

@@ -125,6 +125,27 @@ function isWindowValid(): boolean {
   return mainWindow !== null && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()
 }
 
+// ========== SSH 交互式认证：main→renderer 请求-响应桥 ==========
+// 复用 close-confirm 的范式：主进程把 prompt 推给渲染进程弹框，等用户回答后 resolve。
+let sshAuthResolver: ((answer: string | null) => void) | null = null
+
+async function requestSshAuth(sessionId: string, prompt: string): Promise<string | null> {
+  if (!isWindowValid()) return null
+  // 防御：若上一次询问未关闭（理论上不会），先按取消 resolve
+  if (sshAuthResolver) {
+    sshAuthResolver(null)
+    sshAuthResolver = null
+  }
+  try {
+    mainWindow!.webContents.send('ssh-auth-prompt', sessionId, prompt)
+  } catch {
+    return null
+  }
+  return new Promise<string | null>((resolve) => {
+    sshAuthResolver = resolve
+  })
+}
+
 app.whenReady().then(() => {
   // 移除默认菜单栏（File/Edit/View/Window/Help），保持界面简洁统一
   Menu.setApplicationMenu(null)
@@ -143,6 +164,15 @@ app.whenReady().then(() => {
   ipcMain.handle('secret-set', (_, key, value) => secretStorage.set(key, value))
   ipcMain.handle('secret-get', (_, key) => secretStorage.get(key))
   ipcMain.handle('secret-remove', (_, key) => secretStorage.remove(key))
+
+  // SSH 交互式认证：渲染进程用户输入答案后回传，唤醒 requestSshAuth 里的 await
+  ipcMain.handle('ssh-auth-reply', (_, answer: string | null) => {
+    sshAuthResolver?.(answer)
+    sshAuthResolver = null
+  })
+
+  // 把认证桥注入 ptyManager（SshBackend 通过它询问渲染进程）
+  ptyManager.setSshAuthBridge({ requestAuth: requestSshAuth })
 
   // 窗口控制 IPC
   ipcMain.handle('window-minimize', () => {

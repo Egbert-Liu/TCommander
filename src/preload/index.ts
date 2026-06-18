@@ -4,6 +4,7 @@ let outputCallbacks: Array<(sessionId: string, data: string) => void> = []
 let exitCallbacks: Array<(sessionId: string, exitCode: number) => void> = []
 let appClosingCallbacks: Array<() => void> = []
 let closeConfirmCallbacks: Array<(hasActiveSessions: boolean) => void> = []
+let sshAuthPromptCallbacks: Array<(sessionId: string, prompt: string) => void> = []
 
 ipcRenderer.on('session-output', (_, sessionId, data) => {
   outputCallbacks.forEach(cb => cb(sessionId, data))
@@ -20,6 +21,11 @@ ipcRenderer.on('app-closing', () => {
 // 主进程要求弹出关闭确认框（用户点了原生 X 按钮）
 ipcRenderer.on('request-close-confirm', (_, hasActiveSessions: boolean) => {
   closeConfirmCallbacks.forEach(cb => cb(hasActiveSessions))
+})
+
+// 主进程要求弹出 SSH 交互式认证输入框（keyboard-interactive / known_hosts）
+ipcRenderer.on('ssh-auth-prompt', (_, sessionId: string, prompt: string) => {
+  sshAuthPromptCallbacks.forEach(cb => cb(sessionId, prompt))
 })
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -70,6 +76,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   closeConfirmResponse: (confirmed: boolean) =>
     ipcRenderer.invoke('close-confirm-response', confirmed),
+
+  // SSH 交互式认证：主进程推 prompt → 渲染进程弹框；用户输入后回传答案
+  onSshAuthPrompt: (callback: (sessionId: string, prompt: string) => void) => {
+    sshAuthPromptCallbacks.push(callback)
+    return () => {
+      sshAuthPromptCallbacks = sshAuthPromptCallbacks.filter(cb => cb !== callback)
+    }
+  },
+  replySshAuth: (answer: string | null) =>
+    ipcRenderer.invoke('ssh-auth-reply', answer),
 
   onSessionOutput: (callback: (sessionId: string, data: string) => void) => {
     outputCallbacks.push(callback)

@@ -18,6 +18,8 @@ interface ElectronAPI {
   onAppClosing: (callback: () => void) => () => void
   onRequestCloseConfirm: (callback: () => void) => () => void
   closeConfirmResponse: (confirmed: boolean) => Promise<void>
+  onSshAuthPrompt: (callback: (sessionId: string, prompt: string) => void) => () => void
+  replySshAuth: (answer: string | null) => Promise<void>
   onSessionOutput: (callback: (sessionId: string, data: string) => void) => () => void
   onSessionExit: (callback: (sessionId: string, exitCode: number) => void) => () => void
 }

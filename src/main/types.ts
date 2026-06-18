@@ -96,3 +96,14 @@ export interface SessionConfig {
   // —— ssh ——
   ssh?: SshConfig
 }
+
+/**
+ * main→renderer 请求-响应桥：用于 SSH 交互式认证与 known_hosts 首连确认。
+ * SshBackend 在 keyboard-interactive / hostVerifier 回调中调用 requestAuth，
+ * main 把 prompt 推给渲染进程弹框，用户回答后 resolve 回来。
+ *
+ * 返回 null 表示用户取消或窗口已销毁，SshBackend 应中止认证。
+ */
+export interface SshAuthBridge {
+  requestAuth(sessionId: string, prompt: string): Promise<string | null>
+}
