@@ -441,6 +441,9 @@ export default function FullscreenTerminal() {
           flex: 1,
           padding: '8px',
           overflow: 'hidden',
+          // 内边距区背景跟随终端主题：消除 xterm 渲染前/外的色差闪烁，
+          // 使整个终端区视觉无缝（深色主题→深底，亮色主题→亮底）。
+          background: getTerminalTheme(terminalThemeId).colors.background,
         }}
       />
 

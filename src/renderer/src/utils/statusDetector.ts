@@ -187,6 +187,30 @@ export function tailLines(raw: string, maxBytes: number = 16 * 1024): string {
   return raw.slice(start)
 }
 
+/**
+ * 截断到「最后一次屏幕清除」之后的内容。
+ *
+ * 终端的整屏擦除序列会把此前所有可见行从屏幕上抹掉（真实终端里就看不见了），
+ * 但我们的预览是基于原始 PTY 流做行级重放的，若不识别这些序列，
+ * 已被擦除的旧内容会继续显示，导致整块内容重复（例如 PowerShell banner 出现两次）。
+ *
+ * 视为「清屏」的序列（取所有出现位置里最后一次的之后）：
+ *   - \x1b[2J   ED mode 2：擦除整个屏幕
+ *   - \x1b[3J   ED mode 3：擦除滚动缓冲（更强，xterm 扩展）
+ *
+ * 注：alt-screen（\x1b[?1049h）刻意不在此处理 —— TUI 退出后真实终端会恢复主屏，
+ *     若在此截断反而会显示已退出的 TUI 残影。清屏序列才是「永久擦除」语义。
+ */
+export function truncateAtLastScreenClear(s: string): string {
+  if (!s) return ''
+  let lastIdx = -1
+  for (const c of ['\x1b[2J', '\x1b[3J']) {
+    const idx = s.lastIndexOf(c)
+    if (idx !== -1) lastIdx = Math.max(lastIdx, idx + c.length)
+  }
+  return lastIdx < 0 ? s : s.substring(lastIdx)
+}
+
 export function detectStatusWithRules(
   rawOutput: string,
   rules: TriggerRule[]
@@ -297,27 +321,38 @@ export function cleanTerminalOutput(raw: string): string {
 }
 
 /**
- * 保留 ANSI 颜色的终端输出清洗 —— 模拟终端 cell buffer。
+ * 保留 ANSI 颜色的终端输出清洗 —— 2D 屏幕缓冲模拟。
  *
- * 核心机制：用一个 cells[] 数组模拟终端每一行的字符缓冲区，逐字节处理输入，
+ * 核心机制：用一个 rows × cols 的字符网格（screen[][]）模拟整个终端屏幕，
+ * 维护全局光标 (row, col) 与当前 SGR 样式，逐字节重放原始 PTY 流。
+ * 这与 xterm.js 等真实终端模拟器的核心数据结构一致。
+ *
  * 正确模拟以下控制序列的终端效果（而非简单剥离）：
- *   - \r        回到行首（col=0），后续字符覆盖旧内容
- *   - \b        光标左移一格
- *   - \x1b[K    EL 擦除光标到行尾（浏览历史命令时擦除旧字符尾部，关键！）
- *   - \x1b[<n>C CUF 光标前移
- *   - \x1b[<n>D CUB 光标后移
- *   - \x1b[<n>G CHA 光标设到绝对列
- *   - \x1b[...m SGR 颜色/样式，累积到每个 cell 上，最终输出保留
+ *   - \r \n \b \t     回车 / 换行 / 退格 / 制表符
+ *   - \x1b[r;cH       CUP 光标绝对定位（row+col，TUI 重绘关键！）
+ *   - \x1b[nA/B/C/D   CUU/CUD/CUF/CUB 光标上/下/前/后移
+ *   - \x1b[cG         CHA 光标绝对列
+ *   - \x1b[K          EL 行擦除（0/1/2 三种模式）
+ *   - \x1b[J          ED 屏幕擦除（0/1/2/3 四种模式）
+ *   - \x1b[nX/P/@     ECH/DCH/ICH 字符擦除/删除/插入
+ *   - \x1b[nL/M       IL/DL 行插入/删除
+ *   - \x1b[nS/T       SU/SD 屏幕滚动
+ *   - \x1b[...m       SGR 颜色/样式，累积到每个 cell 上，最终输出保留
  *
- * 这样 shell（PowerShell/bash/zsh）浏览历史命令、退格编辑等交互产生的
- * 光标移动 + 行擦除序列都能被正确还原，避免预览文字「纯累积不替换」。
+ * 这样无论是 shell（PowerShell/bash/zsh）的行内编辑、退格、历史命令浏览，
+ * 还是 TUI 程序（Claude Code / vim / htop / less）的全屏重绘、spinner 动画，
+ * 都能被正确还原，避免预览「纯累积不替换」「整屏重复 N 次」等问题。
  *
  * 用于：卡片预览区 previewText 的存储。
  */
 export function cleanTerminalOutputKeepColor(raw: string): string {
   if (!raw) return ''
+  // 0. 截断到最后一次屏幕清除之后：真实终端的 \x1b[2J 会擦除此前所有可见行，
+  //    预览也必须跟随，否则已被清掉的旧内容会重复显示（如 PowerShell banner 出现两次）。
+  //    必须在剥离任何转义之前做，否则会丢失清屏序列的上下文。
+  let s = truncateAtLastScreenClear(raw)
   // 1. 剥离 OSC（设置窗口标题等）
-  let s = raw.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
+  s = s.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
   // 2. 剥离单字节转义（字符集切换等，不影响光标/擦除）
   s = s.replace(/\x1b[()*+]/g, '')
   // 注意：不再在此处批量剥离 CSI 序列！
@@ -326,100 +361,221 @@ export function cleanTerminalOutputKeepColor(raw: string): string {
   //   否则 shell（如 PowerShell/PSReadLine）浏览历史命令时发送的 \r+新命令+\x1b[K 会被
   //   拆开处理，导致旧命令尾部字符无法被擦除，表现为预览文字「纯累积不替换」。
 
-  // 3. 逐行处理：模拟终端 cell buffer，正确处理 \r 覆盖 + 光标移动 + 行擦除 + SGR 样式
-  const lines = s.split('\n')
-  const outLines: string[] = []
+  // 3. 2D 屏幕缓冲模拟。
+  //    用 rows × cols 的字符网格模拟终端屏幕，维护全局光标 (row, col) 与当前 SGR 样式。
+  //    这是正确处理 TUI 程序（Claude Code / vim / htop / less 等）所必需的——它们用
+  //    \x1b[<row>;<col>H（CUP）跳到屏幕任意位置重绘（如 spinner 每一帧）。旧的「逐行独立」
+  //    模型会丢弃 row 维度，导致每次重绘都被追加显示而非覆盖，表现为整屏内容重复 N 次、
+  //    spinner 每一帧各占一块。2D 网格 + 全局光标能正确还原覆盖语义。
+  type Cell = { ch: string; ansi: string }
+  const screen: Cell[][] = [[]]
+  let row = 0
+  let col = 0
+  let curAnsi = ''
 
-  for (const line of lines) {
-    const cells: { ch: string; ansi: string }[] = []
-    const segments = line.split('\r')
-    for (const seg of segments) {
-      let col = 0
-      let curAnsi = ''
-      let i = 0
-      while (i < seg.length) {
-        const code = seg.charCodeAt(i)
+  const ensureRow = (r: number) => {
+    while (screen.length <= r) screen.push([])
+  }
+  const ensureCell = (r: number, c: number) => {
+    ensureRow(r)
+    const cells = screen[r]
+    while (cells.length <= c) cells.push({ ch: ' ', ansi: '' })
+  }
 
-        // \b backspace：光标左移一格（PowerShell 退格键常用）
-        if (code === 0x08) {
-          if (col > 0) col--
-          i++
-          continue
-        }
+  let i = 0
+  while (i < s.length) {
+    const code = s.charCodeAt(i)
 
-        if (code === 0x1b) {
-          // SGR: \x1b[<params>m —— 颜色/样式，累积到 curAnsi
-          const sgr = /^\x1b\[([0-9;]*)m/.exec(seg.slice(i))
-          if (sgr) {
-            if (sgr[1] === '' || sgr[1] === '0') curAnsi = ''
-            else curAnsi += sgr[0]
-            i += sgr[0].length
-            continue
-          }
-          // EL —— Erase in Line: \x1b[K / \x1b[0K / \x1b[1K / \x1b[2K
-          const el = /^\x1b\[([012])?K/.exec(seg.slice(i))
-          if (el) {
-            const mode = el[1] ?? '0'
-            if (mode === '0') {
-              // 擦除从光标到行尾（最常见，浏览历史时清旧字符）
-              if (cells.length > col) cells.length = col
-            } else if (mode === '1') {
-              // 擦除从行首到光标
-              for (let c = 0; c < col && c < cells.length; c++) cells[c] = { ch: ' ', ansi: '' }
-            } else {
-              // 擦除整行
-              cells.length = 0
-              col = 0
-            }
-            i += el[0].length
-            continue
-          }
-          // CUF —— Cursor Forward: \x1b[<n>C
-          const cuf = /^\x1b\[([0-9]*)C/.exec(seg.slice(i))
-          if (cuf) {
-            col += cuf[1] === '' ? 1 : parseInt(cuf[1], 10)
-            i += cuf[0].length
-            continue
-          }
-          // CUB —— Cursor Back: \x1b[<n>D
-          const cub = /^\x1b\[([0-9]*)D/.exec(seg.slice(i))
-          if (cub) {
-            col = Math.max(0, col - (cub[1] === '' ? 1 : parseInt(cub[1], 10)))
-            i += cub[0].length
-            continue
-          }
-          // CHA —— Cursor Horizontal Absolute: \x1b[<n>G（1-based）
-          const cha = /^\x1b\[([0-9]*)G/.exec(seg.slice(i))
-          if (cha) {
-            col = Math.max(0, (cha[1] === '' ? 1 : parseInt(cha[1], 10)) - 1)
-            i += cha[0].length
-            continue
-          }
-          // 其它未识别 CSI，整体跳过
-          const otherCsi = /^\x1b\[[0-9;?!]*[A-Za-z]/.exec(seg.slice(i))
-          if (otherCsi) {
-            i += otherCsi[0].length
-            continue
-          }
-          // 单字节转义，跳过
-          i++
-          continue
-        }
+    // LF —— 换行（convertEol 语义：换到下一行并回到列 0，与 xterm convertEol:true 一致）
+    if (code === 0x0a) { row++; col = 0; i++; continue }
+    // CR —— 回车
+    if (code === 0x0d) { col = 0; i++; continue }
+    // BS —— 退格，光标左移一格
+    if (code === 0x08) { if (col > 0) col--; i++; continue }
+    // HT —— 水平制表符，跳到下一个 8 列 tab stop
+    if (code === 0x09) { col = (Math.floor(col / 8) + 1) * 8; i++; continue }
 
-        if (code < 0x20) {
-          // 跳过其它控制字符（\r 已被 split 消化）
-          i++
-          continue
-        }
-        const ch = seg[i]
-        while (cells.length <= col) cells.push({ ch: ' ', ansi: '' })
-        cells[col] = { ch, ansi: curAnsi }
-        col++
-        i++
+    if (code === 0x1b) {
+      const rest = s.slice(i)
+
+      // SGR —— 颜色/样式，累积到 curAnsi
+      const sgr = /^\x1b\[([0-9;]*)m/.exec(rest)
+      if (sgr) {
+        if (sgr[1] === '' || sgr[1] === '0') curAnsi = ''
+        else curAnsi += sgr[0]
+        i += sgr[0].length
+        continue
       }
+      // CUP / HVP —— Cursor Position: \x1b[<row>;<col>H 或 \x1b[<row>;<col>f（均 1-based）
+      // 关键：同时更新 row 和 col —— 这是 TUI 重绘（如 spinner 每帧）能正确覆盖的前提。
+      const cup = /^\x1b\[([0-9;]*)[Hf]/.exec(rest)
+      if (cup) {
+        const ps = cup[1].split(';')
+        const rParam = ps[0] !== '' ? parseInt(ps[0], 10) : 1
+        const cParam = ps.length >= 2 && ps[1] !== '' ? parseInt(ps[1], 10) : 1
+        row = Math.max(0, rParam - 1)
+        col = Math.max(0, cParam - 1)
+        i += cup[0].length
+        continue
+      }
+      // CHA —— Cursor Horizontal Absolute: \x1b[<col>G（1-based）
+      const cha = /^\x1b\[([0-9]*)G/.exec(rest)
+      if (cha) {
+        col = Math.max(0, (cha[1] === '' ? 1 : parseInt(cha[1], 10)) - 1)
+        i += cha[0].length
+        continue
+      }
+      // CUF —— Cursor Forward: \x1b[<n>C
+      const cuf = /^\x1b\[([0-9]*)C/.exec(rest)
+      if (cuf) {
+        col += cuf[1] === '' ? 1 : parseInt(cuf[1], 10)
+        i += cuf[0].length
+        continue
+      }
+      // CUB —— Cursor Back: \x1b[<n>D
+      const cub = /^\x1b\[([0-9]*)D/.exec(rest)
+      if (cub) {
+        col = Math.max(0, col - (cub[1] === '' ? 1 : parseInt(cub[1], 10)))
+        i += cub[0].length
+        continue
+      }
+      // CUU —— Cursor Up: \x1b[<n>A
+      const cuu = /^\x1b\[([0-9]*)A/.exec(rest)
+      if (cuu) {
+        row = Math.max(0, row - (cuu[1] === '' ? 1 : parseInt(cuu[1], 10)))
+        i += cuu[0].length
+        continue
+      }
+      // CUD —— Cursor Down: \x1b[<n>B
+      const cud = /^\x1b\[([0-9]*)B/.exec(rest)
+      if (cud) {
+        row += cud[1] === '' ? 1 : parseInt(cud[1], 10)
+        i += cud[0].length
+        continue
+      }
+      // EL —— Erase in Line: \x1b[K / \x1b[0K / \x1b[1K / \x1b[2K
+      const el = /^\x1b\[([012])?K/.exec(rest)
+      if (el) {
+        ensureRow(row)
+        const cells = screen[row]
+        const mode = el[1] ?? '0'
+        if (mode === '0') {
+          if (cells.length > col) cells.length = col
+        } else if (mode === '1') {
+          for (let c = 0; c < col && c < cells.length; c++) cells[c] = { ch: ' ', ansi: '' }
+        } else {
+          cells.length = 0
+        }
+        i += el[0].length
+        continue
+      }
+      // ED —— Erase in Display: \x1b[J / \x1b[0J / \x1b[1J / \x1b[2J / \x1b[3J
+      const ed = /^\x1b\[([0-3])?J/.exec(rest)
+      if (ed) {
+        ensureRow(row)
+        const mode = ed[1] ?? '0'
+        if (mode === '0') {
+          if (screen[row].length > col) screen[row].length = col
+          for (let r = row + 1; r < screen.length; r++) screen[r] = []
+        } else if (mode === '1') {
+          for (let r = 0; r < row && r < screen.length; r++) screen[r] = []
+          for (let c = 0; c <= col; c++) if (c < screen[row].length) screen[row][c] = { ch: ' ', ansi: '' }
+        } else {
+          for (let r = 0; r < screen.length; r++) screen[r] = []
+        }
+        i += ed[0].length
+        continue
+      }
+      // ECH —— Erase Characters: \x1b[<n>X（从光标起 n 个字符置空，光标不动）
+      const ech = /^\x1b\[([0-9]*)X/.exec(rest)
+      if (ech) {
+        const n = ech[1] === '' ? 1 : parseInt(ech[1], 10)
+        ensureRow(row)
+        const cells = screen[row]
+        for (let c = col; c < col + n && c < cells.length; c++) cells[c] = { ch: ' ', ansi: '' }
+        i += ech[0].length
+        continue
+      }
+      // DCH —— Delete Characters: \x1b[<n>P（删光标处 n 个字符，右侧左移）
+      const dch = /^\x1b\[([0-9]*)P/.exec(rest)
+      if (dch) {
+        const n = dch[1] === '' ? 1 : parseInt(dch[1], 10)
+        ensureRow(row)
+        if (col < screen[row].length) screen[row].splice(col, Math.min(n, screen[row].length - col))
+        i += dch[0].length
+        continue
+      }
+      // ICH —— Insert Characters: \x1b[<n>@（光标处插入 n 个空格，右侧右移）
+      const ich = /^\x1b\[([0-9]*)@/.exec(rest)
+      if (ich) {
+        const n = ich[1] === '' ? 1 : parseInt(ich[1], 10)
+        ensureRow(row)
+        for (let k = 0; k < n; k++) screen[row].splice(col, 0, { ch: ' ', ansi: '' })
+        i += ich[0].length
+        continue
+      }
+      // IL —— Insert Lines: \x1b[<n>L（在光标行处插入 n 个空行，下方下移）
+      const il = /^\x1b\[([0-9]*)L/.exec(rest)
+      if (il) {
+        const n = il[1] === '' ? 1 : parseInt(il[1], 10)
+        ensureRow(row)
+        for (let k = 0; k < n; k++) screen.splice(row, 0, [])
+        i += il[0].length
+        continue
+      }
+      // DL —— Delete Lines: \x1b[<n>M（删光标行起 n 行，上方上移）
+      const dl = /^\x1b\[([0-9]*)M/.exec(rest)
+      if (dl) {
+        const n = dl[1] === '' ? 1 : parseInt(dl[1], 10)
+        ensureRow(row)
+        screen.splice(row, Math.min(n, screen.length - row))
+        if (screen.length === 0) screen.push([])
+        i += dl[0].length
+        continue
+      }
+      // SU —— Scroll Up: \x1b[<n>S（整屏向上滚 n 行，顶部 n 行消失）
+      const su = /^\x1b\[([0-9]*)S/.exec(rest)
+      if (su) {
+        const n = su[1] === '' ? 1 : parseInt(su[1], 10)
+        screen.splice(0, Math.min(n, screen.length))
+        if (screen.length === 0) screen.push([])
+        row = Math.max(0, row - n)
+        i += su[0].length
+        continue
+      }
+      // SD —— Scroll Down: \x1b[<n>T（整屏向下滚 n 行，顶部补 n 空行）
+      const sd = /^\x1b\[([0-9]*)T/.exec(rest)
+      if (sd) {
+        const n = sd[1] === '' ? 1 : parseInt(sd[1], 10)
+        for (let k = 0; k < n; k++) screen.splice(0, 0, [])
+        row += n
+        i += sd[0].length
+        continue
+      }
+      // 其它未识别 CSI，整体跳过
+      const otherCsi = /^\x1b\[[0-9;?!]*[A-Za-z]/.exec(rest)
+      if (otherCsi) {
+        i += otherCsi[0].length
+        continue
+      }
+      // 单字节 ESC，跳过
+      i++
+      continue
     }
 
-    // 重构该行：相邻相同样式合并，末尾 reset
+    // 其它控制字符，跳过
+    if (code < 0x20) { i++; continue }
+
+    // 普通可打印字符：写入网格 (row, col)
+    ensureCell(row, col)
+    screen[row][col] = { ch: s[i], ansi: curAnsi }
+    col++
+    i++
+  }
+
+  // 4. 网格 → 文本：逐行合并相邻相同样式、trim 行尾空格、跳过空行
+  const outLines: string[] = []
+  for (const cells of screen) {
     let result = ''
     let lastAnsi = '__none__'
     for (const c of cells) {
@@ -436,7 +592,7 @@ export function cleanTerminalOutputKeepColor(raw: string): string {
     }
   }
 
-  // 5. 连续空行去重（与 cleanTerminalOutput 行为对齐）
+  // 5. 连续重复行（忽略 ANSI 比较）去重：兜底处理 TUI 重绘残留 / 重复 banner
   const deduped: string[] = []
   for (const line of outLines) {
     if (line.length === 0) continue

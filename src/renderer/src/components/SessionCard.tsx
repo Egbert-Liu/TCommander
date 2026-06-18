@@ -65,13 +65,19 @@ function SessionCardImpl(props: SessionCardProps) {
     return lines.slice(-previewLineCount).join('\n')
   }, [session.previewText, previewLineCount])
 
+  // 终端主题：预览区背景/前景直接取自当前终端主题，使卡片预览与 xterm.js
+  // 全屏终端视觉完全一致（深色主题→深色预览，亮色主题→亮色预览）。
+  const terminalTheme = useMemo(() => getTerminalTheme(terminalThemeId), [terminalThemeId])
+  const themeBg = terminalTheme.colors.background
+  const themeFg = terminalTheme.colors.foreground
+
   // 将带 ANSI SGR 转义的预览文本渲染为带内联颜色的 HTML，使用当前终端主题调色板，
   // 让卡片预览的配色与 xterm.js 全屏终端完全一致（解决用户反馈「外面看没有颜色」）。
   // ansiToHtml 内部已对纯文本做 escapeHtml，再通过 dangerouslySetInnerHTML 注入是安全的。
   const previewHtml = useMemo(() => {
     if (!session.previewText) return ''
-    return ansiToHtml(preview, getTerminalTheme(terminalThemeId))
-  }, [preview, terminalThemeId, session.previewText])
+    return ansiToHtml(preview, terminalTheme)
+  }, [preview, terminalTheme, session.previewText])
 
   const handleSendInput = async () => {
     if (input.trim()) {
@@ -486,14 +492,22 @@ function SessionCardImpl(props: SessionCardProps) {
             minHeight: 126,
             height: 16 + previewLineCount * 22,
             padding: '10px 12px',
-            background: 'rgba(0, 0, 0, 0.25)',
+            // 背景跟随终端主题：预览区视觉与全屏终端保持一致
+            background: themeBg,
+            // CSS 变量供 ::after 底部淡出遮罩使用（渐变到主题背景，而非固定黑色）
+            ['--preview-bg' as any]: themeBg,
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: 11,
             lineHeight: 1.6,
-            color: 'var(--ant-color-text)',
+            // 前景跟随终端主题：未带 SGR 的纯文本用主题前景色
+            color: themeFg,
             cursor: 'text',
             userSelect: 'text',
-            overflow: 'hidden',
+            // 等宽不折行 + 横向滚动：让按真实终端宽度（可能远宽于卡片）排版的
+            // TUI 内容（如 Claude Code 的 120 列分割线）保持原始列布局，不错位、不折行，
+            // 超出部分横向滚动查看。纵向仍隐藏（只显最后 N 行，不纵向滚动）。
+            overflowX: 'auto',
+            overflowY: 'hidden',
             borderTop: '1px solid var(--ant-color-border)',
             borderBottom: '1px solid var(--ant-color-border)',
             position: 'relative',
@@ -505,12 +519,14 @@ function SessionCardImpl(props: SessionCardProps) {
         >
           {session.previewText ? (
             <pre
-              className="whitespace-pre-wrap m-0"
-              style={{ pointerEvents: 'none' }}
+              className="whitespace-pre m-0"
+              // whitespace-pre（非 -wrap）：保持终端原始列布局，等宽字体下列严格对齐，
+              // 超宽内容不折行、不错位，由外层容器 overflow-x:auto 提供横向滚动。
+              // 不再设 pointerEvents:none —— 此前导致预览文本完全无法选中。
               dangerouslySetInnerHTML={{ __html: previewHtml }}
             />
           ) : (
-            <pre className="whitespace-pre-wrap m-0" style={{ pointerEvents: 'none' }}>等待输出...</pre>
+            <pre className="whitespace-pre m-0" style={{ color: themeFg, opacity: 0.4 }}>等待输出...</pre>
           )}
           {/* 悬浮的「全屏」入口按钮：默认隐藏，hover 时显示，避免抢占文本选择 */}
           <Tooltip title="双击或点击全屏查看">

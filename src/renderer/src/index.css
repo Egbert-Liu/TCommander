@@ -172,7 +172,8 @@ body {
   transform: translateY(-1px);
 }
 .session-card:hover .session-card-preview {
-  background: var(--ant-color-fill-quaternary) !important;
+  /* 预览区背景始终跟随终端主题（由组件内联 background 注入），
+     不再用 !important 覆盖 —— 否则深/亮色终端主题下预览色会被强行统一，与全屏终端不一致。 */
 }
 /* 状态胶囊 Pill：active 选中态放大 + 背景色加深 + 微阴影 */
 .status-pill {
@@ -207,26 +208,37 @@ body {
    保留 max-height 上限仅用于限制卡片最大高度（防止意外过长）。 */
 .session-card-preview {
   max-height: 600px;
-  /* 卡片预览区：用户反馈「滚动条丑」，按需求统一隐藏。
-     保留内容自动换行（pre 已设 whitespace-pre-wrap） */
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  overflow: hidden;
+  /* 等宽不折行 + 横向滚动：横向 overflow 由组件内联注入（overflowX:auto/overflowY:hidden），
+     让按真实终端宽度排版的 TUI 内容保持原始列布局，超宽部分横向滚动查看，不再折行错位。
+     Firefox：细滚动条，半透明。 */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(128, 128, 128, 0.35) transparent;
   position: relative;
   transition: background 0.2s ease;
 }
+/* WebKit（Chromium / Electron）自定义滚动条：细(6px)、半透明、圆角，精致不抢眼。
+   既保留滚动能力（解决超宽终端内容错位），又避免此前「默认滚动条太丑」的问题。 */
 .session-card-preview::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
+  width: 6px;
+  height: 6px;
+}
+.session-card-preview::-webkit-scrollbar-track {
+  background: transparent;
+}
+.session-card-preview::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.35);
+  border-radius: 3px;
+}
+.session-card-preview::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.55);
 }
 
 /* hover 卡片时显示预览区右上角的「全屏」按钮 */
 .session-card:hover .session-card-preview-expand {
   opacity: 1 !important;
 }
-/* 预览区底部淡出遮罩：与深色背景 rgba(0,0,0,0.25) 协调，
-   渐变到接近不透明黑，让「被截断」感更柔和。 */
+/* 预览区底部淡出遮罩：渐变到终端主题背景色（由预览容器内联 --preview-bg 注入），
+   使深色/亮色主题下都能自然过渡，不再固定为黑色。 */
 .session-card-preview::after {
   content: '';
   position: absolute;
@@ -238,7 +250,7 @@ body {
   background: linear-gradient(
     to bottom,
     transparent,
-    rgba(0, 0, 0, 0.32)
+    var(--preview-bg, rgba(0, 0, 0, 0.32))
   );
 }
 
