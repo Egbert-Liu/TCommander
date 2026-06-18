@@ -84,10 +84,20 @@ export default function NewSessionDialog({ open, onClose, resetSession }: NewSes
 
       await window.electronAPI.closeSession(resetSession.id)
 
-      const session = await createSessionFromConfig({
-        ...buildInput(values),
-        quickActions: resetSession.quickActions,
-      })
+      // SSH 重连：若用户未重新输入密码，复用原有 sshConfig（含 secret 引用）
+      const input =
+        values.connectionType === 'ssh' && !values.password && !values.passphrase
+          ? {
+              ...buildInput(values),
+              existingSshConfig: resetSession.sshConfig,
+              quickActions: resetSession.quickActions,
+            }
+          : {
+              ...buildInput(values),
+              quickActions: resetSession.quickActions,
+            }
+
+      const session = await createSessionFromConfig(input)
 
       if (!session) {
         message.error('重置会话失败，请重试')
