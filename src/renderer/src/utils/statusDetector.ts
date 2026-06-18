@@ -170,6 +170,23 @@ export interface DetectResult {
   matched: boolean
 }
 
+/**
+ * 从 raw 输出中截取尾部「完整行」片段，用于状态检测与预览清洗。
+ *
+ * 为什么需要它：cleanTerminalOutputKeepColor / detectStatusWithRules 都是逐行处理的，
+ * 但每次 flush 都对整个 history（最多 400 行/512KB）全量重算，会话越长越慢。
+ * 而状态规则只看最后 8 行、预览也只需尾部几行，所以只需截取尾部即可。
+ *
+ * 截取时保证从「换行符之后」开始，避免第一行被截断导致 \\r 覆盖处理错误。
+ */
+export function tailLines(raw: string, maxBytes: number = 16 * 1024): string {
+  if (raw.length <= maxBytes) return raw
+  let start = raw.length - maxBytes
+  const nl = raw.indexOf('\n', start)
+  if (nl >= 0 && nl < raw.length - 1) start = nl + 1
+  return raw.slice(start)
+}
+
 export function detectStatusWithRules(
   rawOutput: string,
   rules: TriggerRule[]

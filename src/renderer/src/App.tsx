@@ -14,7 +14,7 @@ import RulesDialog from './components/RulesDialog'
 import EmptyState from './components/EmptyState'
 import LoadingMask from './components/LoadingMask'
 import CloseConfirmDialog from './components/CloseConfirmDialog'
-import { cleanTerminalOutputKeepColor, detectStatusWithRules, truncateHistory, hasStatus, IDLE_THRESHOLD_MS, statusPriority } from './utils/statusDetector'
+import { cleanTerminalOutputKeepColor, detectStatusWithRules, truncateHistory, tailLines, hasStatus, IDLE_THRESHOLD_MS, statusPriority } from './utils/statusDetector'
 import { STATUS_COLORS } from './utils/statusColors'
 import { createSessionFromConfig } from './utils/sessionActions'
 
@@ -163,7 +163,12 @@ function App() {
 
   const pendingBufferRef = useRef<Record<string, string[]>>({})
   const batchQueueRef = useRef<Record<string, string[]>>({})
-  const batchTimerRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  // 用 requestAnimationFrame 节流替代 setTimeout+clearTimeout。
+  // 旧实现每来一个 chunk 都 clearTimeout 重设 timer，导致连续输出流中 flush 被无限推迟，
+  // 表现为「按键后预览迟迟不更新」。rAF 在下一帧绘制前统一 flush 累积 chunk：
+  //   - 首字节延迟 ≤ 1 帧(~16ms)，且不会被后续 chunk 推迟
+  //   - 同一帧内多个 chunk 自动合并为一次 flush
+  const rafIdRef = useRef<Record<string, number>>({})
   // 渲染进程批队列字节上限：每会话 128 KB；超过则从头丢弃旧块
   const BATCH_QUEUE_BYTE_LIMIT = 128 * 1024
 
@@ -192,8 +197,12 @@ function App() {
     const rawHistory = [...session.history, ...chunks]
     const newHistory = truncateHistory(rawHistory)
     const fullRaw = newHistory.join('')
-    const cleanText = cleanTerminalOutputKeepColor(fullRaw)
-    const detectResult = detectStatusWithRules(fullRaw, state.rules)
+    // 性能优化：状态检测与预览清洗都只需尾部内容。
+    // cleanTerminalOutputKeepColor / detectStatusWithRules 均为逐行处理，
+    // 截取尾部 16KB 完整行即可，避免对整个 512KB history 全量重算（会话越长延迟越高）。
+    const tailRaw = tailLines(fullRaw, 16 * 1024)
+    const cleanText = cleanTerminalOutputKeepColor(tailRaw)
+    const detectResult = detectStatusWithRules(tailRaw, state.rules)
 
     if (detectResult.matched) {
       // 命中规则：应用新状态（可能是 error/needs-confirm/needs-input）
@@ -248,19 +257,22 @@ function App() {
         }
       }
 
-      if (batchTimerRef.current[sessionId]) {
-        clearTimeout(batchTimerRef.current[sessionId])
+      if (rafIdRef.current[sessionId] != null) {
+        // 本帧已调度过 flush，后续 chunk 累积进 queue，本帧结束前一并 flush
+        return
       }
-      batchTimerRef.current[sessionId] = setTimeout(() => {
+      rafIdRef.current[sessionId] = requestAnimationFrame(() => {
+        delete rafIdRef.current[sessionId]
         flushSession(sessionId)
-      }, 16)
+      })
     }
 
     const handleExit = (sessionId: string, exitCode: number) => {
-      const timer = batchTimerRef.current[sessionId]
-      if (timer) {
-        clearTimeout(timer)
-        delete batchTimerRef.current[sessionId]
+      // 取消可能 pending 的 rAF flush：进程已退出，handleExit 自己做最终 flush
+      const rafId = rafIdRef.current[sessionId]
+      if (rafId != null) {
+        cancelAnimationFrame(rafId)
+        delete rafIdRef.current[sessionId]
       }
 
       const state = useAppStore.getState()
@@ -276,7 +288,8 @@ function App() {
         const exitMsg = `\r\n\x1b[33m[进程已退出，退出码: ${exitCode}]\x1b[0m\r\n`
         const newHistory = [...session.history, ...allChunks, exitMsg]
         const fullRaw = newHistory.join('')
-        const cleanText = cleanTerminalOutputKeepColor(fullRaw)
+        const tailRaw = tailLines(fullRaw, 16 * 1024)
+        const cleanText = cleanTerminalOutputKeepColor(tailRaw)
 
         state.updateSession(sessionId, {
           history: newHistory,
@@ -295,26 +308,26 @@ function App() {
     return () => {
       unsubOutput()
       unsubExit()
-      Object.values(batchTimerRef.current).forEach(t => clearTimeout(t))
-      batchTimerRef.current = {}
+      Object.values(rafIdRef.current).forEach(id => cancelAnimationFrame(id))
+      rafIdRef.current = {}
       batchQueueRef.current = {}
       pendingBufferRef.current = {}
     }
   }, [flushSession])
 
   // ========== 修复: 进入全屏时立即 flush 当前会话的批处理数据 ==========
-  // 确保 FullscreenTerminal 的 replay 包含最新的数据，不会丢失最近 30ms 的输出
+  // 确保 FullscreenTerminal 的 replay 包含最新的数据，不会丢失未 flush 的输出
   const isFs = useAppStore((s) => s.isFullscreen)
   const activeId = useAppStore((s) => s.activeSessionId)
   useEffect(() => {
     if (isFs && activeId) {
-      // 清除当前会话的 batch timer，立即 flush
-      const timer = batchTimerRef.current[activeId]
-      if (timer) {
-        clearTimeout(timer)
-        delete batchTimerRef.current[activeId]
+      // 取消可能 pending 的 rAF，改为立即 flush，保证全屏 replay 不丢数据
+      const rafId = rafIdRef.current[activeId]
+      if (rafId != null) {
+        cancelAnimationFrame(rafId)
+        delete rafIdRef.current[activeId]
       }
-      // 直接调用统一的 flushSession，无需再重复 ~50 行实现
+      // 直接调用统一的 flushSession，无需再重复实现
       flushSession(activeId)
     }
   }, [isFs, activeId, flushSession])
