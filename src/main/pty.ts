@@ -1,5 +1,6 @@
 import type { SessionConfig, TerminalBackend } from './types'
 import { LocalPtyBackend } from './backends/localPty'
+import { SshBackend } from './backends/sshBackend'
 
 interface PtySession {
   id: string
@@ -41,27 +42,37 @@ export function createPtyManager() {
   /**
    * 按 config.kind 选择后端实现。
    * - local：LocalPtyBackend（包 node-pty，行为与重构前完全一致）
-   * - ssh：SshBackend（Task 5/6 实现，本 Task 先抛错占位）
+   * - ssh：SshBackend（包 ssh2，异步连接；start() 由 createSession 调用）
+   *
+   * 返回 backend 与（仅 ssh）异步启动函数。local 构造即就绪，无需启动。
    */
-  function createBackend(config: SessionConfig): TerminalBackend {
+  function createBackend(config: SessionConfig): {
+    backend: TerminalBackend
+    starter?: () => Promise<void>
+  } {
     const kind = config.kind || 'local'
     if (kind === 'ssh') {
-      // TODO(Task 5/6): return new SshBackend(config.ssh!, ipcBridge)
-      throw new Error('SSH backend not implemented yet')
+      if (!config.ssh) {
+        throw new Error('SSH 会话缺少 ssh 配置')
+      }
+      const ssh = new SshBackend(config.ssh)
+      return { backend: ssh, starter: () => ssh.start() }
     }
-    return new LocalPtyBackend({
-      terminalType: config.terminalType,
-      cwd: config.cwd,
-      cols: config.cols,
-      rows: config.rows,
-    })
+    return {
+      backend: new LocalPtyBackend({
+        terminalType: config.terminalType,
+        cwd: config.cwd,
+        cols: config.cols,
+        rows: config.rows,
+      }),
+    }
   }
 
   function createSession(config: SessionConfig): string {
     if (disposed) return ''
 
     const id = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    const backend = createBackend(config)
+    const { backend, starter } = createBackend(config)
 
     const session: PtySession = {
       id,
@@ -87,6 +98,20 @@ export function createPtyManager() {
     })
 
     sessions.set(id, session)
+
+    // SSH 异步连接：失败时推一条用户可读的错误文本到预览，再触发 exit
+    // （保持 createSession 同步返回 id，避免 invoke 改 async 的连锁改动）
+    if (starter) {
+      starter().catch((err) => {
+        if (disposed) return
+        const msg = `\r\n[SSH 连接失败] ${(err as Error).message || err}\r\n`
+        session.ringBuf = appendToRing(session.ringBuf, msg, session.ringBufMax)
+        outputListeners.forEach((listener) => listener(id, msg))
+        session.destroyed = true
+        sessions.delete(id)
+        exitListeners.forEach((listener) => listener(id, 1))
+      })
+    }
 
     if (config.initialCommand) {
       let sent = false
