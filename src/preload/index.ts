@@ -31,6 +31,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   storageGet: (key: string) => ipcRenderer.invoke('storage-get', key),
   storageSet: (key: string, value: any) => ipcRenderer.invoke('storage-set', key, value),
+
+  // 敏感信息加密存储（SSH 密码 / 私钥口令）
+  secretGet: (key: string) => ipcRenderer.invoke('secret-get', key),
+  secretSet: (key: string, value: string) => ipcRenderer.invoke('secret-set', key, value),
+  secretRemove: (key: string) => ipcRenderer.invoke('secret-remove', key),
   setTitleBarOverlay: (opts: { color: string; symbolColor: string }) =>
     ipcRenderer.invoke('set-title-bar-overlay', opts),
 

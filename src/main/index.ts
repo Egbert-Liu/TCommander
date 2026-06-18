@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, Menu } from 'electron'
 import path from 'path'
 import { createPtyManager } from './pty'
 import { createStorageManager } from './storage'
+import { secretStorage } from './secretStorage'
 
 const ptyManager = createPtyManager()
 const storageManager = createStorageManager()
@@ -137,6 +138,11 @@ app.whenReady().then(() => {
   
   ipcMain.handle('storage-get', (_, key) => storageManager.get(key))
   ipcMain.handle('storage-set', (_, key, value) => storageManager.set(key, value))
+
+  // 敏感信息（SSH 密码 / 私钥口令）加密封装：底层 safeStorage + electron-store
+  ipcMain.handle('secret-set', (_, key, value) => secretStorage.set(key, value))
+  ipcMain.handle('secret-get', (_, key) => secretStorage.get(key))
+  ipcMain.handle('secret-remove', (_, key) => secretStorage.remove(key))
 
   // 窗口控制 IPC
   ipcMain.handle('window-minimize', () => {
