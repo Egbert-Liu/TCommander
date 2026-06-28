@@ -170,12 +170,13 @@ function App() {
 
   const pendingBufferRef = useRef<Record<string, string[]>>({})
   const batchQueueRef = useRef<Record<string, string[]>>({})
-  // 用 requestAnimationFrame 节流替代 setTimeout+clearTimeout。
-  // 旧实现每来一个 chunk 都 clearTimeout 重设 timer，导致连续输出流中 flush 被无限推迟，
-  // 表现为「按键后预览迟迟不更新」。rAF 在下一帧绘制前统一 flush 累积 chunk：
-  //   - 首字节延迟 ≤ 1 帧(~16ms)，且不会被后续 chunk 推迟
-  //   - 同一帧内多个 chunk 自动合并为一次 flush
-  const rafIdRef = useRef<Record<string, number>>({})
+  // 优化方案：前缘立即flush + 后缘16ms节流（一帧）
+  // - 前缘：首个chunk立即flush，确保用户操作即时响应（0ms延迟）
+  // - 后缘：连续输出时，每16ms（一帧）flush一次，避免过度渲染
+  // - 相比之前的30ms，16ms更接近60fps，视觉更流畅
+  const lastFlushTimeRef = useRef<Record<string, number>>({})
+  const trailingTimerRef = useRef<Record<string, NodeJS.Timeout>>({})
+  const FLUSH_INTERVAL = 16 // 最大 flush 间隔 16ms（一帧）
   // 渲染进程批队列字节上限：每会话 128 KB；超过则从头丢弃旧块
   const BATCH_QUEUE_BYTE_LIMIT = 128 * 1024
 
@@ -264,22 +265,33 @@ function App() {
         }
       }
 
-      if (rafIdRef.current[sessionId] != null) {
-        // 本帧已调度过 flush，后续 chunk 累积进 queue，本帧结束前一并 flush
-        return
-      }
-      rafIdRef.current[sessionId] = requestAnimationFrame(() => {
-        delete rafIdRef.current[sessionId]
+      // 双定时器策略：前缘立即 flush + 后缘 30ms 节流
+      const now = Date.now()
+      const lastFlush = lastFlushTimeRef.current[sessionId] || 0
+      const timeSinceLastFlush = now - lastFlush
+
+      if (timeSinceLastFlush >= FLUSH_INTERVAL) {
+        // 前缘：距离上次 flush 已超过间隔，立即 flush
         flushSession(sessionId)
-      })
+        lastFlushTimeRef.current[sessionId] = now
+      } else {
+        // 后缘：设置定时器确保在间隔结束时 flush
+        if (trailingTimerRef.current[sessionId] == null) {
+          trailingTimerRef.current[sessionId] = setTimeout(() => {
+            delete trailingTimerRef.current[sessionId]
+            flushSession(sessionId)
+            lastFlushTimeRef.current[sessionId] = Date.now()
+          }, FLUSH_INTERVAL - timeSinceLastFlush)
+        }
+      }
     }
 
     const handleExit = (sessionId: string, exitCode: number) => {
-      // 取消可能 pending 的 rAF flush：进程已退出，handleExit 自己做最终 flush
-      const rafId = rafIdRef.current[sessionId]
-      if (rafId != null) {
-        cancelAnimationFrame(rafId)
-        delete rafIdRef.current[sessionId]
+      // 取消可能 pending 的后缘定时器 flush：进程已退出，handleExit 自己做最终 flush
+      const trailingTimer = trailingTimerRef.current[sessionId]
+      if (trailingTimer != null) {
+        clearTimeout(trailingTimer)
+        delete trailingTimerRef.current[sessionId]
       }
 
       const state = useAppStore.getState()
@@ -319,8 +331,9 @@ function App() {
       unsubOutput()
       unsubExit()
       unsubConnStatus()
-      Object.values(rafIdRef.current).forEach(id => cancelAnimationFrame(id))
-      rafIdRef.current = {}
+      Object.values(trailingTimerRef.current).forEach(id => clearTimeout(id))
+      trailingTimerRef.current = {}
+      lastFlushTimeRef.current = {}
       batchQueueRef.current = {}
       pendingBufferRef.current = {}
     }
@@ -332,11 +345,11 @@ function App() {
   const activeId = useAppStore((s) => s.activeSessionId)
   useEffect(() => {
     if (isFs && activeId) {
-      // 取消可能 pending 的 rAF，改为立即 flush，保证全屏 replay 不丢数据
-      const rafId = rafIdRef.current[activeId]
-      if (rafId != null) {
-        cancelAnimationFrame(rafId)
-        delete rafIdRef.current[activeId]
+      // 取消可能 pending 的后缘定时器 flush，改为立即 flush，保证全屏 replay 不丢数据
+      const trailingTimer = trailingTimerRef.current[activeId]
+      if (trailingTimer != null) {
+        clearTimeout(trailingTimer)
+        delete trailingTimerRef.current[activeId]
       }
       // 直接调用统一的 flushSession，无需再重复实现
       flushSession(activeId)
@@ -670,7 +683,7 @@ function App() {
             )}
 
             {filteredSessions.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
+              <div className="grid gap-5" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(500px, 1fr))' }}>
                 {filteredSessions.map((session, index) => (
                   <div key={session.id} className="animate-fade-in" style={{ animationDelay: `${index * 50}ms` }}>
                     <SessionCard

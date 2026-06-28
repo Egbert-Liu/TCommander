@@ -527,27 +527,25 @@ function SessionCardImpl(props: SessionCardProps) {
       <div
         className="session-card-preview"
           style={{
-            // 高度按行数自适应：每行 22px（更舒展，字号 11 行高 1.6 ≈ 17.6，按 22 给足）
-            // 上下 padding 16 = 16 + N * 22
-            // 5 行 = 126px, 10 行 = 236px, 15 行 = 346px, 20 行 = 456px
-            // 颜色加深：从 var(--ant-color-fill) 改为深灰底（与卡片容器形成层级感）
-            minHeight: 126,
-            height: 16 + previewLineCount * 22,
-            padding: '10px 12px',
+            // 高度按行数自适应：每行 16px（字号 11 行高 1.4 = 15.4，按 16 给足）
+            // 上下 padding 16 = 16 + N * 16
+            // 5 行 = 96px, 10 行 = 176px, 15 行 = 256px, 20 行 = 336px
+            minHeight: 96,
+            height: 16 + previewLineCount * 16,
+            padding: '8px 10px',
             // 背景跟随终端主题：预览区视觉与全屏终端保持一致
             background: themeBg,
             // CSS 变量供 ::after 底部淡出遮罩使用（渐变到主题背景，而非固定黑色）
             ['--preview-bg' as any]: themeBg,
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: 11,
-            lineHeight: 1.6,
+            lineHeight: 1.4,
             // 前景跟随终端主题：未带 SGR 的纯文本用主题前景色
             color: themeFg,
             cursor: 'text',
             userSelect: 'text',
-            // 等宽不折行 + 横向滚动：让按真实终端宽度（可能远宽于卡片）排版的
-            // TUI 内容（如 Claude Code 的 120 列分割线）保持原始列布局，不错位、不折行，
-            // 超出部分横向滚动查看。纵向仍隐藏（只显最后 N 行，不纵向滚动）。
+            // 横向滚动 + 保持格式：超宽终端内容不自动换行，保持原始格式
+            // 横向滚动更符合终端用户的阅读习惯，避免自动换行导致的视觉混乱
             overflowX: 'auto',
             overflowY: 'hidden',
             borderTop: '1px solid var(--ant-color-border)',
@@ -562,9 +560,8 @@ function SessionCardImpl(props: SessionCardProps) {
           {session.previewText ? (
             <pre
               className="whitespace-pre m-0"
-              // whitespace-pre（非 -wrap）：保持终端原始列布局，等宽字体下列严格对齐，
-              // 超宽内容不折行、不错位，由外层容器 overflow-x:auto 提供横向滚动。
-              // 不再设 pointerEvents:none —— 此前导致预览文本完全无法选中。
+              // whitespace-pre：保持空白符，不自动换行
+              // 让终端内容保持原始格式，超宽内容通过横向滚动查看
               dangerouslySetInnerHTML={{ __html: previewHtml }}
             />
           ) : (

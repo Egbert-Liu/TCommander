@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Modal, Form, Input, Select, Button, Space, Checkbox, Divider, Popconfirm, message } from 'antd'
 import { CodeFilled, SaveFilled, ReloadOutlined, ExclamationCircleFilled } from '@ant-design/icons'
 import { useAppStore } from '../store'
 import { Session, Preset } from '../types'
 import { createSessionFromConfig } from '../utils/sessionActions'
 import SessionConfigFields from './SessionConfigFields'
+import { sortPresets } from '../utils/presetSort'
 
 interface NewSessionDialogProps {
   open: boolean
@@ -23,6 +24,9 @@ export default function NewSessionDialog({ open, onClose, resetSession }: NewSes
   const [presetName, setPresetName] = useState('')
 
   const isResetMode = !!resetSession
+
+  // 按优先级和使用次数排序
+  const sortedPresets = useMemo(() => sortPresets(presets), [presets])
 
   useEffect(() => {
     if (open && resetSession) {
@@ -257,7 +261,7 @@ export default function NewSessionDialog({ open, onClose, resetSession }: NewSes
           </div>
         )}
 
-        {!isResetMode && presets.length > 0 && (
+        {!isResetMode && sortedPresets.length > 0 && (
           <div className="mb-4">
             <div style={{ color: 'var(--ant-color-text-secondary)', fontSize: 12, marginBottom: 6, fontWeight: 500 }}>
               从预设选择
@@ -268,7 +272,7 @@ export default function NewSessionDialog({ open, onClose, resetSession }: NewSes
               allowClear
               className="w-full"
             >
-              {presets.map(preset => (
+              {sortedPresets.map(preset => (
                 <Select.Option key={preset.id} value={preset.id}>
                   {preset.kind === 'ssh' ? '🔐 ' : ''}{preset.name}
                 </Select.Option>

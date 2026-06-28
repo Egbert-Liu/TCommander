@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TCommander 预览方案对比</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 40px;
+      line-height: 1.6;
+    }
+    
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #61dafb;
+      font-size: 32px;
+    }
+    
+    .intro {
+      text-align: center;
+      margin-bottom: 50px;
+      color: #888;
+      font-size: 14px;
+    }
+    
+    .option {
+      margin-bottom: 80px;
+      background: #252526;
+      border-radius: 12px;
+      padding: 30px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    }
+    
+    .option-header {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #333;
+    }
+    
+    .option-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: #61dafb;
+    }
+    
+    .option-badge {
+      background: #0e639c;
+      color: white;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    
+    .option-desc {
+      color: #aaa;
+      font-size: 14px;
+      margin-bottom: 25px;
+      line-height: 1.8;
+    }
+    
+    .pros-cons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 25px;
+    }
+    
+    .pros, .cons {
+      padding: 15px;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    
+    .pros {
+      background: rgba(35, 134, 54, 0.1);
+      border: 1px solid rgba(35, 134, 54, 0.3);
+    }
+    
+    .cons {
+      background: rgba(215, 58, 73, 0.1);
+      border: 1px solid rgba(215, 58, 73, 0.3);
+    }
+    
+    .pros h4, .cons h4 {
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+    
+    .pros h4 { color: #3fb950; }
+    .cons h4 { color: #f85149; }
+    
+    .pros ul, .cons ul {
+      list-style: none;
+      padding-left: 0;
+    }
+    
+    .pros li::before {
+      content: "✓ ";
+      color: #3fb950;
+      font-weight: bold;
+      margin-right: 8px;
+    }
+    
+    .cons li::before {
+      content: "✗ ";
+      color: #f85149;
+      font-weight: bold;
+      margin-right: 8px;
+    }
+    
+    .preview-container {
+      background: #1e1e1e;
+      border: 1px solid #333;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    
+    .preview-header {
+      background: #2d2d30;
+      padding: 10px 15px;
+      border-bottom: 1px solid #333;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+    }
+    
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #3fb950;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    .preview-content {
+      font-family: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #d4d4d4;
+      background: #1e1e1e;
+    }
+    
+    /* 方案 A: 垂直滚动 + 自动换行 */
+    .option-a .preview-content {
+      padding: 15px;
+      max-height: 240px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    
+    /* 方案 B: 水平滚动 + 不换行 */
+    .option-b .preview-content {
+      padding: 15px;
+      max-height: 240px;
+      overflow-y: auto;
+      overflow-x: auto;
+      white-space: pre;
+      word-wrap: normal;
+    }
+    
+    /* 方案 C: 固定高度 + 底部淡出 */
+    .option-c .preview-wrapper {
+      position: relative;
+      max-height: 240px;
+      overflow: hidden;
+    }
+    
+    .option-c .preview-content {
+      padding: 15px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    
+    .option-c .preview-wrapper::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 60px;
+      background: linear-gradient(to bottom, transparent, #1e1e1e);
+      pointer-events: none;
+    }
+    
+    /* 方案 D: 智能混合模式 */
+    .option-d .preview-content {
+      padding: 15px;
+      max-height: 240px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    
+    .option-d .preview-content .long-line {
+      display: block;
+      overflow-x: auto;
+      white-space: pre;
+      background: rgba(255, 255, 255, 0.02);
+      border-left: 2px solid #0e639c;
+      padding-left: 10px;
+      margin: 5px 0;
+    }
+    
+    /* ANSI 颜色示例 */
+    .ansi-green { color: #4ec9b0; }
+    .ansi-yellow { color: #dcdcaa; }
+    .ansi-blue { color: #569cd6; }
+    .ansi-red { color: #f48771; }
+    .ansi-magenta { color: #c586c0; }
+    .ansi-cyan { color: #9cdcfe; }
+    .ansi-bold { font-weight: bold; }
+    .ansi-dim { opacity: 0.6; }
+    
+    .scrollbar-demo {
+      scrollbar-width: thin;
+      scrollbar-color: #424242 #1e1e1e;
+    }
+    
+    .scrollbar-demo::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    
+    .scrollbar-demo::-webkit-scrollbar-track {
+      background: #1e1e1e;
+    }
+    
+    .scrollbar-demo::-webkit-scrollbar-thumb {
+      background: #424242;
+      border-radius: 4px;
+    }
+    
+    .scrollbar-demo::-webkit-scrollbar-thumb:hover {
+      background: #4a4a4a;
+    }
+    
+    .recommendation {
+      background: linear-gradient(135deg, #0e639c 0%, #1177bb 100%);
+      padding: 20px;
+      border-radius: 8px;
+      margin-top: 20px;
+      font-size: 14px;
+    }
+    
+    .recommendation h4 {
+      color: white;
+      margin-bottom: 10px;
+      font-size: 16px;
+    }
+    
+    .recommendation p {
+      color: rgba(255, 255, 255, 0.9);
+      line-height: 1.6;
+    }
+    
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 30px 0;
+      font-size: 13px;
+    }
+    
+    .comparison-table th {
+      background: #2d2d30;
+      padding: 12px;
+      text-align: left;
+      border: 1px solid #333;
+      color: #61dafb;
+    }
+    
+    .comparison-table td {
+      padding: 12px;
+      border: 1px solid #333;
+    }
+    
+    .comparison-table tr:nth-child(even) {
+      background: rgba(255, 255, 255, 0.02);
+    }
+    
+    .rating {
+      display: inline-block;
+      color: #f0c674;
+    }
+  </style>
+</head>
+<body>
+  <h1>🎨 TCommander 卡片预览方案对比</h1>
+  <p class="intro">基于业界主流终端工具（Wave Terminal、Tabby、VS Code、Hyper）的设计模式，提供 4 种预览方案供选择</p>
+  
+  <!-- 方案 A -->
+  <div class="option option-a">
+    <div class="option-header">
+      <div class="option-title">方案 A: 垂直滚动 + 自动换行</div>
+      <div class="option-badge">推荐</div>
+    </div>
+    <div class="option-desc">
+      <strong>设计理念：</strong>最符合用户阅读习惯的方式，长行自动换行，垂直滚动查看更多内容。<br>
+      <strong>参考产品：</strong>Wave Terminal、Hyper Terminal、VS Code 集成终端
+    </div>
+    
+    <div class="pros-cons">
+      <div class="pros">
+        <h4>优势</h4>
+        <ul>
+          <li>符合自然阅读习惯，无需横向滚动</li>
+          <li>内容利用率高，充分利用卡片宽度</li>
+          <li>业界主流方案，用户接受度高</li>
+          <li>适合查看长命令输出和日志</li>
+        </ul>
+      </div>
+      <div class="cons">
+        <h4>劣势</h4>
+        <ul>
+          <li>长命令换行后可能影响可读性</li>
+          <li>无法精确保持终端原始格式</li>
+          <li>复制粘贴时可能包含多余换行</li>
+        </ul>
+      </div>
+    </div>
+    
+    <div class="preview-container">
+      <div class="preview-header">
+        <div class="status-dot"></div>
+        <span>PowerShell - 运行中</span>
+      </div>
+      <div class="preview-content scrollbar-demo">
+<span class="ansi-green">PS C:\Projects\tcommander&gt;</span> npm run build
+
+<span class="ansi-yellow">> tcommander@0.8.0 build</span>
+<span class="ansi-yellow">> vite build</span>
+
+<span class="ansi-cyan">vite</span> <span class="ansi-dim">v5.1.0</span> <span class="ansi-green">building for production...</span>
+<span class="ansi-blue">✓</span> <span class="ansi-bold">1247 modules transformed.</span>
+<span class="ansi-green">dist/index.html</span>                   <span class="ansi-cyan">0.46 kB</span> │ <span class="ansi-dim">gzip: 0.30 kB</span>
+<span class="ansi-green">dist/assets/index-D1X8K9FZ.css</span>     <span class="ansi-cyan">23.45 kB</span> │ <span class="ansi-dim">gzip: 5.67 kB</span>
+<span class="ansi-green">dist/assets/index-A7B3C2D1.js</span>     <span class="ansi-cyan">456.78 kB</span> │ <span class="ansi-dim">gzip: 145.23 kB</span>
+<span class="ansi-green bold">✓ built in 3.45s</span>
+
+<span class="ansi-green">PS C:\Projects\tcommander&gt;</span> <span class="ansi-bold">_</span>
+      </div>
+    </div>
+    
+    <div class="recommendation">
+      <h4>💡 适用场景</h4>
+      <p>适合大多数使用场景，特别是查看构建日志、命令输出、错误信息等。用户无需横向滚动即可看到完整内容，阅读体验最佳。</p>
+    </div>
+  </div>
+  
+  <!-- 方案 B -->
+  <div class="option option-b">
+    <div class="option-header">
+      <div class="option-title">方案 B: 水平滚动 + 不换行</div>
+      <div class="option-badge">当前方案</div>
+    </div>
+    <div class="option-desc">
+      <strong>设计理念：</strong>完全保持终端原始格式，长行不换行，通过水平滚动查看。<br>
+      <strong>参考产品：</strong>传统终端模拟器、tmux 预览、纯文本编辑器
+    </div>
+    
+    <div class="pros-cons">
+      <div class="pros">
+        <h4>优势</h4>
+        <ul>
+          <li>完美保持终端原始格式</li>
+          <li>长命令不会被截断或换行</li>
+          <li>复制粘贴内容准确无误</li>
+          <li>适合查看表格、对齐数据</li>
+        </ul>
+      </div>
+      <div class="cons">
+        <h4>劣势</h4>
+        <ul>
+          <li>需要横向滚动，操作不便</li>
+          <li>宽内容可能被截断看不到</li>
+          <li>不符合常规阅读习惯</li>
+          <li>小屏幕下体验较差</li>
+        </ul>
+      </div>
+    </div>
+    
+    <div class="preview-container">
+      <div class="preview-header">
+        <div class="status-dot"></div>
+        <span>PowerShell - 运行中</span>
+      </div>
+      <div class="preview-content scrollbar-demo">
+<span class="ansi-green">PS C:\Projects\tcommander&gt;</span> npm run build
+
+<span class="ansi-yellow">> tcommander@0.8.0 build</span>
+<span class="ansi-yellow">> vite build</span>
+
+<span class="ansi-cyan">vite</span> <span class="ansi-dim">v5.1.0</span> <span class="ansi-green">building for production...</span>
+<span class="ansi-blue">✓</span> <span class="ansi-bold">1247 modules transformed.</span>
+<span class="ansi-green">dist/index.html</span>                   <span class="ansi-cyan">0.46 kB</span> │ <span class="ansi-dim">gzip: 0.30 kB</span>
+<span class="ansi-green">dist/assets/index-D1X8K9FZ.css</span>     <span class="ansi-cyan">23.45 kB</span> │ <span class="ansi-dim">gzip: 5.67 kB</span>
+<span class="ansi-green">dist/assets/index-A7B3C2D1.js</span>     <span class="ansi-cyan">456.78 kB</span> │ <span class="ansi-dim">gzip: 145.23 kB</span>
+<span class="ansi-green bold">✓ built in 3.45s</span>
+
+<span class="ansi-green">PS C:\Projects\tcommander&gt;</span> Get-Process | Where-Object {$_.CPU -gt 100} | Select-Object Name, Id, CPU, WorkingSet64 | Format-Table -AutoSize
+
+<span class="ansi-green">PS C:\Projects\tcommander&gt;</span> <span class="ansi-bold">_</span>
+      </div>
+    </div>
+    
+    <div class="recommendation">
+      <h4>💡 适用场景</h4>
+      <p>适合需要精确保持终端格式的场景，如查看表格数据、长命令、对齐的输出等。但需要用户适应横向滚动。</p>
+    </div>
+  </div>
+  
+  <!-- 方案 C -->
+  <div class="option option-c">
+    <div class="option-header">
+      <div class="option-title">方案 C: 固定高度 + 底部淡出</div>
+      <div class="option-badge">视觉优先</div>
+    </div>
+    <div class="option-desc">
+      <strong>设计理念：</strong>固定预览区高度，底部使用渐变淡出效果，暗示还有更多内容。<br>
+      <strong>参考产品：</strong>macOS Terminal 预览、Slack 代码块、GitHub Gist
+    </div>
+    
+    <div class="pros-cons">
+      <div class="pros">
+        <h4>优势</h4>
+        <ul>
+          <li>卡片高度统一，布局整齐美观</li>
+          <li>淡出效果优雅，视觉体验好</li>
+          <li>自动换行，阅读舒适</li>
+          <li>适合快速浏览最新输出</li>
+        </ul>
+      </div>
+      <div class="cons">
+        <h4>劣势</h4>
+        <ul>
+          <li>无法看到完整历史内容</li>
+          <li>需要进入全屏才能查看完整输出</li>
+          <li>淡出区域可能遮挡内容</li>
+          <li>不适合需要回溯历史的场景</li>
+        </ul>
+      </div>
+    </div>
+    
+    <div class="preview-container">
+      <div class="preview-header">
+        <div class="status-dot"></div>
+        <span>PowerShell - 运行中</span>
+      </div>
+      <div class="preview-wrapper">
+        <div class="preview-content">
+<span class="ansi-green">PS C:\Projects\tcommander&gt;</span> npm run build
+
+<span class="ansi-yellow">> tcommander@0.8.0 build</span>
+<span class="ansi-yellow">> vite build</span>
+
+<span class="ansi-cyan">vite</span> <span class="ansi-dim">v5.1.0</span> <span class="ansi-green">building for production...</span>
+<span class="ansi-blue">✓</span> <span class="ansi-bold">1247 modules transformed.</span>
+<span class="ansi-green">dist/index.html</span>                   <span class="ansi-cyan">0.46 kB</span> │ <span class="ansi-dim">gzip: 0.30 kB</span>
+<span class="ansi-green">dist/assets/index-D1X8K9FZ.css</span>     <span class="ansi-cyan">23.45 kB</span> │ <span class="ansi-dim">gzip: 5.67 kB</span>
+<span class="ansi-green">dist/assets/index-A7B3C2D1.js</span>     <span class="ansi-cyan">456.78 kB</span> │ <span class="ansi-dim">gzip: 145.23 kB</span>
+<span class="ansi-green bold">✓ built in 3.45s</span>
+
+<span class="ansi-green">PS C:\Projects\tcommander&gt;</span> <span class="ansi-bold">_</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="recommendation">
+      <h4>💡 适用场景</h4>
+      <p>适合快速浏览最新输出的场景，视觉效果最佳。但需要频繁进入全屏查看完整内容，适合"快照式"预览。</p>
+    </div>
+  </div>
+  
+  <!-- 方案 D -->
+  <div class="option option-d">
+    <div class="option-header">
+      <div class="option-title">方案 D: 智能混合模式</div>
+      <div class="option-badge">创新方案</div>
+    </div>
+    <div class="option-desc">
+      <strong>设计理念：</strong>普通行自动换行，超长行（如表格、长命令）独立横向滚动。<br>
+      <strong>参考产品：</strong>现代代码编辑器（VS Code、WebStorm）的终端输出处理
+    </div>
+    
+    <div class="pros-cons">
+      <div class="pros">
+        <h4>优势</h4>
+        <ul>
+          <li>兼顾可读性和格式保持</li>
+          <li>普通内容自动换行，阅读舒适</li>
+          <li>超长行独立滚动，不影响整体布局</li>
+          <li>智能识别，用户体验最佳</li>
+        </ul>
+      </div>
+      <div class="cons">
+        <h4>劣势</h4>
+        <ul>
+          <li>实现复杂度较高</li>
+          <li>需要智能判断"长行"阈值</li>
+          <li>视觉风格不统一</li>
+          <li>可能增加渲染开销</li>
+        </ul>
+      </div>
+    </div>
+    
+    <div class="preview-container">
+      <div class="preview-header">
+        <div class="status-dot"></div>
+        <span>PowerShell - 运行中</span>
+      </div>
+      <div class="preview-content scrollbar-demo">
+<span class="ansi-green">PS C:\Projects\tcommander&gt;</span> npm run build
+
+<span class="ansi-yellow">> tcommander@0.8.0 build</span>
+<span class="ansi-yellow">> vite build</span>
+
+<span class="ansi-cyan">vite</span> <span class="ansi-dim">v5.1.0</span> <span class="ansi-green">building for production...</span>
+<span class="ansi-blue">✓</span> <span class="ansi-bold">1247 modules transformed.</span>
+<span class="ansi-green">dist/index.html</span>                   <span class="ansi-cyan">0.46 kB</span> │ <span class="ansi-dim">gzip: 0.30 kB</span>
+<span class="ansi-green">dist/assets/index-D1X8K9FZ.css</span>     <span class="ansi-cyan">23.45 kB</span> │ <span class="ansi-dim">gzip: 5.67 kB</span>
+<span class="ansi-green">dist/assets/index-A7B3C2D1.js</span>     <span class="ansi-cyan">456.78 kB</span> │ <span class="ansi-dim">gzip: 145.23 kB</span>
+<span class="ansi-green bold">✓ built in 3.45s</span>
+
+<span class="ansi-green">PS C:\Projects\tcommander&gt;</span> <span class="ansi-bold">_</span>
+      </div>
+    </div>
+    
+    <div class="recommendation">
+      <h4>💡 适用场景</h4>
+      <p>适合混合内容场景，既有普通日志输出，又有表格/长命令。智能平衡可读性和格式保持，但实现成本较高。</p>
+    </div>
+  </div>
+  
+  <!-- 对比表格 -->
+  <div class="option">
+    <div class="option-header">
+      <div class="option-title">📊 方案对比总结</div>
+    </div>
+    
+    <table class="comparison-table">
+      <thead>
+        <tr>
+          <th>评估维度</th>
+          <th>方案 A<br>垂直滚动</th>
+          <th>方案 B<br>水平滚动</th>
+          <th>方案 C<br>底部淡出</th>
+          <th>方案 D<br>智能混合</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>可读性</strong></td>
+          <td><span class="rating">★★★★★</span></td>
+          <td><span class="rating">★★★☆☆</span></td>
+          <td><span class="rating">★★★★☆</span></td>
+          <td><span class="rating">★★★★★</span></td>
+        </tr>
+        <tr>
+          <td><strong>格式保持</strong></td>
+          <td><span class="rating">★★★☆☆</span></td>
+          <td><span class="rating">★★★★★</span></td>
+          <td><span class="rating">★★★☆☆</span></td>
+          <td><span class="rating">★★★★☆</span></td>
+        </tr>
+        <tr>
+          <td><strong>视觉效果</strong></td>
+          <td><span class="rating">★★★★☆</span></td>
+          <td><span class="rating">★★★☆☆</span></td>
+          <td><span class="rating">★★★★★</span></td>
+          <td><span class="rating">★★★★☆</span></td>
+        </tr>
+        <tr>
+          <td><strong>实现难度</strong></td>
+          <td><span class="rating">★☆☆☆☆</span> 简单</td>
+          <td><span class="rating">★☆☆☆☆</span> 简单</td>
+          <td><span class="rating">★★☆☆☆</span> 中等</td>
+          <td><span class="rating">★★★★☆</span> 复杂</td>
+        </tr>
+        <tr>
+          <td><strong>用户接受度</strong></td>
+          <td><span class="rating">★★★★★</span></td>
+          <td><span class="rating">★★☆☆☆</span></td>
+          <td><span class="rating">★★★★☆</span></td>
+          <td><span class="rating">★★★★☆</span></td>
+        </tr>
+        <tr>
+          <td><strong>业界采用</strong></td>
+          <td>Wave, Hyper, VS Code</td>
+          <td>传统终端, tmux</td>
+          <td>macOS Terminal, Slack</td>
+          <td>现代编辑器</td>
+        </tr>
+      </tbody>
+    </table>
+    
+    <div class="recommendation">
+      <h4>🎯 最终建议</h4>
+      <p>
+        <strong>推荐方案 A（垂直滚动 + 自动换行）</strong>作为默认方案。<br><br>
+        <strong>理由：</strong><br>
+        1. 符合大多数用户的阅读习惯，无需横向滚动<br>
+        2. 业界主流方案（Wave Terminal、Hyper、VS Code 均采用）<br>
+        3. 实现简单，性能优秀<br>
+        4. 适合 TCommander 的多会话管理场景，快速浏览多个会话输出<br><br>
+        
+        <strong>备选方案：</strong><br>
+        - 如果用户强烈要求保持终端格式 → 方案 B<br>
+        - 如果追求极致视觉效果 → 方案 C<br>
+        - 如果愿意投入开发成本 → 方案 D<br><br>
+        
+        <strong>可优化点：</strong><br>
+        - 增加"复制原始格式"按钮，解决自动换行后的复制问题<br>
+        - 提供设置选项，允许用户切换不同预览模式<br>
+        - 卡片宽度建议调整到 600-640px，提供更舒适的阅读空间
+      </p>
+    </div>
+  </div>
+  
+  <div style="text-align: center; margin-top: 40px; color: #666; font-size: 12px;">
+    <p>💡 提示：可以滚动查看各个方案的完整效果</p>
+    <p>Generated for TCommander Terminal Optimization</p>
+  </div>
+</body>
+</html>

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Modal, Table, Button, Space, Popconfirm, message } from 'antd'
 import { PlusOutlined, DeleteOutlined, EditOutlined, SettingOutlined, PlayCircleOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
@@ -7,6 +7,7 @@ import PresetForm from './PresetForm'
 import EmptyState from './EmptyState'
 import { createSessionFromConfig } from '../utils/sessionActions'
 import { Preset } from '../types'
+import { sortPresets } from '../utils/presetSort'
 
 interface PresetsDialogProps {
   open: boolean
@@ -16,6 +17,7 @@ interface PresetsDialogProps {
 export default function PresetsDialog({ open, onClose }: PresetsDialogProps) {
   const presets = useAppStore((s) => s.presets)
   const removePreset = useAppStore((s) => s.removePreset)
+  const updatePreset = useAppStore((s) => s.updatePreset)
   const [showForm, setShowForm] = useState(false)
   const [editingPreset, setEditingPreset] = useState<Preset | null>(null)
 
@@ -53,18 +55,32 @@ export default function PresetsDialog({ open, onClose }: PresetsDialogProps) {
       message.error('创建会话失败')
       return
     }
+    
+    // 更新使用次数
+    updatePreset(preset.id, { usageCount: (preset.usageCount || 0) + 1 })
+    
     message.success(`会话"${preset.name}"已创建`)
   }
+
+  // 按优先级和使用次数排序
+  const sortedPresets = useMemo(() => sortPresets(presets), [presets])
 
   const columns: ColumnsType<Preset> = [
     {
       title: '名称',
       dataIndex: 'name',
       key: 'name',
+      width: 150,
       render: (name: string, record: Preset) => (
-        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>
+        <div style={{ 
+          fontFamily: "'JetBrains Mono', monospace", 
+          fontSize: 12,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
+        }} title={name}>
           {record.kind === 'ssh' ? '🔐 ' : ''}{name}
-        </span>
+        </div>
       )
     },
     {
@@ -74,10 +90,17 @@ export default function PresetsDialog({ open, onClose }: PresetsDialogProps) {
       render: (_, record: Preset) => {
         if (record.kind === 'ssh' && record.sshConfig) {
           return (
-            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: 'rgba(34, 197, 94, 0.9)' }}>
+            <div style={{ 
+              fontFamily: "'JetBrains Mono', monospace", 
+              fontSize: 11, 
+              color: 'rgba(34, 197, 94, 0.9)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
+            }} title={`${record.sshConfig.username}@${record.sshConfig.host}${record.sshConfig.port !== 22 ? `:${record.sshConfig.port}` : ''}`}>
               {record.sshConfig.username}@{record.sshConfig.host}
               {record.sshConfig.port !== 22 ? `:${record.sshConfig.port}` : ''}
-            </span>
+            </div>
           )
         }
         return (
@@ -95,19 +118,54 @@ export default function PresetsDialog({ open, onClose }: PresetsDialogProps) {
       title: '工作目录',
       dataIndex: 'cwd',
       key: 'cwd',
-      ellipsis: true,
-      render: (cwd: string, record: Preset) => record.kind === 'ssh' ? '-' : cwd,
+      width: 150,
+      render: (cwd: string, record: Preset) => {
+        if (record.kind === 'ssh') return '-'
+        return (
+          <div style={{ 
+            fontFamily: "'JetBrains Mono', monospace", 
+            fontSize: 11,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }} title={cwd}>
+            {cwd}
+          </div>
+        )
+      },
     },
     {
       title: '初始命令',
       dataIndex: 'initialCommand',
       key: 'initialCommand',
-      ellipsis: true,
+      width: 200,
       render: (cmd: string) => cmd ? (
-        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: 'var(--ant-color-text-secondary)' }}>
+        <div style={{ 
+          fontFamily: "'JetBrains Mono', monospace", 
+          fontSize: 11, 
+          color: 'var(--ant-color-text-secondary)',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
+        }} title={cmd}>
           {cmd}
-        </span>
+        </div>
       ) : '-'
+    },
+    {
+      title: '使用次数',
+      dataIndex: 'usageCount',
+      key: 'usageCount',
+      width: 80,
+      render: (count: number) => (
+        <span style={{ 
+          fontFamily: "'JetBrains Mono', monospace", 
+          fontSize: 11,
+          color: count > 0 ? 'var(--ant-color-primary)' : 'var(--ant-color-text-tertiary)'
+        }}>
+          {count || 0}
+        </span>
+      ),
     },
     {
       title: '操作',
@@ -150,7 +208,7 @@ export default function PresetsDialog({ open, onClose }: PresetsDialogProps) {
         open={open}
         onCancel={onClose}
         footer={null}
-        width={700}
+        width={900}
       >
         <div className="mb-3 flex justify-end">
           <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} size="small">
@@ -158,13 +216,14 @@ export default function PresetsDialog({ open, onClose }: PresetsDialogProps) {
           </Button>
         </div>
         
-        {presets.length > 0 ? (
+        {sortedPresets.length > 0 ? (
           <Table
             columns={columns}
-            dataSource={presets}
+            dataSource={sortedPresets}
             rowKey="id"
             pagination={false}
             size="small"
+            scroll={{ x: 'max-content' }}
           />
         ) : (
           <div className="flex flex-col items-center gap-4 py-10">

@@ -67,6 +67,10 @@ export interface Preset {
   groupId?: string
   kind?: 'local' | 'ssh'
   sshConfig?: SshSessionConfig
+  /** 优先级：数字越大优先级越高，默认为 0 */
+  priority?: number
+  /** 使用次数：每次从该预设创建会话时递增 */
+  usageCount?: number
 }
 
 export interface Snapshot {

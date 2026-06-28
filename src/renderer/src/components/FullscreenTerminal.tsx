@@ -116,6 +116,33 @@ export default function FullscreenTerminal() {
       terminalRef.current = terminal
       fitAddonRef.current = fitAddon
 
+      // ========== Ctrl+Alt+左右方向键快速切换终端 ==========
+      terminal.attachCustomKeyEventHandler((e: KeyboardEvent) => {
+        if (e.ctrlKey && e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+          e.preventDefault()
+          e.stopPropagation()
+
+          const currentIndex = sessions.findIndex(s => s.id === activeSessionId)
+          if (currentIndex === -1) return false
+
+          let targetIndex: number
+          if (e.key === 'ArrowLeft') {
+            // 切换到上一个终端（循环）
+            targetIndex = currentIndex > 0 ? currentIndex - 1 : sessions.length - 1
+          } else {
+            // 切换到下一个终端（循环）
+            targetIndex = currentIndex < sessions.length - 1 ? currentIndex + 1 : 0
+          }
+
+          const targetSession = sessions[targetIndex]
+          if (targetSession) {
+            setActiveSession(targetSession.id)
+          }
+          return false // 阻止事件继续传播
+        }
+        return true // 允许其他按键事件正常处理
+      })
+
       // ========== 关键修复: 先 fit 到真实尺寸，再写入任何内容 ==========
       // 否则内容会先按 80x24 默认尺寸换行，等下一帧 fit 到真实尺寸后出现错乱与上下跳动
       try {

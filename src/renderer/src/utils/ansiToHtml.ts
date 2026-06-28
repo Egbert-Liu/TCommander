@@ -89,9 +89,10 @@ interface StyleState {
   underline: boolean
 }
 
-function styleToCss(s: StyleState): string {
+function styleToCss(s: StyleState, defaultFg?: string): string {
   const parts: string[] = []
-  if (s.color) parts.push(`color:${s.color}`)
+  // 始终输出 color：未设置时用默认前景色，确保所有文本都有颜色（修复「预览区没颜色」）
+  parts.push(`color:${s.color || defaultFg || 'inherit'}`)
   if (s.bold) parts.push('font-weight:700')
   if (s.dim) parts.push('opacity:0.6')
   if (s.italic) parts.push('font-style:italic')
@@ -108,8 +109,9 @@ export function ansiToHtml(raw: string, theme: TerminalTheme): string {
   if (!raw) return ''
   // 先剥离 OSC（标题设置）与无关 CSI
   let text = raw.replace(OSC_RE, '')
-  text = text.replace(CSI_RE, (m) => (SGR_RE.test(m) ? m : ''))
-  SGR_RE.lastIndex = 0
+  // 修复：使用非全局正则测试，避免全局正则 lastIndex 状态导致的颜色丢失
+  const SGR_TEST_RE = /\x1b\[([\d;]*)m/
+  text = text.replace(CSI_RE, (m) => (SGR_TEST_RE.test(m) ? m : ''))
 
   const table = buildColorTable(theme)
   const defaultFg = theme.colors.foreground
@@ -127,7 +129,7 @@ export function ansiToHtml(raw: string, theme: TerminalTheme): string {
     }
   }
   const openSpan = () => {
-    const css = styleToCss(state)
+    const css = styleToCss(state, defaultFg)
     if (css) {
       out.push(`<span style="${css}">`)
       openCss = css
@@ -139,6 +141,9 @@ export function ansiToHtml(raw: string, theme: TerminalTheme): string {
     closeSpan()
     openSpan()
   }
+
+  // 重置全局正则状态，避免上次调用残留的 lastIndex 导致颜色丢失
+  SGR_RE.lastIndex = 0
 
   let match: RegExpExecArray | null
   while ((match = SGR_RE.exec(text)) !== null) {

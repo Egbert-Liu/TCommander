@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TCommander 卡片预览方案 v2 — 从"终端左下角"到"信息仪表盘"</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+      padding: 40px 20px;
+      line-height: 1.6;
+    }
+    h1 { text-align: center; color: #58a6ff; font-size: 28px; margin-bottom: 8px; }
+    .subtitle { text-align: center; color: #8b949e; font-size: 14px; margin-bottom: 50px; }
+
+    /* ===== 问题诊断 ===== */
+    .problem-section {
+      max-width: 1200px;
+      margin: 0 auto 60px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 30px;
+    }
+    .problem-section h2 { color: #f85149; font-size: 20px; margin-bottom: 20px; }
+    .problem-compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .problem-card {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .problem-card .label {
+      padding: 10px 15px;
+      font-size: 13px;
+      font-weight: 600;
+      border-bottom: 1px solid #30363d;
+    }
+    .problem-card .label.bad { background: rgba(248,81,73,0.1); color: #f85149; }
+    .problem-card .label.good { background: rgba(63,185,80,0.1); color: #3fb950; }
+    .problem-card .content {
+      padding: 15px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    /* ===== 方案展示 ===== */
+    .option {
+      max-width: 1200px;
+      margin: 0 auto 60px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 30px;
+    }
+    .option-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .option-title { font-size: 22px; font-weight: 700; color: #58a6ff; }
+    .option-tag {
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .tag-recommend { background: #238636; color: white; }
+    .tag-innovative { background: #8957e5; color: white; }
+    .tag-practical { background: #1f6feb; color: white; }
+    .tag-minimal { background: #30363d; color: #8b949e; }
+    .option-desc {
+      color: #8b949e;
+      font-size: 14px;
+      margin-bottom: 25px;
+      line-height: 1.8;
+    }
+    .option-desc strong { color: #c9d1d9; }
+
+    /* 卡片网格 */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    /* 统一卡片外壳 */
+    .session-card {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-bottom: 1px solid #30363d;
+      font-size: 12px;
+    }
+    .card-top .name {
+      font-weight: 600;
+      color: #c9d1d9;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .status-badge {
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    .status-running { background: rgba(63,185,80,0.15); color: #3fb950; }
+    .status-error { background: rgba(248,81,73,0.15); color: #f85149; }
+    .status-idle { background: rgba(139,148,158,0.15); color: #8b949e; }
+    .status-confirm { background: rgba(210,153,34,0.15); color: #d29922; }
+
+    /* ===== 方案 A: 命令 + 结构化摘要 ===== */
+    .preview-a {
+      padding: 12px;
+    }
+    .preview-a .last-cmd {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      padding: 6px 10px;
+      background: rgba(56,139,253,0.06);
+      border: 1px solid rgba(56,139,253,0.15);
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+    }
+    .preview-a .last-cmd .prompt { color: #3fb950; }
+    .preview-a .last-cmd .cmd { color: #79c0ff; }
+    .preview-a .summary-block {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .preview-a .summary-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .preview-a .summary-icon {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      flex-shrink: 0;
+    }
+    .icon-success { background: rgba(63,185,80,0.2); color: #3fb950; }
+    .icon-info { background: rgba(56,139,253,0.2); color: #58a6ff; }
+    .icon-warn { background: rgba(210,153,34,0.2); color: #d29922; }
+    .icon-error { background: rgba(248,81,73,0.2); color: #f85149; }
+    .preview-a .key-output {
+      margin-top: 8px;
+      padding: 8px 10px;
+      background: #161b22;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      line-height: 1.5;
+      color: #8b949e;
+      max-height: 80px;
+      overflow: hidden;
+      position: relative;
+    }
+    .preview-a .key-output::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 30px;
+      background: linear-gradient(transparent, #161b22);
+    }
+
+    /* ===== 方案 B: 活动流 / 时间线 ===== */
+    .preview-b {
+      padding: 12px;
+    }
+    .preview-b .timeline {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .preview-b .tl-item {
+      display: flex;
+      gap: 10px;
+      padding: 6px 0;
+      font-size: 12px;
+      position: relative;
+    }
+    .preview-b .tl-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-top: 5px;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 1;
+    }
+    .preview-b .tl-item:not(:last-child) .tl-dot::after {
+      content: '';
+      position: absolute;
+      top: 10px;
+      left: 3px;
+      width: 2px;
+      height: calc(100% + 6px);
+      background: #30363d;
+    }
+    .preview-b .tl-time {
+      color: #484f58;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      flex-shrink: 0;
+      width: 50px;
+    }
+    .preview-b .tl-content {
+      font-family: 'JetBrains Mono', monospace;
+      color: #c9d1d9;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ===== 方案 C: 指标面板 + 尾部输出 ===== */
+    .preview-c {
+      padding: 12px;
+    }
+    .preview-c .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .preview-c .metric {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 8px 10px;
+      text-align: center;
+    }
+    .preview-c .metric .value {
+      font-size: 18px;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      color: #58a6ff;
+    }
+    .preview-c .metric .label {
+      font-size: 10px;
+      color: #484f58;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+    .preview-c .tail-output {
+      padding: 8px 10px;
+      background: #161b22;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      line-height: 1.5;
+      color: #8b949e;
+      max-height: 80px;
+      overflow: hidden;
+      position: relative;
+    }
+    .preview-c .tail-output::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 30px;
+      background: linear-gradient(transparent, #161b22);
+    }
+    .preview-c .tail-output .ansi-green { color: #3fb950; }
+    .preview-c .tail-output .ansi-yellow { color: #d29922; }
+    .preview-c .tail-output .ansi-blue { color: #58a6ff; }
+    .preview-c .tail-output .ansi-red { color: #f85149; }
+    .preview-c .tail-output .ansi-bold { font-weight: bold; }
+
+    /* ===== 方案 D: 智能提取（命令 + 结果 + 关键数据） ===== */
+    .preview-d {
+      padding: 12px;
+    }
+    .preview-d .smart-block {
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .preview-d .smart-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+    }
+    .preview-d .smart-cmd {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: #79c0ff;
+    }
+    .preview-d .smart-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+    }
+    .preview-d .smart-body {
+      padding: 10px 12px;
+    }
+    .preview-d .smart-extract {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .preview-d .extract-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .preview-d .extract-key {
+      color: #484f58;
+      flex-shrink: 0;
+    }
+    .preview-d .extract-val {
+      color: #c9d1d9;
+    }
+    .preview-d .extract-val.green { color: #3fb950; }
+    .preview-d .extract-val.yellow { color: #d29922; }
+    .preview-d .extract-val.blue { color: #58a6ff; }
+    .preview-d .smart-divider {
+      height: 1px;
+      background: #30363d;
+      margin: 8px 0;
+    }
+    .preview-d .smart-tail {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      line-height: 1.5;
+      color: #8b949e;
+      max-height: 60px;
+      overflow: hidden;
+      position: relative;
+    }
+    .preview-d .smart-tail::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 25px;
+      background: linear-gradient(transparent, #0d1117);
+    }
+
+    /* ===== 方案对比 ===== */
+    .comparison {
+      max-width: 1200px;
+      margin: 0 auto 60px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 30px;
+    }
+    .comparison h2 { color: #58a6ff; font-size: 20px; margin-bottom: 20px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th {
+      background: #0d1117;
+      padding: 10px 12px;
+      text-align: left;
+      border: 1px solid #30363d;
+      color: #58a6ff;
+      font-weight: 600;
+    }
+    td {
+      padding: 10px 12px;
+      border: 1px solid #30363d;
+    }
+    tr:nth-child(even) { background: rgba(255,255,255,0.02); }
+    .stars { color: #d29922; }
+
+    /* ===== 核心理念 ===== */
+    .concept {
+      max-width: 1200px;
+      margin: 0 auto 60px;
+      background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 30px;
+    }
+    .concept h2 { color: #58a6ff; font-size: 20px; margin-bottom: 20px; }
+    .concept-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    .concept-item {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .concept-item h3 {
+      font-size: 14px;
+      color: #58a6ff;
+      margin-bottom: 8px;
+    }
+    .concept-item p {
+      font-size: 12px;
+      color: #8b949e;
+      line-height: 1.6;
+    }
+    .concept-item .ref {
+      margin-top: 8px;
+      font-size: 11px;
+      color: #484f58;
+    }
+  </style>
+</head>
+<body>
+
+<h1>TCommander 卡片预览方案 v2</h1>
+<p class="subtitle">从"终端左下角"到"信息仪表盘" — 预览区应该告诉你发生了什么，而不是给你看原始碎片</p>
+
+<!-- ===== 问题诊断 ===== -->
+<div class="problem-section">
+  <h2>当前问题：预览 = 终端左下角</h2>
+  <div class="problem-compare">
+    <div class="problem-card">
+      <div class="label bad">当前做法：截取原始输出尾部</div>
+      <div class="content" style="color: #8b949e;">
+        <span style="color:#3fb950;">PS C:\Projects&gt;</span> npm run build<br>
+        <span style="color:#d29922;">> tcommander@0.8.0 build</span><br>
+        <span style="color:#d29922;">> vite build</span><br>
+        <br>
+        <span style="color:#58a6ff;">vite</span> v5.1.0 building...<br>
+        1247 modules transformed.<br>
+        dist/index.html&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;0.46 kB<br>
+        dist/assets/index-D1X.css&nbsp;&nbsp;23.45 kB<br>
+        dist/assets/index-A7B.js&nbsp;&nbsp;456.78 kB<br>
+        built in 3.45s<br>
+        <span style="color:#3fb950;">PS C:\Projects&gt;</span> _<br>
+      </div>
+    </div>
+    <div class="problem-card">
+      <div class="label good">应该做的：提炼关键信息</div>
+      <div class="content">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:6px 10px;background:rgba(56,139,253,0.06);border:1px solid rgba(56,139,253,0.15);border-radius:6px;font-size:12px;">
+          <span style="color:#3fb950;">$</span>
+          <span style="color:#79c0ff;">npm run build</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;">
+            <span style="width:16px;height:16px;border-radius:50%;background:rgba(63,185,80,0.2);color:#3fb950;display:flex;align-items:center;justify-content:center;font-size:10px;">&#10003;</span>
+            <span style="color:#3fb950;">构建成功</span>
+            <span style="color:#484f58;">3.45s</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;">
+            <span style="width:16px;height:116px;border-radius:50%;background:rgba(56,139,253,0.2);color:#58a6ff;display:flex;align-items:center;justify-content:center;font-size:10px;">i</span>
+            <span style="color:#8b949e;">1247 modules | 3 files | 480.69 kB</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 核心理念 ===== -->
+<div class="concept">
+  <h2>核心理念：预览区 = 信息仪表盘，不是终端截图</h2>
+  <div class="concept-grid">
+    <div class="concept-item">
+      <h3>Wave Terminal 的 Block</h3>
+      <p>每次命令的输入+输出封装为独立块，预览显示"命令 + 结果摘要"，而非原始输出流。</p>
+      <div class="ref">参考: wave.dev</div>
+    </div>
+    <div class="concept-item">
+      <h3>GitHub Actions 的 Job 卡片</h3>
+      <p>不显示原始日志，而是显示结构化步骤：步骤名 + 状态图标 + 耗时，点击展开详情。</p>
+      <div class="ref">参考: github.com/actions</div>
+    </div>
+    <div class="concept-item">
+      <h3>Docker Desktop 的容器卡片</h3>
+      <p>显示结构化信息（状态、端口、CPU/内存），而非 docker logs 原始输出。</p>
+      <div class="ref">参考: docker.com/desktop</div>
+    </div>
+    <div class="concept-item">
+      <h3>PM2 的进程列表</h3>
+      <p>进程名 + 状态 + CPU/内存 + 运行时长，一目了然，不需要看原始 stdout。</p>
+      <div class="ref">参考: pm2.keymetrics.io</div>
+    </div>
+    <div class="concept-item">
+      <h3>Grafana 的仪表盘</h3>
+      <p>关键指标 + 趋势图 + 状态灯，把海量数据提炼为几个核心数字。</p>
+      <div class="ref">参考: grafana.com</div>
+    </div>
+    <div class="concept-item">
+      <h3>VS Code 的 Problems 面板</h3>
+      <p>不显示编译器原始输出，而是提取 error/warning 结构化展示：文件 + 行号 + 消息。</p>
+      <div class="ref">参考: code.visualstudio.com</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 方案 A: 命令 + 结构化摘要 ===== -->
+<div class="option">
+  <div class="option-header">
+    <div class="option-title">方案 A: 命令 + 结构化摘要</div>
+    <span class="option-tag tag-recommend">推荐</span>
+  </div>
+  <div class="option-desc">
+    <strong>核心思路：</strong>从终端输出中提取"最后执行的命令"和"结果摘要"，用结构化方式展示。<br>
+    <strong>信息来源：</strong>利用已有的 statusDetector 规则引擎，提取命令提示符后的文本作为"当前命令"，
+    提取输出中的关键数据（成功/失败、数字指标、文件列表等）作为摘要。<br>
+    <strong>参考：</strong>Wave Terminal 的 Block 概念 + GitHub Actions 的 Job 卡片
+  </div>
+
+  <div class="card-grid">
+    <!-- 构建成功场景 -->
+    <div class="session-card">
+      <div class="card-top">
+        <span class="name">frontend-build</span>
+        <span class="status-badge status-running">运行中</span>
+      </div>
+      <div class="preview-a">
+        <div class="last-cmd">
+          <span class="prompt">$</span>
+          <span class="cmd">npm run build</span>
+        </div>
+        <div class="summary-block">
+          <div class="summary-line">
+            <span class="summary-icon icon-success">&#10003;</span>
+            <span style="color:#3fb950;">构建成功</span>
+            <span style="color:#484f58;margin-left:auto;">3.45s</span>
+          </div>
+          <div class="summary-line">
+            <span class="summary-icon icon-info">i</span>
+            <span style="color:#8b949e;">1247 modules | 3 files | 480.69 kB</span>
+          </div>
+        </div>
+        <div class="key-output">
+          <span style="color:#3fb950;">dist/index.html</span>          0.46 kB<br>
+          <span style="color:#3fb950;">dist/assets/index.css</span>   23.45 kB<br>
+          <span style="color:#3fb950;">dist/assets/index.js</span>   456.78 kB
+        </div>
+      </div>
+    </div>
+
+    <!-- 错误场景 -->
+    <div class="session-card">
+      <div class="card-top">
+        <span class="name">api-server</span>
+        <span class="status-badge status-error">错误</span>
+      </div>
+      <div class="preview-a">
+        <div class="last-cmd">
+          <span class="prompt">$</span>
+          <span class="cmd">npm start</span>
+        </div>
+        <div class="summary-block">
+          <div class="summary-line">
+            <span class="summary-icon icon-error">&#10007;</span>
+            <span style="color:#f85149;">启动失败</span>
+            <span style="color:#484f58;margin-left:auto;">EADDRINUSE</span>
+          </div>
+          <div class="summary-line">
+            <span class="summary-icon icon-warn">!</span>
+            <span style="color:#d29922;">端口 3000 被占用</span>
+          </div>
+        </div>
+        <div class="key-output" style="color:#f85149;">
+          Error: listen EADDRINUSE: address already in use :::3000<br>
+          &nbsp;&nbsp;at Server.setupListenHandle (net.js:423)<br>
+          &nbsp;&nbsp;at listen (cluster.js:345)
+        </div>
+      </div>
+    </div>
+
+    <!-- 等待确认场景 -->
+    <div class="session-card">
+      <div class="card-top">
+        <span class="name">deploy-prod</span>
+        <span class="status-badge status-confirm">等待确认</span>
+      </div>
+      <div class="preview-a">
+        <div class="last-cmd">
+          <span class="prompt">$</span>
+          <span class="cmd">deploy --env production</span>
+        </div>
+        <div class="summary-block">
+          <div class="summary-line">
+            <span class="summary-icon icon-warn">?</span>
+            <span style="color:#d29922;">等待用户确认</span>
+          </div>
+          <div class="summary-line">
+            <span class="summary-icon icon-info">i</span>
+            <span style="color:#8b949e;">即将部署到 production 环境</span>
+          </div>
+        </div>
+        <div class="key-output" style="color:#d29922;">
+          Are you sure you want to deploy to production? [y/N]
+        </div>
+      </div>
+    </div>
+
+    <!-- 空闲场景 -->
+    <div class="session-card">
+      <div class="card-top">
+        <span class="name">dev-shell</span>
+        <span class="status-badge status-idle">空闲</span>
+      </div>
+      <div class="preview-a">
+        <div class="last-cmd">
+          <span class="prompt">$</span>
+          <span class="cmd" style="color:#484f58;">等待输入...</span>
+        </div>
+        <div class="summary-block">
+          <div class="summary-line">
+            <span class="summary-icon icon-info">i</span>
+            <span style="color:#8b949e;">上次命令: git status</span>
+          </div>
+          <div class="summary-line">
+            <span class="summary-icon icon-success">&#10003;</span>
+            <span style="color:#8b949e;">工作区干净 | 2 分钟前</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 方案 B: 活动流 / 时间线 ===== -->
+<div class="option">
+  <div class="option-header">
+    <div class="option-title">方案 B: 活动流 / 时间线</div>
+    <span class="option-tag tag-innovative">创新</span>
+  </div>
+  <div class="option-desc">
+    <strong>核心思路：</strong>把终端活动抽象为"事件时间线"，每个事件是一行结构化信息（时间 + 类型 + 摘要）。<br>
+    <strong>信息来源：</strong>从输出流中提取关键事件：命令执行、成功/失败、状态变化、用户交互等。<br>
+    <strong>参考：</strong>CI/CD Pipeline 的 Step 列表 + 日志查看器的时间戳导航
+  </div>
+
+  <div class="card-grid">
+    <div class="session-card">
+      <div class="card-top">
+        <span class="name">frontend-build</span>
+        <span class="status-badge status-running">运行中</span>
+      </div>
+      <div class="preview-b">
+        <div class="timeline">
+          <div class="tl-item">
+            <div class="tl-dot" style="background:#3fb950;"></div>
+            <div class="tl-time">00:00</div>
+            <div class="tl-content" style="color:#3fb950;">npm run build 启动</div>
+          </div>
+          <div class="tl-item">
+            <div class="tl-dot" style="background:#58a6ff;"></div>
+            <div class="tl-time">00:01</div>
+            <div class="tl-content">vite 开始编译 1247 个模块...</div>
+          </div>
+          <div class="tl-item">
+            <div class="tl-dot" style="background:#58a6ff;"></div>
+            <div class="tl-time">00:02</div>
+            <div class="tl-content">模块转换完成，开始打包...</div>
+          </div>
+          <div class="tl-item">
+            <div class="tl-dot" style="background:#3fb950;"></div>
+            <div class="tl-time">00:03</div>
+            <div class="tl-content" style="color:#3fb950;">构建成功 — 3 files, 480.69 kB</div>
+          </div>
+          <div class="tl-item">
+            <div class="tl-dot" style="background:#3fb950;"></div>
+            <div class="tl-time">00:03</div>
+            <div class="tl-content" style="color:#8b949e;">PS C:\Projects&gt; _</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="session-card">
+      <div class="card-top">
+        <span class="name">api-server</span>
+        <span class="status-badge status-error">错误</span>
+      </div>
+      <div class="preview-b">
+        <div class="timeline">
+          <div class="tl-item">
+            <div class="tl-dot" style="background:#3fb950;"></div>
+            <div class="tl-time">00:00</div>
+            <div class="tl-content" style="color:#3fb950;">npm start 启动</div>
+          </div>
+          <div class="tl-item">
+            <div class="tl-dot" style="background:#58a6ff;"></div>
+            <div class="tl-time">00:00</div>
+            <div class="tl-content">加载配置文件 .env.production</div>
+          </div>
+          <div class="tl-item">
+            <div class="tl-dot" style="background:#58a6ff;"></div>
+            <div class="tl-time">00:01</div>
+            <div class="tl-content">连接数据库 localhost:5432...</div>
+          </div>
+          <div class="tl-item">
+            <div class="tl-dot" style="background:#f85149;"></div>
+            <div class="tl-time">00:01</div>
+            <div class="tl-content" style="color:#f85149;">EADDRINUSE: 端口 3000 被占用</div>
+          </div>
+          <div class="tl-item">
+            <div class="tl-dot" style="background:#f85149;"></div>
+            <div class="tl-time">00:01</div>
+            <div class="tl-content" style="color:#f85149;">进程退出 code=1</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 方案 C: 指标面板 + 尾部输出 ===== -->
+<div class="option">
+  <div class="option-header">
+    <div class="option-title">方案 C: 指标面板 + 尾部输出</div>
+    <span class="option-tag tag-practical">实用</span>
+  </div>
+  <div class="option-desc">
+    <strong>核心思路：</strong>上半部分是"指标面板"（运行时长、输出行数、错误数、最后命令），下半部分是精简后的尾部输出。<br>
+    <strong>信息来源：</strong>指标从 session 元数据中提取，尾部输出保留 ANSI 颜色但做智能裁剪（去控制序列、去空行）。<br>
+    <strong>参考：</strong>Docker Desktop 容器卡片 + PM2 进程列表
+  </div>
+
+  <div class="card-grid">
+    <div class="session-card">
+      <div class="card-top">
+        <span class="name">frontend-build</span>
+        <span class="status-badge status-running">运行中</span>
+      </div>
+      <div class="preview-c">
+        <div class="metrics">
+          <div class="metric">
+            <div class="value" style="color:#3fb950;">3.4s</div>
+            <div class="label">耗时</div>
+          </div>
+          <div class="metric">
+            <div class="value">1.2k</div>
+            <div class="label">模块数</div>
+          </div>
+          <div class="metric">
+            <div class="value">481</div>
+            <div class="label">输出 kB</div>
+          </div>
+          <div class="metric">
+            <div class="value" style="color:#3fb950;">0</div>
+            <div class="label">错误</div>
+          </div>
+        </div>
+        <div class="tail-output">
+          <span class="ansi-green">dist/index.html</span>          0.46 kB<br>
+          <span class="ansi-green">dist/assets/index.css</span>   23.45 kB<br>
+          <span class="ansi-green">dist/assets/index.js</span>   456.78 kB<br>
+          <span class="ansi-bold" style="color:#3fb950;">&#10003; built in 3.45s</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="session-card">
+      <div class="card-top">
+        <span class="name">api-server</span>
+        <span class="status-badge status-error">错误</span>
+      </div>
+      <div class="preview-c">
+        <div class="metrics">
+          <div class="metric">
+            <div class="value" style="color:#f85149;">1.2s</div>
+            <div class="label">耗时</div>
+          </div>
+          <div class="metric">
+            <div class="value">47</div>
+            <div class="label">输出行</div>
+          </div>
+          <div class="metric">
+            <div class="value">2.1</div>
+            <div class="label">输出 kB</div>
+          </div>
+          <div class="metric">
+            <div class="value" style="color:#f85149;">1</div>
+            <div class="label">错误</div>
+          </div>
+        </div>
+        <div class="tail-output">
+          <span class="ansi-red">Error: listen EADDRINUSE: address already in use :::3000</span><br>
+          &nbsp;&nbsp;at Server.setupListenHandle (net.js:423)<br>
+          &nbsp;&nbsp;at listen (cluster.js:345)<br>
+          <span style="color:#d29922;">[进程已退出，退出码: 1]</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 方案 D: 智能提取 ===== -->
+<div class="option">
+  <div class="option-header">
+    <div class="option-title">方案 D: 智能提取（命令 + 结果 + 关键数据）</div>
+    <span class="option-tag tag-innovative">创新</span>
+  </div>
+  <div class="option-desc">
+    <strong>核心思路：</strong>把预览区分为三个区域：顶部显示"最后命令"，中间显示"结构化结果"（自动从输出中提取关键数据），底部显示"精简尾部"。<br>
+    <strong>信息来源：</strong>命令从 prompt 模式匹配中提取；结果通过正则规则引擎提取（构建时间、文件数、错误信息等）；尾部保留 ANSI 颜色。<br>
+    <strong>参考：</strong>VS Code Problems 面板 + Wave Terminal Block + GitHub Actions Step
+  </div>
+
+  <div class="card-grid">
+    <div class="session-card">
+      <div class="card-top">
+        <span class="name">frontend-build</span>
+        <span class="status-badge status-running">运行中</span>
+      </div>
+      <div class="preview-d">
+        <div class="smart-block">
+          <div class="smart-header">
+            <span class="smart-cmd">$ npm run build</span>
+            <span class="smart-status">
+              <span style="color:#3fb950;">&#10003;</span>
+              <span style="color:#3fb950;">成功</span>
+              <span style="color:#484f58;">3.45s</span>
+            </span>
+          </div>
+          <div class="smart-body">
+            <div class="smart-extract">
+              <div class="extract-row">
+                <span class="extract-key">modules:</span>
+                <span class="extract-val blue">1247</span>
+              </div>
+              <div class="extract-row">
+                <span class="extract-key">output:</span>
+                <span class="extract-val">3 files | 480.69 kB</span>
+              </div>
+            </div>
+            <div class="smart-divider"></div>
+            <div class="smart-tail">
+              <span style="color:#3fb950;">dist/index.html</span>          0.46 kB<br>
+              <span style="color:#3fb950;">dist/assets/index.css</span>   23.45 kB<br>
+              <span style="color:#3fb950;">dist/assets/index.js</span>   456.78 kB
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="session-card">
+      <div class="card-top">
+        <span class="name">api-server</span>
+        <span class="status-badge status-error">错误</span>
+      </div>
+      <div class="preview-d">
+        <div class="smart-block">
+          <div class="smart-header">
+            <span class="smart-cmd">$ npm start</span>
+            <span class="smart-status">
+              <span style="color:#f85149;">&#10007;</span>
+              <span style="color:#f85149;">失败</span>
+              <span style="color:#484f58;">exit 1</span>
+            </span>
+          </div>
+          <div class="smart-body">
+            <div class="smart-extract">
+              <div class="extract-row">
+                <span class="extract-key">error:</span>
+                <span class="extract-val" style="color:#f85149;">EADDRINUSE</span>
+              </div>
+              <div class="extract-row">
+                <span class="extract-key">detail:</span>
+                <span class="extract-val" style="color:#d29922;">端口 3000 被占用</span>
+              </div>
+            </div>
+            <div class="smart-divider"></div>
+            <div class="smart-tail">
+              <span style="color:#f85149;">Error: listen EADDRINUSE :::3000</span><br>
+              &nbsp;&nbsp;at Server.setupListenHandle (net.js:423)<br>
+              &nbsp;&nbsp;at listen (cluster.js:345)
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="session-card">
+      <div class="card-top">
+        <span class="name">deploy-prod</span>
+        <span class="status-badge status-confirm">等待确认</span>
+      </div>
+      <div class="preview-d">
+        <div class="smart-block">
+          <div class="smart-header">
+            <span class="smart-cmd">$ deploy --env production</span>
+            <span class="smart-status">
+              <span style="color:#d29922;">?</span>
+              <span style="color:#d29922;">等待确认</span>
+            </span>
+          </div>
+          <div class="smart-body">
+            <div class="smart-extract">
+              <div class="extract-row">
+                <span class="extract-key">target:</span>
+                <span class="extract-val" style="color:#d29922;">production</span>
+              </div>
+              <div class="extract-row">
+                <span class="extract-key">action:</span>
+                <span class="extract-val">deploy 3 services</span>
+              </div>
+            </div>
+            <div class="smart-divider"></div>
+            <div class="smart-tail" style="color:#d29922;">
+              Are you sure you want to deploy to production?<br>
+              This will affect 3 services. [y/N]
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="session-card">
+      <div class="card-top">
+        <span class="name">dev-shell</span>
+        <span class="status-badge status-idle">空闲</span>
+      </div>
+      <div class="preview-d">
+        <div class="smart-block">
+          <div class="smart-header">
+            <span class="smart-cmd" style="color:#484f58;">$ _</span>
+            <span class="smart-status">
+              <span style="color:#8b949e;">idle</span>
+              <span style="color:#484f58;">2m ago</span>
+            </span>
+          </div>
+          <div class="smart-body">
+            <div class="smart-extract">
+              <div class="extract-row">
+                <span class="extract-key">last cmd:</span>
+                <span class="extract-val">git status</span>
+              </div>
+              <div class="extract-row">
+                <span class="extract-key">result:</span>
+                <span class="extract-val green">工作区干净</span>
+              </div>
+              <div class="extract-row">
+                <span class="extract-key">branch:</span>
+                <span class="extract-val blue">feature/terminal-opt</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 对比表格 ===== -->
+<div class="comparison">
+  <h2>方案对比</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>维度</th>
+        <th>方案 A: 命令+摘要</th>
+        <th>方案 B: 活动流</th>
+        <th>方案 C: 指标+尾部</th>
+        <th>方案 D: 智能提取</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>信息密度</strong></td>
+        <td><span class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span></td>
+        <td><span class="stars">&#9733;&#9733;&#9733;</span></td>
+        <td><span class="stars">&#9733;&#9733;&#9733;&#9733;</span></td>
+        <td><span class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span></td>
+      </tr>
+      <tr>
+        <td><strong>一眼看懂</strong></td>
+        <td><span class="stars">&#9733;&#9733;&#9733;&#9733;&#9733;</span></td>
+        <td><span class="stars">&#9733;&#9733;&#9733;&#9733;</span></td>
+        <td><span class="stars">&#9733;&#9733;&#9733;</span></td>
+        <td><span class="stars">&#9733;&#9733;&#9733;&#9733;</span></td>
+      </tr>
+      <tr>
+        <td><strong>实现难度</strong></td>
+        <td>中等 — 需要命令提取+摘要规则</td>
+        <td>高 — 需要事件流解析</td>
+        <td>低 — 指标已有，尾部复用现有逻辑</td>
+        <td>高 — 需要智能提取引擎</td>
+      </tr>
+      <tr>
+        <tr>
+        <td><strong>性能影响</strong></td>
+        <td>低 — 只处理尾部</td>
+        <td>中 — 需要维护事件列表</td>
+        <td>低 — 指标从元数据计算</td>
+        <td>中 — 规则匹配有开销</td>
+      </tr>
+      <tr>
+        <td><strong>适用场景</strong></td>
+        <td>通用，特别适合构建/部署</td>
+        <td>长时间运行的任务</td>
+        <td>需要快速扫状态</td>
+        <td>复杂 CLI 工具输出</td>
+      </tr>
+      <tr>
+        <td><strong>参考产品</strong></td>
+        <td>Wave Terminal, GitHub Actions</td>
+        <td>CI/CD Pipeline, 日志查看器</td>
+        <td>Docker Desktop, PM2</td>
+        <td>VS Code Problems, Wave Block</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div style="text-align:center;color:#484f58;font-size:12px;margin-top:40px;">
+  <p>TCommander 卡片预览方案 v2 — 从"终端左下角"到"信息仪表盘"</p>
+</div>
+
+</body>
+</html>

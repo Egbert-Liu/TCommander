@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TCommander - AI时代的智能终端会话管理器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #0f0f1e 0%, #1a1a2e 50%, #16213e 100%);
+            color: #e0e0e0;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* 头部区域 */
+        .hero {
+            padding: 80px 0 60px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(56, 189, 248, 0.1) 0%, transparent 70%);
+            animation: pulse 8s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .logo {
+            font-size: 48px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 16px;
+            letter-spacing: 2px;
+        }
+
+        .tagline {
+            font-size: 20px;
+            color: #94a3b8;
+            margin-bottom: 32px;
+        }
+
+        .badges {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 24px;
+        }
+
+        .badge {
+            padding: 8px 16px;
+            background: rgba(56, 189, 248, 0.1);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            border-radius: 20px;
+            font-size: 14px;
+            color: #38bdf8;
+        }
+
+        /* 章节标题 */
+        .section {
+            padding: 60px 0;
+        }
+
+        .section-title {
+            font-size: 32px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #f0f0f0;
+            position: relative;
+            display: inline-block;
+        }
+
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 0;
+            width: 60px;
+            height: 3px;
+            background: linear-gradient(90deg, #38bdf8, transparent);
+            border-radius: 2px;
+        }
+
+        .section-subtitle {
+            font-size: 16px;
+            color: #94a3b8;
+            margin-bottom: 40px;
+        }
+
+        /* 问题与解决方案 */
+        .problem-solution {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-top: 40px;
+        }
+
+        .problem-card, .solution-card {
+            padding: 32px;
+            border-radius: 16px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .problem-card {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(239, 68, 68, 0.05) 100%);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+        }
+
+        .solution-card {
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1) 0%, rgba(34, 197, 94, 0.05) 100%);
+            border: 1px solid rgba(34, 197, 94, 0.2);
+        }
+
+        .card-icon {
+            font-size: 32px;
+            margin-bottom: 16px;
+        }
+
+        .card-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        .problem-card .card-title { color: #f87171; }
+        .solution-card .card-title { color: #4ade80; }
+
+        .card-list {
+            list-style: none;
+        }
+
+        .card-list li {
+            padding: 8px 0;
+            padding-left: 24px;
+            position: relative;
+            color: #cbd5e1;
+        }
+
+        .problem-card .card-list li::before {
+            content: '✕';
+            position: absolute;
+            left: 0;
+            color: #f87171;
+        }
+
+        .solution-card .card-list li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #4ade80;
+        }
+
+        /* 功能特性 */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            margin-top: 40px;
+        }
+
+        .feature-card {
+            padding: 28px;
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid rgba(56, 189, 248, 0.1);
+            border-radius: 12px;
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(56, 189, 248, 0.4);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.2) 0%, rgba(14, 165, 233, 0.1) 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin-bottom: 16px;
+        }
+
+        .feature-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #f0f0f0;
+        }
+
+        .feature-desc {
+            font-size: 14px;
+            color: #94a3b8;
+        }
+
+        /* 状态展示 */
+        .status-demo {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            border-radius: 16px;
+            padding: 32px;
+            margin-top: 40px;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-top: 24px;
+        }
+
+        .status-item {
+            padding: 16px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: blink 2s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .status-error { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); }
+        .status-error .status-dot { background: #ef4444; }
+        
+        .status-confirm { background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3); }
+        .status-confirm .status-dot { background: #fbbf24; }
+        
+        .status-input { background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.3); }
+        .status-input .status-dot { background: #38bdf8; }
+        
+        .status-running { background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); }
+        .status-running .status-dot { background: #22c55e; }
+        
+        .status-idle { background: rgba(148, 163, 184, 0.1); border: 1px solid rgba(148, 163, 184, 0.3); }
+        .status-idle .status-dot { background: #94a3b8; animation: none; }
+
+        .status-label {
+            font-size: 14px;
+            color: #e0e0e0;
+        }
+
+        /* 技术架构 */
+        .tech-stack {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .tech-item {
+            padding: 10px 20px;
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            border-radius: 8px;
+            font-size: 14px;
+            color: #cbd5e1;
+            transition: all 0.2s ease;
+        }
+
+        .tech-item:hover {
+            border-color: #38bdf8;
+            color: #38bdf8;
+        }
+
+        /* 用户场景 */
+        .scenarios {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            margin-top: 40px;
+        }
+
+        .scenario-card {
+            padding: 24px;
+            background: rgba(30, 41, 59, 0.4);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            border-radius: 12px;
+        }
+
+        .scenario-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .scenario-icon {
+            font-size: 28px;
+        }
+
+        .scenario-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #f0f0f0;
+        }
+
+        .scenario-desc {
+            font-size: 14px;
+            color: #94a3b8;
+        }
+
+        /* 价值主张 */
+        .value-props {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 32px;
+            margin-top: 40px;
+        }
+
+        .value-card {
+            text-align: center;
+            padding: 32px 24px;
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.05) 0%, rgba(14, 165, 233, 0.02) 100%);
+            border: 1px solid rgba(56, 189, 248, 0.15);
+            border-radius: 16px;
+        }
+
+        .value-number {
+            font-size: 48px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 8px;
+        }
+
+        .value-unit {
+            font-size: 16px;
+            color: #94a3b8;
+            margin-bottom: 16px;
+        }
+
+        .value-desc {
+            font-size: 14px;
+            color: #cbd5e1;
+        }
+
+        /* 页脚 */
+        .footer {
+            padding: 40px 0;
+            text-align: center;
+            border-top: 1px solid rgba(148, 163, 184, 0.1);
+            margin-top: 60px;
+        }
+
+        .footer-text {
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .cta-button {
+            display: inline-block;
+            padding: 14px 32px;
+            background: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%);
+            color: #0f172a;
+            font-weight: 600;
+            border-radius: 8px;
+            text-decoration: none;
+            margin-top: 24px;
+            transition: all 0.3s ease;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(56, 189, 248, 0.3);
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .problem-solution {
+                grid-template-columns: 1fr;
+            }
+            
+            .value-props {
+                grid-template-columns: 1fr;
+            }
+            
+            .logo {
+                font-size: 36px;
+            }
+            
+            .section-title {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 头部 -->
+    <section class="hero">
+        <div class="container hero-content">
+            <h1 class="logo">TCommander</h1>
+            <p class="tagline">AI时代的智能终端会话管理器</p>
+            <div class="badges">
+                <span class="badge">🚀 多会话管理</span>
+                <span class="badge">🧠 智能状态感知</span>
+                <span class="badge">⚡ 快捷操作</span>
+                <span class="badge">💾 快照恢复</span>
+                <span class="badge">🌐 跨平台支持</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- 问题与解决方案 -->
+    <section class="section">
+        <div class="container">
+            <h2 class="section-title">为什么需要 TCommander？</h2>
+            <p class="section-subtitle">AI编程助手改变了开发方式，但终端管理方式却停滞不前</p>
+            
+            <div class="problem-solution">
+                <div class="problem-card">
+                    <div class="card-icon">😫</div>
+                    <h3 class="card-title">传统终端的痛点</h3>
+                    <ul class="card-list">
+                        <li>多个终端窗口来回切换，容易遗漏AI助手的等待状态</li>
+                        <li>无法直观看到每个会话的当前状态</li>
+                        <li>手动输入确认命令繁琐且容易出错</li>
+                        <li>工作环境难以保存和恢复</li>
+                        <li>缺乏统一的会话分组和筛选机制</li>
+                    </ul>
+                </div>
+                
+                <div class="solution-card">
+                    <div class="card-icon">✨</div>
+                    <h3 class="card-title">TCommander 的解决方案</h3>
+                    <ul class="card-list">
+                        <li>卡片式实时预览，一屏监控所有会话</li>
+                        <li>智能状态感知引擎，自动检测5种终端状态</li>
+                        <li>一键确认/拒绝操作，减少80%重复输入</li>
+                        <li>预设系统和快照功能，秒级恢复工作环境</li>
+                        <li>分组管理+状态筛选，快速定位目标会话</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 核心功能 -->
+    <section class="section" style="background: rgba(15, 23, 42, 0.5);">
+        <div class="container">
+            <h2 class="section-title">核心功能</h2>
+            <p class="section-subtitle">为AI时代的开发工作流量身定制</p>
+            
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🎯</div>
+                    <h3 class="feature-title">状态感知引擎</h3>
+                    <p class="feature-desc">自动检测终端状态：需确认、待输入、错误、运行中、空闲，无需人工盯屏</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3 class="feature-title">快捷操作</h3>
+                    <p class="feature-desc">一键确认(Y)/拒绝(N)、快速输入命令，大幅提升与AI助手的交互效率</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">📺</div>
+                    <h3 class="feature-title">全屏终端</h3>
+                    <p class="feature-desc">基于xterm.js的完整终端视图，支持ESC快速退出，沉浸式操作体验</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">📁</div>
+                    <h3 class="feature-title">分组管理</h3>
+                    <p class="feature-desc">自定义分组，16色色板选择，按项目/环境/用途灵活组织会话</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">📋</div>
+                    <h3 class="feature-title">预设系统</h3>
+                    <p class="feature-desc">创建预设模板，新建会话时一键填充配置，支持保存为预设</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">💾</div>
+                    <h3 class="feature-title">快照管理</h3>
+                    <p class="feature-desc">一键保存/恢复工作环境，中断工作后可快速回到之前的状态</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">🔍</div>
+                    <h3 class="feature-title">智能筛选</h3>
+                    <p class="feature-desc">按状态、分组、关键词快速筛选，状态优先级自动排序</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">🎨</div>
+                    <h3 class="feature-title">深色主题</h3>
+                    <p class="feature-desc">Cyber-Terminal深色科技风UI，长时间使用不伤眼</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 状态感知演示 -->
+    <section class="section">
+        <div class="container">
+            <h2 class="section-title">智能状态感知</h2>
+            <p class="section-subtitle">自动识别终端状态，让你对每个会话的情况了如指掌</p>
+            
+            <div class="status-demo">
+                <h3 style="color: #f0f0f0; margin-bottom: 16px;">五种状态，一目了然</h3>
+                <div class="status-grid">
+                    <div class="status-item status-error">
+                        <div class="status-dot"></div>
+                        <span class="status-label">错误 - 需要立即处理</span>
+                    </div>
+                    <div class="status-item status-confirm">
+                        <div class="status-dot"></div>
+                        <span class="status-label">需确认 - 等待你的决策</span>
+                    </div>
+                    <div class="status-item status-input">
+                        <div class="status-dot"></div>
+                        <span class="status-label">待输入 - 需要你的指令</span>
+                    </div>
+                    <div class="status-item status-running">
+                        <div class="status-dot"></div>
+                        <span class="status-label">运行中 - 正在执行任务</span>
+                    </div>
+                    <div class="status-item status-idle">
+                        <div class="status-dot"></div>
+                        <span class="status-label">空闲 - 等待新任务</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 用户场景 -->
+    <section class="section" style="background: rgba(15, 23, 42, 0.5);">
+        <div class="container">
+            <h2 class="section-title">适用场景</h2>
+            <p class="section-subtitle">无论你是开发者、运维工程师还是技术爱好者</p>
+            
+            <div class="scenarios">
+                <div class="scenario-card">
+                    <div class="scenario-header">
+                        <span class="scenario-icon">🤖</span>
+                        <h3 class="scenario-title">AI编程助手管理</h3>
+                    </div>
+                    <p class="scenario-desc">同时运行多个Claude Code/Codex实例，自动检测等待确认的状态，一键响应</p>
+                </div>
+                
+                <div class="scenario-card">
+                    <div class="scenario-header">
+                        <span class="scenario-icon">🖥️</span>
+                        <h3 class="scenario-title">多服务器运维</h3>
+                    </div>
+                    <p class="scenario-desc">管理多个SSH连接，按环境分组（开发/测试/生产），快速切换和监控</p>
+                </div>
+                
+                <div class="scenario-card">
+                    <div class="scenario-header">
+                        <span class="scenario-icon">🔧</span>
+                        <h3 class="scenario-title">自动化任务</h3>
+                    </div>
+                    <p class="scenario-desc">执行需要阶段性确认的脚本，状态变化时自动提醒，不会错过关键节点</p>
+                </div>
+                
+                <div class="scenario-card">
+                    <div class="scenario-header">
+                        <span class="scenario-icon">📦</span>
+                        <h3 class="scenario-title">构建与测试</h3>
+                    </div>
+                    <p class="scenario-desc">监控长时间运行的构建、测试任务，出错时立即通知，成功时自动标记</p>
+                </div>
+                
+                <div class="scenario-card">
+                    <div class="scenario-header">
+                        <span class="scenario-icon">👥</span>
+                        <h3 class="scenario-title">团队协作</h3>
+                    </div>
+                    <p class="scenario-desc">预设模板共享，快照导出导入，团队成员快速复用标准工作环境</p>
+                </div>
+                
+                <div class="scenario-card">
+                    <div class="scenario-header">
+                        <span class="scenario-icon">🎓</span>
+                        <h3 class="scenario-title">教学演示</h3>
+                    </div>
+                    <p class="scenario-desc">多终端并行展示，状态可视化，让学生清晰看到每个命令的执行结果</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 技术架构 -->
+    <section class="section">
+        <div class="container">
+            <h2 class="section-title">技术架构</h2>
+            <p class="section-subtitle">现代化技术栈，保证性能与体验</p>
+            
+            <div class="tech-stack">
+                <span class="tech-item">Electron 29</span>
+                <span class="tech-item">React 18</span>
+                <span class="tech-item">TypeScript 5</span>
+                <span class="tech-item">Vite 5</span>
+                <span class="tech-item">Zustand</span>
+                <span class="tech-item">Ant Design 5</span>
+                <span class="tech-item">TailwindCSS 3</span>
+                <span class="tech-item">xterm.js</span>
+                <span class="tech-item">node-pty</span>
+                <span class="tech-item">SSH2</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- 价值数据 -->
+    <section class="section" style="background: rgba(15, 23, 42, 0.5);">
+        <div class="container">
+            <h2 class="section-title">效率提升</h2>
+            <p class="section-subtitle">用数据说话</p>
+            
+            <div class="value-props">
+                <div class="value-card">
+                    <div class="value-number">80%</div>
+                    <div class="value-unit">减少重复输入</div>
+                    <p class="value-desc">一键确认/拒绝操作，告别繁琐的手动输入</p>
+                </div>
+                
+                <div class="value-card">
+                    <div class="value-number">90%</div>
+                    <div class="value-unit">降低切换成本</div>
+                    <p class="value-desc">卡片式预览，一屏监控所有会话状态</p>
+                </div>
+                
+                <div class="value-card">
+                    <div class="value-number">秒级</div>
+                    <div class="value-unit">环境恢复</div>
+                    <p class="value-desc">快照功能让你随时回到之前的工作状态</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 页脚 -->
+    <section class="footer">
+        <div class="container">
+            <p class="footer-text">TCommander - 让AI时代的终端管理更智能、更高效</p>
+            <a href="#" class="cta-button">开始使用</a>
+        </div>
+    </section>
+</body>
+</html>
