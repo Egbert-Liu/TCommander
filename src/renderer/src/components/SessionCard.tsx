@@ -527,19 +527,19 @@ function SessionCardImpl(props: SessionCardProps) {
       <div
         className="session-card-preview"
           style={{
-            // 高度按行数自适应：每行 16px（字号 11 行高 1.4 = 15.4，按 16 给足）
-            // 上下 padding 16 = 16 + N * 16
-            // 5 行 = 96px, 10 行 = 176px, 15 行 = 256px, 20 行 = 336px
-            minHeight: 96,
-            height: 16 + previewLineCount * 16,
-            padding: '8px 10px',
+            // 高度按行数自适应：每行 14px（字号 10 行高 1.3 = 13，按 14 给足）
+            // 上下 padding 12 = 12 + N * 14
+            // 5 行 = 82px, 10 行 = 152px, 15 行 = 222px, 20 行 = 292px
+            minHeight: 82,
+            height: 12 + previewLineCount * 14,
+            padding: '6px 8px',
             // 背景跟随终端主题：预览区视觉与全屏终端保持一致
             background: themeBg,
             // CSS 变量供 ::after 底部淡出遮罩使用（渐变到主题背景，而非固定黑色）
             ['--preview-bg' as any]: themeBg,
             fontFamily: "'JetBrains Mono', monospace",
-            fontSize: 11,
-            lineHeight: 1.4,
+            fontSize: 10,
+            lineHeight: 1.3,
             // 前景跟随终端主题：未带 SGR 的纯文本用主题前景色
             color: themeFg,
             cursor: 'text',

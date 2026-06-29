@@ -49,6 +49,7 @@
     "appId": "com.tcommander.app",
     "productName": "TCommander",
     "copyright": "Copyright © 2024",
+    "publish": ["github"],
     "directories": {
       "output": "release_v5"
     },
