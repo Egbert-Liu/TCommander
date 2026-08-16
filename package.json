@@ -3,7 +3,7 @@
   "version": "0.8.0",
   "description": "TCommander - Multi-terminal session manager for developers",
   "main": "./out/main/index.js",
-  "author": "",
+  "author": "egbertLiu",
   "license": "MIT",
   "scripts": {
     "dev": "vite",
@@ -26,6 +26,9 @@
     "node-pty": "^1.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-markdown": "^10.1.0",
+    "rehype-highlight": "^7.0.2",
+    "remark-gfm": "^4.0.1",
     "ssh2": "^1.17.0",
     "zustand": "^4.5.0"
   },
@@ -48,8 +51,10 @@
   "build": {
     "appId": "com.tcommander.app",
     "productName": "TCommander",
-    "copyright": "Copyright © 2024",
-    "publish": ["github"],
+    "copyright": "Copyright © 2026 egbertLiu",
+    "publish": [
+      "github"
+    ],
     "directories": {
       "output": "release_v5"
     },
@@ -58,6 +63,12 @@
       "dist/**/*",
       "build/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "hooks",
+        "to": "hooks"
+      }
     ],
     "asarUnpack": [
       "**/*.node",

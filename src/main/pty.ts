@@ -8,14 +8,18 @@ interface PtySession {
   config: SessionConfig
   destroyed: boolean
   /**
-   * 主进程侧 ring buffer：按字符数（UTF-16 code unit）保留最近一段原始输出。
+   * 主进程侧 ring buffer：分块保留最近一段原始输出（按 UTF-16 code unit 计数）。
+   * 按块追加 + 惰性丢弃头部整块，避免 buffer 满后每个 chunk 触发一次
+   * 256KB 级字符串拼接/拷贝；仅在 getRecentOutput 读取时才 join。
    * 用作「最近 N 字节历史」快照，避免在主进程堆无限增长；
    * 真正的卡片状态/预览缓存由渲染进程侧的双级缓存管理。
    *
    * 上限 256 KB ≈ 13 万中文字 ≈ 25 万 ASCII；普通终端滚动缓冲远超这个值，
    * 保留这么多够状态检测和快速回放用。
    */
-  ringBuf: string
+  ringChunks: string[]
+  ringTotal: number
+  /** ring buffer 容量上限（字符数） */
   ringBufMax: number
 }
 
@@ -35,12 +39,27 @@ export function createPtyManager() {
   // 由 main/index.ts 在 app.whenReady 后通过 setSshAuthBridge 注入。
   let sshAuthBridge: SshAuthBridge | null = null
 
-  function appendToRing(buf: string, chunk: string, cap: number): string {
-    if (cap <= 0) return ''
-    const next = buf + chunk
-    if (next.length <= cap) return next
-    // 超出容量时截掉头部，保留尾部 cap 个字符。
-    return next.slice(next.length - cap)
+  /**
+   * 追加 chunk 到分块 ring buffer：
+   * - 剩余总量仍 ≥ cap 时整块丢弃头部（无大字符串拷贝，均摊 O(1)）
+   * - 单块即超 cap 的异常大 chunk 才做一次 slice 截尾
+   * 内存上界约 cap + 最大单块长度（≤ 2×cap）。
+   */
+  function appendToRing(session: PtySession, chunk: string): void {
+    const cap = session.ringBufMax
+    if (cap <= 0) return
+    session.ringChunks.push(chunk)
+    session.ringTotal += chunk.length
+    while (session.ringChunks.length > 1) {
+      const headLen = session.ringChunks[0].length
+      if (session.ringTotal - headLen < cap) break
+      session.ringChunks.shift()
+      session.ringTotal -= headLen
+    }
+    if (session.ringChunks.length === 1 && session.ringTotal > cap) {
+      session.ringChunks[0] = session.ringChunks[0].slice(session.ringTotal - cap)
+      session.ringTotal = cap
+    }
   }
 
   /**
@@ -68,6 +87,7 @@ export function createPtyManager() {
         cwd: config.cwd,
         cols: config.cols,
         rows: config.rows,
+        sessionId: sessionId,
       }),
     }
   }
@@ -83,14 +103,15 @@ export function createPtyManager() {
       backend,
       config,
       destroyed: false,
-      ringBuf: '',
+      ringChunks: [],
+      ringTotal: 0,
       ringBufMax: MAIN_RING_BUFFER_MAX,
     }
 
     backend.onData((data) => {
       if (session.destroyed || disposed) return
       // 主进程 ring buffer：append-and-trim，避免内存堆积
-      session.ringBuf = appendToRing(session.ringBuf, data, session.ringBufMax)
+      appendToRing(session, data)
       outputListeners.forEach((listener) => listener(id, data))
     })
 
@@ -116,7 +137,7 @@ export function createPtyManager() {
           if (disposed) return
           connStatusListeners.forEach((l) => l(id, 'error'))
           const msg = `\r\n[SSH 连接失败] ${(err as Error).message || err}\r\n`
-          session.ringBuf = appendToRing(session.ringBuf, msg, session.ringBufMax)
+          appendToRing(session, msg)
           outputListeners.forEach((listener) => listener(id, msg))
           session.destroyed = true
           sessions.delete(id)
@@ -155,8 +176,12 @@ export function createPtyManager() {
   function getRecentOutput(sessionId: string, maxChars?: number): string {
     const session = sessions.get(sessionId)
     if (!session) return ''
-    if (!maxChars || maxChars >= session.ringBuf.length) return session.ringBuf
-    return session.ringBuf.slice(-maxChars)
+    const chunks = session.ringChunks
+    if (chunks.length === 0) return ''
+    // 读取时才 join（低频路径），单块时直接返回避免无谓拷贝
+    const joined = chunks.length === 1 ? chunks[0] : chunks.join('')
+    if (!maxChars || maxChars >= joined.length) return joined
+    return joined.slice(-maxChars)
   }
 
   function sendInput(sessionId: string, data: string): void {

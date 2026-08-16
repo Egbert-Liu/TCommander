@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { Session, Group, Preset, Snapshot, TriggerRule } from '../types'
+import { Session, Group, Preset, Snapshot, TriggerRule, TranscriptEntry } from '../types'
 import { DEFAULT_SYSTEM_RULES } from '../utils/statusDetector'
 import { TERMINAL_THEMES } from '../utils/terminalThemes'
 
@@ -12,12 +12,15 @@ interface AppState {
   activeSessionId: string | null
   searchQuery: string
   selectedGroupId: string | null
-  statusFilter: string | null
+  statusFilter: string[]
   isFullscreen: boolean
   darkMode: boolean
   previewLineCount: number
   defaultQuickActions: string[]
   terminalTheme: string  // 终端主题 ID
+  markdownEnabled: boolean  // 终端实时 Markdown 渲染层开关（卡片/全屏共用）
+  /** Claude Code transcript 对话流（sessionId → 条目数组，全屏 MD 模式数据源） */
+  claudeTranscripts: Record<string, TranscriptEntry[]>
 
   addSession: (session: Session) => void
   updateSession: (id: string, updates: Partial<Session>) => void
@@ -43,12 +46,14 @@ interface AppState {
 
   setSearchQuery: (query: string) => void
   setSelectedGroupId: (id: string | null) => void
-  setStatusFilter: (status: string | null) => void
+  setStatusFilter: (statuses: string[]) => void
   setIsFullscreen: (fullscreen: boolean) => void
   setPreviewLineCount: (count: number) => void
   toggleDarkMode: () => void
   setDarkMode: (dark: boolean) => void
   setTerminalTheme: (themeId: string) => void
+  setMarkdownEnabled: (enabled: boolean) => void
+  appendClaudeTranscript: (sessionId: string, entries: TranscriptEntry[]) => void
   setPresets: (presets: Preset[]) => void
   setGroups: (groups: Group[]) => void
   setSnapshots: (snapshots: Snapshot[]) => void
@@ -67,6 +72,9 @@ function applyTitleBarOverlay(dark: boolean) {
   )
 }
 
+/** transcript 条目全局递增 id 序列（React key 用，见 appendClaudeTranscript） */
+let transcriptIdSeq = 0
+
 export const useAppStore = create<AppState>((set) => ({
   sessions: [],
   groups: [],
@@ -76,25 +84,32 @@ export const useAppStore = create<AppState>((set) => ({
   activeSessionId: null,
   searchQuery: '',
   selectedGroupId: null,
-  statusFilter: null,
+  statusFilter: [],
   isFullscreen: false,
   darkMode: true,
   terminalTheme: 'github-dark',
-  previewLineCount: 10,
+  previewLineCount: 15,
   defaultQuickActions: ['Y', 'N', 'CtrlC', 'Up', 'Down', 'Input', 'Send', 'Enter'],
+  markdownEnabled: false,
+  claudeTranscripts: {},
 
   addSession: (session) => set((state) => ({
-    sessions: [...state.sessions, session]
+    sessions: [...state.sessions, { ...session, stableActivityAt: session.stableActivityAt ?? session.lastActivityAt ?? Date.now() }]
   })),
 
   updateSession: (id, updates) => set((state) => ({
     sessions: state.sessions.map(s => s.id === id ? { ...s, ...updates } : s)
   })),
 
-  removeSession: (id) => set((state) => ({
-    sessions: state.sessions.filter(s => s.id !== id),
-    activeSessionId: state.activeSessionId === id ? null : state.activeSessionId
-  })),
+  removeSession: (id) => set((state) => {
+    // 顺带清理该会话的 transcript 对话流，避免长期运行内存增长
+    const { [id]: _removed, ...restTranscripts } = state.claudeTranscripts
+    return {
+      sessions: state.sessions.filter(s => s.id !== id),
+      activeSessionId: state.activeSessionId === id ? null : state.activeSessionId,
+      claudeTranscripts: restTranscripts
+    }
+  }),
 
   setActiveSession: (id) => set({ activeSessionId: id }),
 
@@ -182,7 +197,7 @@ export const useAppStore = create<AppState>((set) => ({
 
   setSelectedGroupId: (id) => set({ selectedGroupId: id }),
 
-  setStatusFilter: (status) => set({ statusFilter: status }),
+  setStatusFilter: (statuses) => set({ statusFilter: statuses }),
 
   setIsFullscreen: (fullscreen) => set({ isFullscreen: fullscreen }),
 
@@ -215,6 +230,26 @@ export const useAppStore = create<AppState>((set) => ({
   setTerminalTheme: (themeId) => {
     window.electronAPI?.storageSet('terminalTheme', themeId)
     return set({ terminalTheme: themeId })
+  },
+
+  setMarkdownEnabled: (enabled) => {
+    window.electronAPI?.storageSet('markdownEnabled', enabled)
+    return set({ markdownEnabled: enabled })
+  },
+
+  // 追加 transcript 条目：主进程 transcriptManager 增量推送。
+  // - 渲染层为每条分配全局递增 id（React key 用）：500 条截断时若用 index 作 key
+  //   会导致所有条目 key 错位 → 全量 remount → ReactMarkdown 全部重解析
+  // - 上限保护：超长会话仅保留最新条目（MD 视图是「最近对话」语义）
+  appendClaudeTranscript: (sessionId, entries) => {
+    if (entries.length === 0) return
+    set((state) => {
+      const withIds = entries.map(e => ({ ...e, id: ++transcriptIdSeq }))
+      const merged = [...(state.claudeTranscripts[sessionId] ?? []), ...withIds]
+      const MAX_ENTRIES = 500
+      const trimmed = merged.length > MAX_ENTRIES ? merged.slice(merged.length - MAX_ENTRIES) : merged
+      return { claudeTranscripts: { ...state.claudeTranscripts, [sessionId]: trimmed } }
+    })
   },
 
   setPresets: (presets) => set({ presets }),

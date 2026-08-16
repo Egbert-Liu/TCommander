@@ -6,6 +6,8 @@ let appClosingCallbacks: Array<() => void> = []
 let closeConfirmCallbacks: Array<(hasActiveSessions: boolean) => void> = []
 let sshAuthPromptCallbacks: Array<(sessionId: string, prompt: string) => void> = []
 let connStatusCallbacks: Array<(sessionId: string, status: string) => void> = []
+let hookStatusUpdateCallbacks: Array<(sessionId: string, payload: any) => void> = []
+let claudeTranscriptCallbacks: Array<(sessionId: string, appended: any[]) => void> = []
 
 ipcRenderer.on('session-output', (_, sessionId, data) => {
   outputCallbacks.forEach(cb => cb(sessionId, data))
@@ -32,6 +34,16 @@ ipcRenderer.on('ssh-auth-prompt', (_, sessionId: string, prompt: string) => {
 // SSH 连接状态变化：connecting → ready / error
 ipcRenderer.on('session-conn-status', (_, sessionId: string, status: string) => {
   connStatusCallbacks.forEach(cb => cb(sessionId, status))
+})
+
+// Hook 服务器状态更新推送
+ipcRenderer.on('hook-status-update', (_, sessionId: string, payload: any) => {
+  hookStatusUpdateCallbacks.forEach(cb => cb(sessionId, payload))
+})
+
+// Claude Code transcript 增量推送（全屏 MD 对话流数据源）
+ipcRenderer.on('claude-transcript', (_, sessionId: string, appended: any[]) => {
+  claudeTranscriptCallbacks.forEach(cb => cb(sessionId, appended))
 })
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -111,4 +123,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
       connStatusCallbacks = connStatusCallbacks.filter(cb => cb !== callback)
     }
   },
+  onHookStatusUpdate: (callback: (sessionId: string, payload: any) => void) => {
+    hookStatusUpdateCallbacks.push(callback)
+    return () => {
+      hookStatusUpdateCallbacks = hookStatusUpdateCallbacks.filter(cb => cb !== callback)
+    }
+  },
+
+  // Claude Code transcript 增量订阅（主进程 transcriptManager 推送）
+  onClaudeTranscript: (callback: (sessionId: string, appended: any[]) => void) => {
+    claudeTranscriptCallbacks.push(callback)
+    return () => {
+      claudeTranscriptCallbacks = claudeTranscriptCallbacks.filter(cb => cb !== callback)
+    }
+  },
+
+  // Claude Code 集成配置（读写 ~/.claude/settings.json 的 hooks）
+  claudeIntegrationStatus: () =>
+    ipcRenderer.invoke('claude-integration-status') as Promise<{ configured: boolean; hookPath: string }>,
+  claudeIntegrationEnable: () =>
+    ipcRenderer.invoke('claude-integration-enable') as Promise<{ success: boolean; error?: string }>,
+  claudeIntegrationDisable: () =>
+    ipcRenderer.invoke('claude-integration-disable') as Promise<{ success: boolean; error?: string }>,
 })

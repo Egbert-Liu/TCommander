@@ -1,5 +1,7 @@
 import { useAppStore } from '../store'
 import type { Session, SshSessionConfig } from '../types'
+import { terminalPool } from './terminalPool'
+import { getTerminalTheme } from './terminalThemes'
 
 interface CreateSessionInput {
   name: string
@@ -89,9 +91,12 @@ async function createLocalSession(input: CreateSessionInput): Promise<Session | 
     quickActions: input.quickActions ?? [...useAppStore.getState().defaultQuickActions],
     createdAt: Date.now(),
     lastActivityAt: Date.now(),
+    stableActivityAt: Date.now(),
     kind: 'local',
   }
   useAppStore.getState().addSession(session)
+  // 创建对应 xterm 实例（异步）：PTY 输出会先缓存到 pool.pendingData，create 完成后 flush
+  void terminalPool.create(session.id, getTerminalTheme(useAppStore.getState().terminalTheme))
   return session
 }
 
@@ -122,11 +127,14 @@ async function createSshSession(input: CreateSessionInput): Promise<Session | nu
     quickActions: input.quickActions ?? [...useAppStore.getState().defaultQuickActions],
     createdAt: Date.now(),
     lastActivityAt: Date.now(),
+    stableActivityAt: Date.now(),
     kind: 'ssh',
     sshConfig,
     connectionStatus: 'connecting',
   }
   useAppStore.getState().addSession(session)
+  // 创建对应 xterm 实例（异步）：PTY 输出会先缓存到 pool.pendingData，create 完成后 flush
+  void terminalPool.create(session.id, getTerminalTheme(useAppStore.getState().terminalTheme))
   return session
 }
 

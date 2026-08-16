@@ -132,8 +132,59 @@ export function statusPriority(s: string): number {
   return STATUS_PRIORITY[s] ?? 5
 }
 
-function testRule(cleanLine: string, _rawLine: string, rule: TriggerRule): boolean {
-  const text = rule.caseSensitive ? cleanLine : cleanLine.toLowerCase()
+/**
+ * 正则编译缓存：pattern+flags → RegExp。
+ * detectStatusWithRules 每 100ms 每会话调用一次，不缓存的话每次都 new RegExp，
+ * 6 条系统规则 × N 会话 × 10 次/秒 的编译开销非常可观。
+ * 注意：缓存实例不带 g 标志（.test 不推进 lastIndex，无状态化，可安全复用）。
+ */
+const regexCache = new Map<string, RegExp | null>()
+
+function getCachedRegex(pattern: string, caseSensitive: boolean): RegExp | null {
+  const flags = caseSensitive ? '' : 'i'
+  const key = `${flags}:${pattern}`
+  let re = regexCache.get(key)
+  if (re === undefined) {
+    try {
+      re = new RegExp(pattern, flags)
+    } catch {
+      re = null // 非法模式：缓存「编译失败」避免反复尝试
+    }
+    regexCache.set(key, re)
+  }
+  return re
+}
+
+/**
+ * 从后向前拼接 history 分块，只生成「尾部 ≤ maxBytes」的字符串。
+ * 替代 `history.join('')` 后再 tailLines 的做法——后者每次 flush 都要
+ * 拼接整个 512KB 历史只为取 16KB 尾部；本函数只 join 需要的尾部块。
+ * 保证从「换行符之后」开始，避免首行被截断（与 tailLines 语义一致）。
+ */
+export function joinTail(chunks: string[], maxBytes: number): string {
+  let bytes = 0
+  let start = chunks.length
+  while (start > 0) {
+    bytes += chunks[start - 1].length
+    if (bytes > maxBytes) break
+    start--
+  }
+  let joined = chunks.slice(start).join('')
+  if (start > 0 && joined.length > maxBytes) {
+    // 极端情况：首块本身超限，退化为字符级截取并对齐到行首
+    joined = tailLines(joined, maxBytes)
+  } else if (start > 0) {
+    // 前面还有块被丢弃：同样对齐到完整行首，避免 \r 覆盖处理错误
+    const nl = joined.indexOf('\n')
+    if (nl >= 0 && nl < joined.length - 1) joined = joined.slice(nl + 1)
+  }
+  return joined
+}
+
+function testRule(cleanLine: string, lowerLine: string, rule: TriggerRule): boolean {
+  // lowerLine 为调用方预先 toLowerCase 的版本（同一文本被多条规则测试，
+  // 提前算一次避免每条规则重复 lowercase 整段尾部文本）
+  const text = rule.caseSensitive ? cleanLine : lowerLine
   const pattern = rule.caseSensitive ? rule.pattern : rule.pattern.toLowerCase()
 
   switch (rule.triggerType) {
@@ -145,13 +196,10 @@ function testRule(cleanLine: string, _rawLine: string, rule: TriggerRule): boole
       return text.startsWith(pattern)
     case 'endsWith':
       return text.endsWith(pattern)
-    case 'regex':
-      try {
-        const flags = rule.caseSensitive ? 'g' : 'gi'
-        return new RegExp(rule.pattern, flags).test(cleanLine)
-      } catch {
-        return false
-      }
+    case 'regex': {
+      const re = getCachedRegex(rule.pattern, !!rule.caseSensitive)
+      return re ? re.test(cleanLine) : false
+    }
     default:
       return false
   }
@@ -222,14 +270,17 @@ export function detectStatusWithRules(
   const tailLines = lines.slice(-8)
   const tailText = tailLines.join('\n')
   const lastLine = lines[lines.length - 1]
+  // 预 lowercase：tailText/lastLine 各算一次，供所有不区分大小写的规则复用
+  const tailTextLower = tailText.toLowerCase()
+  const lastLineLower = lastLine.toLowerCase()
 
   const activeRules = rules.filter(r => r.enabled)
 
   const matches: { status: SessionStatus; priority: number; ruleName: string }[] = []
 
   for (const rule of activeRules) {
-    const targetText = rule.status === 'idle' ? lastLine : tailText
-    if (testRule(targetText, targetText, rule)) {
+    const isIdleRule = rule.status === 'idle'
+    if (testRule(isIdleRule ? lastLine : tailText, isIdleRule ? lastLineLower : tailTextLower, rule)) {
       matches.push({
         status: rule.status,
         priority: STATUS_PRIORITY[rule.status] ?? 5,

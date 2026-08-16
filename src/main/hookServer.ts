@@ -16,7 +16,11 @@ export interface HookPayload {
   status: 'error' | 'needs-input' | 'needs-confirm' | 'running' | 'idle'
   message?: string
   metadata?: Record<string, any>
-  action?: 'get' | 'update'
+  action?: 'get' | 'update' | 'claude-transcript'
+  /** action === 'claude-transcript'：Claude Code hook 报告的 transcript 信息 */
+  claudeSessionId?: string
+  transcriptPath?: string
+  event?: string
 }
 
 /**
@@ -110,6 +114,34 @@ export function createHookServer(
         return
       }
       
+      // POST /api/session/:sessionId/claude
+      // Claude Code hook 脚本（transcript-hook.js）报告 transcript JSONL 路径：
+      // 主进程 transcriptManager 随后 watch 该文件并增量推送对话条目到渲染进程
+      if (req.method === 'POST' && /^\/api\/session\/[^/]+\/claude$/.test(path)) {
+        const parts = path.split('/')
+        const sessionId = decodeURIComponent(parts[3])
+
+        let body = ''
+        req.on('data', chunk => body += chunk)
+        req.on('end', async () => {
+          try {
+            const payload: HookPayload = JSON.parse(body)
+            payload.action = 'claude-transcript'
+
+            const result = await onRequest(sessionId, payload)
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify(result))
+          } catch (error) {
+            res.writeHead(400, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({
+              success: false,
+              error: `Invalid JSON: ${(error as Error).message}`
+            }))
+          }
+        })
+        return
+      }
+
       // 404
       res.writeHead(404, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ success: false, error: 'Not found' }))

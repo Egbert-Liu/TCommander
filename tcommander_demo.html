@@ -3,182 +3,744 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TCommander - 产品实例展示</title>
+    <title>TCommander — AI 时代的智能终端会话管理器</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root {
+            /* === Color System === */
+            --bg-base: #0a0e1a;
+            --bg-deep: #060912;
+            --bg-elevated: #0f1424;
+            --bg-card: rgba(15, 20, 36, 0.55);
+            --bg-card-hover: rgba(20, 27, 48, 0.7);
+
+            --border-subtle: rgba(148, 163, 184, 0.10);
+            --border-soft: rgba(148, 163, 184, 0.16);
+            --border-strong: rgba(148, 163, 184, 0.28);
+
+            --text-primary: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --text-faint: #64748b;
+
+            --accent: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.45);
+            --accent-soft: rgba(56, 189, 248, 0.12);
+            --violet: #a78bfa;
+            --violet-glow: rgba(167, 139, 250, 0.4);
+            --violet-soft: rgba(167, 139, 250, 0.12);
+            --green: #22c55e;
+            --green-soft: rgba(34, 197, 94, 0.12);
+            --yellow: #fbbf24;
+            --yellow-soft: rgba(251, 191, 36, 0.12);
+            --red: #ef4444;
+            --red-soft: rgba(239, 68, 68, 0.12);
+            --cyan: #22d3ee;
+            --cyan-soft: rgba(34, 211, 238, 0.12);
+
+            /* === Spacing === */
+            --space-xs: 0.5rem;
+            --space-sm: 0.875rem;
+            --space-md: 1.5rem;
+            --space-lg: 2.5rem;
+            --space-xl: 4rem;
+            --space-2xl: 6rem;
+            --space-3xl: 8rem;
+
+            /* === Radius === */
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 22px;
+            --radius-2xl: 28px;
+
+            /* === Type === */
+            --font-display: 'Sora', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-body: 'Manrope', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
         }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html { scroll-behavior: smooth; }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-            background: linear-gradient(135deg, #0f0f1e 0%, #1a1a2e 50%, #16213e 100%);
-            color: #e0e0e0;
-            line-height: 1.6;
+            font-family: var(--font-body);
+            background: var(--bg-base);
+            color: var(--text-secondary);
+            line-height: 1.65;
             overflow-x: hidden;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
-        }
-
-        /* 头部区域 */
-        .hero {
-            padding: 60px 0 40px;
-            text-align: center;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
             position: relative;
+        }
+
+        /* === Background Layers === */
+        .bg-grid {
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(56, 189, 248, 0.025) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(56, 189, 248, 0.025) 1px, transparent 1px);
+            background-size: 56px 56px;
+            mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 80%);
+            -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 80%);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .bg-glow-1 {
+            position: fixed;
+            top: -10%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 900px;
+            height: 700px;
+            background: radial-gradient(circle, rgba(56, 189, 248, 0.12) 0%, transparent 60%);
+            filter: blur(60px);
+            z-index: 0;
+            pointer-events: none;
+            animation: glowPulse 10s ease-in-out infinite;
+        }
+
+        .bg-glow-2 {
+            position: fixed;
+            top: 40%;
+            right: -10%;
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(167, 139, 250, 0.08) 0%, transparent 60%);
+            filter: blur(80px);
+            z-index: 0;
+            pointer-events: none;
+            animation: glowPulse 14s ease-in-out infinite reverse;
+        }
+
+        .particle-field {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
             overflow: hidden;
         }
 
-        .hero::before {
-            content: '';
+        .particle {
             position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, rgba(56, 189, 248, 0.1) 0%, transparent 70%);
-            animation: pulse 8s ease-in-out infinite;
+            width: 2px;
+            height: 2px;
+            background: var(--accent);
+            border-radius: 50%;
+            box-shadow: 0 0 6px var(--accent-glow);
+            animation: float linear infinite;
         }
 
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 0.5; }
-            50% { transform: scale(1.1); opacity: 0.8; }
+        @keyframes float {
+            0%   { transform: translateY(0) translateX(0); opacity: 0; }
+            10%  { opacity: 0.6; }
+            90%  { opacity: 0.6; }
+            100% { transform: translateY(-100vh) translateX(20px); opacity: 0; }
+        }
+
+        @keyframes glowPulse {
+            0%, 100% { transform: translateX(-50%) scale(1); opacity: 0.7; }
+            50%      { transform: translateX(-50%) scale(1.15); opacity: 1; }
         }
 
         @keyframes blink {
             0%, 100% { opacity: 1; }
-            50% { opacity: 0; }
+            50%      { opacity: 0; }
         }
 
-        .hero-content {
+        @keyframes shimmer {
+            0%   { background-position: -200% center; }
+            100% { background-position: 200% center; }
+        }
+
+        /* === Layout === */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
             position: relative;
             z-index: 1;
         }
 
-        .logo {
-            font-size: 48px;
-            font-weight: 700;
-            background: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 16px;
-            letter-spacing: 2px;
+        /* === Glassmorphism === */
+        .glass {
+            background: var(--bg-card);
+            backdrop-filter: blur(16px) saturate(140%);
+            -webkit-backdrop-filter: blur(16px) saturate(140%);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
         }
 
-        .tagline {
-            font-size: 20px;
-            color: #94a3b8;
-            margin-bottom: 24px;
+        /* === Hero === */
+        .hero {
+            padding: 7rem 0 5rem;
+            text-align: center;
+            position: relative;
         }
 
-        .github-link {
+        .hero-badge {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            padding: 10px 20px;
-            background: rgba(56, 189, 248, 0.1);
-            border: 1px solid rgba(56, 189, 248, 0.3);
-            border-radius: 8px;
-            color: #38bdf8;
+            padding: 6px 14px;
+            border-radius: 999px;
+            background: var(--accent-soft);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            color: var(--accent);
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            font-weight: 500;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin-bottom: 1.75rem;
+        }
+
+        .hero-badge-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 8px var(--accent);
+            animation: blink 2s ease-in-out infinite;
+        }
+
+        .hero-title {
+            font-family: var(--font-display);
+            font-size: clamp(3rem, 9vw, 5.5rem);
+            font-weight: 800;
+            line-height: 0.95;
+            letter-spacing: -0.04em;
+            background: linear-gradient(135deg, #f1f5f9 0%, #38bdf8 50%, #a78bfa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 1.25rem;
+        }
+
+        .hero-tagline {
+            font-size: clamp(1.05rem, 2.2vw, 1.4rem);
+            color: var(--text-muted);
+            font-weight: 400;
+            max-width: 620px;
+            margin: 0 auto 3rem;
+            line-height: 1.5;
+        }
+
+        .hero-metrics {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+            max-width: 880px;
+            margin: 0 auto 3rem;
+        }
+
+        .metric {
+            padding: 1.25rem 0.75rem;
+            text-align: center;
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.4s, box-shadow 0.4s;
+        }
+
+        .metric:hover {
+            transform: translateY(-4px);
+            border-color: rgba(56, 189, 248, 0.35);
+            box-shadow: 0 12px 36px rgba(56, 189, 248, 0.08);
+        }
+
+        .metric-value {
+            font-family: var(--font-display);
+            font-size: 1.85rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.02em;
+        }
+
+        .metric-value .unit {
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: var(--accent);
+            margin-left: 2px;
+        }
+
+        .metric-label {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .hero-cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 13px 26px;
+            background: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%);
+            color: #06121f;
             text-decoration: none;
-            font-size: 14px;
-            transition: all 0.3s ease;
-        }
-
-        .github-link:hover {
-            background: rgba(56, 189, 248, 0.2);
-            border-color: rgba(56, 189, 248, 0.5);
-            transform: translateY(-2px);
-        }
-
-        /* 章节标题 */
-        .section {
-            padding: 40px 0;
-        }
-
-        .section-title {
-            font-size: 32px;
             font-weight: 600;
-            margin-bottom: 16px;
-            color: #f0f0f0;
-            position: relative;
-            display: inline-block;
+            font-size: 0.95rem;
+            border-radius: 999px;
+            box-shadow: 0 8px 30px rgba(56, 189, 248, 0.35), 0 0 0 1px rgba(56, 189, 248, 0.3);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s;
         }
 
-        .section-title::after {
+        .hero-cta:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 40px rgba(56, 189, 248, 0.5), 0 0 0 1px rgba(56, 189, 248, 0.5);
+        }
+
+        /* === Sections === */
+        .section {
+            padding: var(--space-2xl) 0;
+            position: relative;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 1.25rem;
+            margin-bottom: 2.5rem;
+        }
+
+        .section-number {
+            font-family: var(--font-display);
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--accent);
+            letter-spacing: 0.15em;
+            padding-top: 0.5rem;
+            position: relative;
+            padding-left: 1.5rem;
+        }
+
+        .section-number::before {
             content: '';
             position: absolute;
-            bottom: -8px;
             left: 0;
-            width: 60px;
-            height: 3px;
-            background: linear-gradient(90deg, #38bdf8, transparent);
-            border-radius: 2px;
+            top: 0.65rem;
+            width: 1rem;
+            height: 1px;
+            background: var(--accent);
+        }
+
+        .section-title-block { flex: 1; }
+
+        .section-title {
+            font-family: var(--font-display);
+            font-size: clamp(1.75rem, 3.5vw, 2.4rem);
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.02em;
+            line-height: 1.15;
+            margin-bottom: 0.6rem;
         }
 
         .section-subtitle {
-            font-size: 16px;
-            color: #94a3b8;
-            margin-bottom: 30px;
+            font-size: 1.05rem;
+            color: var(--text-muted);
+            max-width: 640px;
         }
 
-        /* 页脚 */
-        .footer {
-            padding: 40px 0;
+        /* === Reveal Animation === */
+        .reveal {
+            opacity: 0;
+            transform: translateY(32px);
+            transition: opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1), transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .reveal[data-delay="1"]  { transition-delay: 0.1s; }
+        .reveal[data-delay="2"]  { transition-delay: 0.2s; }
+        .reveal[data-delay="3"]  { transition-delay: 0.3s; }
+        .reveal[data-delay="4"]  { transition-delay: 0.4s; }
+        .reveal[data-delay="5"]  { transition-delay: 0.5s; }
+
+        /* === App Window === */
+        .app-window {
+            border-radius: var(--radius-xl);
+            overflow: hidden;
+            border: 1px solid rgba(56, 189, 248, 0.18);
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5), 0 0 60px rgba(56, 189, 248, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+            background: var(--bg-elevated);
+        }
+
+        /* === Status Cards === */
+        .status-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+            gap: 14px;
+            margin-top: 2rem;
+        }
+
+        .status-card {
+            padding: 1.25rem 1.4rem;
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.35s, box-shadow 0.35s;
+        }
+
+        .status-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 14px 36px rgba(0, 0, 0, 0.3);
+        }
+
+        .status-card-title {
+            font-family: var(--font-display);
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-card-desc {
+            font-size: 0.88rem;
+            color: var(--text-muted);
+            line-height: 1.55;
+        }
+
+        /* === Step Block === */
+        .step-block {
+            margin-top: 1.25rem;
+            padding: 2rem;
+            border-radius: var(--radius-xl);
+        }
+
+        .step-header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 1.75rem;
+        }
+
+        .step-num {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-display);
+            font-size: 1rem;
+            font-weight: 700;
+            color: #06121f;
+            flex-shrink: 0;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .step-num.blue   { background: linear-gradient(135deg, #38bdf8, #0ea5e9); box-shadow: 0 6px 20px rgba(56, 189, 248, 0.35); }
+        .step-num.violet { background: linear-gradient(135deg, #a78bfa, #8b5cf6); box-shadow: 0 6px 20px rgba(167, 139, 250, 0.35); }
+        .step-num.green  { background: linear-gradient(135deg, #22c55e, #16a34a); box-shadow: 0 6px 20px rgba(34, 197, 94, 0.35); }
+        .step-num.cyan   { background: linear-gradient(135deg, #22d3ee, #06b6d4); box-shadow: 0 6px 20px rgba(34, 211, 238, 0.35); }
+        .step-num.yellow { background: linear-gradient(135deg, #fbbf24, #f59e0b); box-shadow: 0 6px 20px rgba(251, 191, 36, 0.35); }
+
+        .step-title {
+            font-family: var(--font-display);
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            letter-spacing: -0.01em;
+        }
+
+        /* === Feature Grid === */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 14px;
+        }
+
+        .feature-card {
+            padding: 1.25rem 1.4rem;
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.35s, box-shadow 0.35s, background 0.35s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(56, 189, 248, 0.3);
+            box-shadow: 0 14px 36px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(56, 189, 248, 0.15);
+            background: var(--bg-card-hover);
+        }
+
+        .feature-card-title {
+            font-family: var(--font-display);
+            font-size: 0.98rem;
+            font-weight: 600;
+            margin-bottom: 0.45rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .feature-card-desc {
+            font-size: 0.86rem;
+            color: var(--text-muted);
+            line-height: 1.55;
+        }
+
+        /* === Code Block === */
+        .code-block {
+            background: #060912;
+            border-radius: var(--radius-md);
+            padding: 1.1rem 1.3rem;
+            font-family: var(--font-mono);
+            font-size: 0.82rem;
+            line-height: 1.85;
+            overflow-x: auto;
+            border: 1px solid var(--border-subtle);
+            color: #94a3b8;
+        }
+
+        /* === Timeline === */
+        .timeline {
+            position: relative;
+            padding-left: 28px;
+        }
+
+        .timeline-line {
+            position: absolute;
+            left: 7px;
+            top: 8px;
+            bottom: 8px;
+            width: 2px;
+            background: linear-gradient(to bottom, #22c55e, #38bdf8, #fbbf24, #22c55e, #64748b);
+            border-radius: 2px;
+        }
+
+        .timeline-node {
+            position: relative;
+            padding-bottom: 1.6rem;
+        }
+
+        .timeline-node:last-child { padding-bottom: 0; }
+
+        .timeline-dot {
+            position: absolute;
+            left: -28px;
+            top: 2px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 2px solid var(--bg-base);
+            box-shadow: 0 0 0 2px rgba(0,0,0,0.4);
+        }
+
+        .timeline-time {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-faint);
+            margin-bottom: 0.25rem;
+            letter-spacing: 0.03em;
+        }
+
+        .timeline-text {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.3rem;
+        }
+
+        .timeline-code {
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            color: var(--text-faint);
+        }
+
+        /* === Flow Diagram === */
+        .flow-diagram {
+            display: flex;
+            align-items: stretch;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 1.5rem;
+        }
+
+        .flow-node {
+            flex: 1;
+            min-width: 130px;
             text-align: center;
-            border-top: 1px solid rgba(148, 163, 184, 0.1);
-            margin-top: 40px;
+            padding: 1.1rem 0.75rem;
+            border-radius: var(--radius-md);
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .flow-node:hover { transform: translateY(-3px); }
+
+        .flow-arrow {
+            display: flex;
+            align-items: center;
+            font-size: 1.3rem;
+            color: var(--text-faint);
+        }
+
+        /* === Rule Chips === */
+        .rule-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 10px;
+        }
+
+        .rule-chip {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            padding: 0.55rem 0.85rem;
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-subtle);
+        }
+
+        /* === Theme Grid === */
+        .theme-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(135px, 1fr));
+            gap: 12px;
+        }
+
+        .theme-card {
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            border: 1px solid var(--border-subtle);
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.35s, box-shadow 0.35s;
+        }
+
+        .theme-card:hover {
+            transform: translateY(-4px) scale(1.02);
+            border-color: rgba(56, 189, 248, 0.4);
+            box-shadow: 0 14px 36px rgba(0, 0, 0, 0.4);
+        }
+
+        .theme-preview {
+            height: 68px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+        }
+
+        .theme-label {
+            padding: 0.5rem 0.6rem;
+            background: var(--bg-elevated);
+            font-family: var(--font-display);
+            font-size: 0.78rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        /* === API Routes === */
+        .api-block {
+            padding: 1.1rem 1.3rem;
+            border-radius: var(--radius-md);
+            background: rgba(6, 9, 18, 0.5);
+            border: 1px solid var(--border-subtle);
+        }
+
+        .api-note {
+            font-size: 0.82rem;
+            color: var(--text-faint);
+            margin-bottom: 0.65rem;
+            font-family: var(--font-mono);
+        }
+
+        .api-route {
+            font-family: var(--font-mono);
+            font-size: 0.82rem;
+            line-height: 2;
+        }
+
+        /* === Footer === */
+        .footer {
+            padding: 4rem 0 3rem;
+            text-align: center;
+            border-top: 1px solid var(--border-subtle);
+            margin-top: 3rem;
+            position: relative;
         }
 
         .footer-text {
-            color: #64748b;
-            font-size: 14px;
-            margin-bottom: 16px;
-        }
-
-        .footer-links {
-            display: flex;
-            justify-content: center;
-            gap: 24px;
-            flex-wrap: wrap;
+            color: var(--text-muted);
+            font-size: 0.98rem;
+            margin-bottom: 1rem;
+            font-weight: 500;
         }
 
         .footer-link {
-            color: #38bdf8;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--accent);
             text-decoration: none;
-            font-size: 14px;
-            transition: color 0.2s ease;
+            font-size: 0.88rem;
+            font-family: var(--font-mono);
+            padding: 8px 16px;
+            border-radius: 999px;
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            background: var(--accent-soft);
+            transition: all 0.3s ease;
         }
 
         .footer-link:hover {
-            color: #0ea5e9;
+            transform: translateY(-2px);
+            border-color: rgba(56, 189, 248, 0.5);
+            box-shadow: 0 8px 24px rgba(56, 189, 248, 0.15);
         }
 
-        /* 响应式 */
+        /* === Responsive === */
         @media (max-width: 768px) {
-            .logo {
-                font-size: 36px;
-            }
-            
-            .section-title {
-                font-size: 24px;
-            }
+            .hero { padding: 4.5rem 0 3rem; }
+            .hero-metrics { grid-template-columns: repeat(2, 1fr); }
+            .section { padding: 3.5rem 0; }
+            .step-block { padding: 1.4rem; }
+            .flow-diagram { flex-direction: column; }
+            .flow-arrow { transform: rotate(90deg); justify-content: center; }
         }
     </style>
 </head>
 <body>
-    <!-- 头部 -->
+    <!-- Background Layers -->
+    <div class="bg-grid"></div>
+    <div class="bg-glow-1"></div>
+    <div class="bg-glow-2"></div>
+    <div class="particle-field" id="particles"></div>
+
+    <!-- ============ HERO ============ -->
     <section class="hero">
-        <div class="container hero-content">
-            <h1 class="logo">TCommander</h1>
-            <p class="tagline">AI时代的智能终端会话管理器 - 产品实例展示</p>
-            <a href="https://github.com/Egbert-Liu/TCommander" target="_blank" class="github-link">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <div class="container">
+            <div class="hero-badge reveal">
+                <span class="hero-badge-dot"></span>
+                AI-Native Terminal Session Manager
+            </div>
+            <h1 class="hero-title reveal" data-delay="1">TCommander</h1>
+            <p class="hero-tagline reveal" data-delay="2">AI 时代的智能终端会话管理器</p>
+
+            <div class="hero-metrics">
+                <div class="metric glass reveal" data-delay="1">
+                    <div class="metric-value">9<span class="unit">套</span></div>
+                    <div class="metric-label">终端主题</div>
+                </div>
+                <div class="metric glass reveal" data-delay="2">
+                    <div class="metric-value">5<span class="unit">种</span></div>
+                    <div class="metric-label">状态感知</div>
+                </div>
+                <div class="metric glass reveal" data-delay="3">
+                    <div class="metric-value" style="font-size:1.4rem;">127.0.0.1</div>
+                    <div class="metric-label">安全隔离</div>
+                </div>
+                <div class="metric glass reveal" data-delay="4">
+                    <div class="metric-value">0<span class="unit">重建</span></div>
+                    <div class="metric-label">切换终端</div>
+                </div>
+            </div>
+
+            <a href="https://github.com/Egbert-Liu/TCommander" target="_blank" class="hero-cta reveal" data-delay="4">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
                 </svg>
                 GitHub 仓库
@@ -186,35 +748,39 @@
         </div>
     </section>
 
-    <!-- 产品实例展示 -->
+    <!-- ============ SECTION 01 — 产品实例展示 ============ -->
     <section class="section">
         <div class="container">
-            <h2 class="section-title">产品实例展示</h2>
-            <p class="section-subtitle">模拟真实使用场景，直观感受 TCommander 的界面与交互</p>
+            <div class="section-header reveal">
+                <span class="section-number">01</span>
+                <div class="section-title-block">
+                    <h2 class="section-title">产品实例展示</h2>
+                    <p class="section-subtitle">模拟真实使用场景，直观感受 TCommander 的界面与交互</p>
+                </div>
+            </div>
 
             <!-- 应用窗口外壳 -->
-            <div style="
-                border-radius: 12px;
+            <div class="app-window reveal" data-delay="1" style="
+                border-radius: 22px;
                 overflow: hidden;
-                border: 1px solid rgba(56, 189, 248, 0.2);
-                box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 40px rgba(56,189,248,0.05);
-                margin-top: 40px;
+                border: 1px solid rgba(56, 189, 248, 0.18);
+                box-shadow: 0 30px 80px rgba(0,0,0,0.5), 0 0 60px rgba(56,189,248,0.06), inset 0 1px 0 rgba(255,255,255,0.04);
+                background: #0f1424;
             ">
                 <!-- 标题栏 -->
                 <div style="
-                    height: 36px;
-                    background: #0f172a;
+                    height: 38px;
+                    background: #0a0e1a;
                     border-bottom: 1px solid #1e293b;
                     display: flex;
                     align-items: center;
-                    padding: 0 12px;
+                    padding: 0 14px;
                     justify-content: space-between;
                 ">
                     <div style="display:flex;align-items:center;gap:8px;">
                         <div style="width:16px;height:16px;border-radius:4px;background:linear-gradient(135deg,#38bdf8,#0ea5e9);display:flex;align-items:center;justify-content:center;font-size:9px;color:#0f172a;font-weight:800;">T</div>
                         <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;color:#e2e8f0;letter-spacing:-0.02em;">TCommander</span>
                         <div style="width:1px;height:16px;background:#1e293b;margin:0 4px;"></div>
-                        <!-- 状态计数 -->
                         <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(34,197,94,0.13);border:1px solid rgba(34,197,94,0.4);color:#22c55e;font-family:'JetBrains Mono',monospace;font-weight:700;">2 运行中</span>
                         <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(251,191,36,0.13);border:1px solid rgba(251,191,36,0.4);color:#fbbf24;font-family:'JetBrains Mono',monospace;font-weight:700;">1 待确认</span>
                         <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(239,68,68,0.13);border:1px solid rgba(239,68,68,0.4);color:#ef4444;font-family:'JetBrains Mono',monospace;font-weight:700;">1 错误</span>
@@ -228,19 +794,18 @@
                 </div>
 
                 <!-- 主体区域 -->
-                <div style="display:flex;background:#0f172a;min-height:520px;">
+                <div style="display:flex;background:#0a0e1a;min-height:520px;">
                     <!-- 左侧边栏 -->
                     <div style="
                         width: 150px;
                         min-width: 150px;
-                        background: #0f172a;
+                        background: #0a0e1a;
                         border-right: 1px solid #1e293b;
                         padding: 8px 6px;
                         display: flex;
                         flex-direction: column;
                     ">
                         <div style="font-size:10px;font-weight:600;color:#475569;font-family:'JetBrains Mono',monospace;padding:4px 6px;margin-bottom:4px;">分组</div>
-                        <!-- 全部会话 -->
                         <div style="
                             padding:4px 8px;border-radius:4px;font-size:11px;color:#e2e8f0;
                             background:rgba(56,189,248,0.1);cursor:pointer;margin-bottom:2px;
@@ -248,7 +813,6 @@
                         ">
                             <span style="font-size:12px;">⊞</span> 全部会话 <span style="font-size:9px;color:#475569;margin-left:auto;">6</span>
                         </div>
-                        <!-- 分组1 -->
                         <div style="
                             padding:4px 8px;border-radius:4px;font-size:11px;color:#94a3b8;
                             cursor:pointer;margin-bottom:2px;display:flex;align-items:center;gap:6px;
@@ -256,7 +820,6 @@
                             <span style="width:8px;height:8px;border-radius:50%;background:#38bdf8;display:inline-block;box-shadow:0 0 4px #38bdf850;"></span>
                             AI 编程 <span style="font-size:9px;color:#475569;margin-left:auto;">3</span>
                         </div>
-                        <!-- 分组2 -->
                         <div style="
                             padding:4px 8px;border-radius:4px;font-size:11px;color:#94a3b8;
                             cursor:pointer;margin-bottom:2px;display:flex;align-items:center;gap:6px;
@@ -264,7 +827,6 @@
                             <span style="width:8px;height:8px;border-radius:50%;background:#a78bfa;display:inline-block;box-shadow:0 0 4px #a78bfa50;"></span>
                             服务器 <span style="font-size:9px;color:#475569;margin-left:auto;">2</span>
                         </div>
-                        <!-- 分组3 -->
                         <div style="
                             padding:4px 8px;border-radius:4px;font-size:11px;color:#94a3b8;
                             cursor:pointer;margin-bottom:2px;display:flex;align-items:center;gap:6px;
@@ -329,6 +891,7 @@
                                     <span style="width:22px;height:20px;border-radius:3px;background:#ef4444;color:#fff;font-size:10px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;">N</span>
                                     <span style="width:28px;height:20px;border-radius:3px;background:#ef4444;color:#fff;font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:1px;cursor:pointer;">⌘C</span>
                                     <div style="flex:1;height:20px;border-radius:3px;background:#0f172a;border:1px solid #334155;padding:0 6px;display:flex;align-items:center;font-size:9px;color:#475569;">输入… Enter发送</div>
+                                    <span style="width:28px;height:20px;border-radius:3px;background:#1e293b;border:1px solid #475569;color:#94a3b8;font-size:9px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;">Copy</span>
                                 </div>
                             </div>
 
@@ -352,6 +915,7 @@
                                 <div style="padding:4px 6px;border-top:1px solid #334155;display:flex;align-items:center;gap:4px;">
                                     <span style="width:28px;height:20px;border-radius:3px;background:#ef4444;color:#fff;font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;">⌘C</span>
                                     <div style="flex:1;height:20px;border-radius:3px;background:#0f172a;border:1px solid #334155;padding:0 6px;display:flex;align-items:center;font-size:9px;color:#475569;">输入… Enter发送</div>
+                                    <span style="width:28px;height:20px;border-radius:3px;background:#1e293b;border:1px solid #475569;color:#94a3b8;font-size:9px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;">Copy</span>
                                 </div>
                             </div>
 
@@ -379,6 +943,7 @@
                                 <div style="padding:4px 6px;border-top:1px solid #334155;display:flex;align-items:center;gap:4px;">
                                     <span style="width:28px;height:20px;border-radius:3px;background:#ef4444;color:#fff;font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;">⌘C</span>
                                     <div style="flex:1;height:20px;border-radius:3px;background:#0f172a;border:1px solid #334155;padding:0 6px;display:flex;align-items:center;font-size:9px;color:#475569;">输入… Enter发送</div>
+                                    <span style="width:28px;height:20px;border-radius:3px;background:#1e293b;border:1px solid #475569;color:#94a3b8;font-size:9px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;">Copy</span>
                                 </div>
                             </div>
 
@@ -408,6 +973,7 @@
                                     <span style="width:28px;height:20px;border-radius:3px;background:#ef4444;color:#fff;font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;">⌘C</span>
                                     <div style="flex:1;height:20px;border-radius:3px;background:#0f172a;border:1px solid #38bdf840;padding:0 6px;display:flex;align-items:center;font-size:9px;color:#38bdf8;">输入指令...<span style="animation:blink 1s step-end infinite;">|</span></div>
                                     <span style="width:22px;height:20px;border-radius:3px;background:#38bdf8;color:#0f172a;font-size:10px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;">↵</span>
+                                    <span style="width:28px;height:20px;border-radius:3px;background:#1e293b;border:1px solid #475569;color:#94a3b8;font-size:9px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;">Copy</span>
                                 </div>
                             </div>
 
@@ -432,6 +998,7 @@
                                 <div style="padding:4px 6px;border-top:1px solid #334155;display:flex;align-items:center;gap:4px;">
                                     <span style="width:28px;height:20px;border-radius:3px;background:#ef4444;color:#fff;font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;">⌘C</span>
                                     <div style="flex:1;height:20px;border-radius:3px;background:#0f172a;border:1px solid #334155;padding:0 6px;display:flex;align-items:center;font-size:9px;color:#475569;">输入… Enter发送</div>
+                                    <span style="width:28px;height:20px;border-radius:3px;background:#1e293b;border:1px solid #475569;color:#94a3b8;font-size:9px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;">Copy</span>
                                 </div>
                             </div>
 
@@ -455,6 +1022,7 @@
                                 <div style="padding:4px 6px;border-top:1px solid #334155;display:flex;align-items:center;gap:4px;">
                                     <span style="width:28px;height:20px;border-radius:3px;background:#ef4444;color:#fff;font-size:9px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;">⌘C</span>
                                     <div style="flex:1;height:20px;border-radius:3px;background:#0f172a;border:1px solid #334155;padding:0 6px;display:flex;align-items:center;font-size:9px;color:#475569;">输入… Enter发送</div>
+                                    <span style="width:28px;height:20px;border-radius:3px;background:#1e293b;border:1px solid #475569;color:#94a3b8;font-size:9px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;">Copy</span>
                                 </div>
                             </div>
 
@@ -464,35 +1032,368 @@
             </div>
 
             <!-- 实例说明 -->
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:24px;">
-                <div style="padding:16px;background:rgba(30,41,59,0.5);border:1px solid #334155;border-radius:8px;">
-                    <div style="font-size:13px;font-weight:600;color:#fbbf24;margin-bottom:6px;">⚠ 需确认</div>
-                    <div style="font-size:12px;color:#94a3b8;">AI助手等待你的决策，Y/N按钮自动出现，一键响应</div>
+            <div class="status-cards">
+                <div class="status-card glass reveal" data-delay="1" style="border-color: rgba(251,191,36,0.18);">
+                    <div class="status-card-title" style="color:#fbbf24;">⚠ 需确认</div>
+                    <div class="status-card-desc">AI助手等待你的决策，Y/N按钮自动出现，一键响应</div>
                 </div>
-                <div style="padding:16px;background:rgba(30,41,59,0.5);border:1px solid #334155;border-radius:8px;">
-                    <div style="font-size:13px;font-weight:600;color:#22c55e;margin-bottom:6px;">● 运行中</div>
-                    <div style="font-size:12px;color:#94a3b8;">正在执行任务，实时预览终端输出，无需切换窗口</div>
+                <div class="status-card glass reveal" data-delay="2" style="border-color: rgba(34,197,94,0.18);">
+                    <div class="status-card-title" style="color:#22c55e;">● 运行中</div>
+                    <div class="status-card-desc">正在执行任务，实时预览终端输出，无需切换窗口</div>
                 </div>
-                <div style="padding:16px;background:rgba(30,41,59,0.5);border:1px solid #334155;border-radius:8px;">
-                    <div style="font-size:13px;font-weight:600;color:#ef4444;margin-bottom:6px;">✕ 错误</div>
-                    <div style="font-size:12px;color:#94a3b8;">自动检测异常并置顶高亮，不会遗漏关键错误</div>
+                <div class="status-card glass reveal" data-delay="3" style="border-color: rgba(239,68,68,0.18);">
+                    <div class="status-card-title" style="color:#ef4444;">✕ 错误</div>
+                    <div class="status-card-desc">自动检测异常并置顶高亮，不会遗漏关键错误</div>
                 </div>
-                <div style="padding:16px;background:rgba(30,41,59,0.5);border:1px solid #334155;border-radius:8px;">
-                    <div style="font-size:13px;font-weight:600;color:#38bdf8;margin-bottom:6px;">▸ 待输入</div>
-                    <div style="font-size:12px;color:#94a3b8;">AI助手等待你的指令，快速输入框直接发送</div>
+                <div class="status-card glass reveal" data-delay="4" style="border-color: rgba(56,189,248,0.18);">
+                    <div class="status-card-title" style="color:#38bdf8;">▸ 待输入</div>
+                    <div class="status-card-desc">AI助手等待你的指令，快速输入框直接发送</div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- 页脚 -->
-    <section class="footer">
+    <!-- ============ SECTION 02 — 演示逻辑 ============ -->
+    <section class="section">
         <div class="container">
-            <p class="footer-text">TCommander - 让AI时代的终端管理更智能、更高效</p>
-            <div class="footer-links">
-                <a href="https://github.com/Egbert-Liu/TCommander" target="_blank" class="footer-link">GitHub 仓库</a>
+            <div class="section-header reveal">
+                <span class="section-number">02</span>
+                <div class="section-title-block">
+                    <h2 class="section-title">演示逻辑</h2>
+                    <p class="section-subtitle">完整工作流：从启动到多会话协同的全链路演示</p>
+                </div>
+            </div>
+
+            <!-- 步骤1: 启动与创建会话 -->
+            <div class="step-block glass reveal" data-delay="1" style="border-color: rgba(56,189,248,0.18);">
+                <div class="step-header">
+                    <div class="step-num blue">1</div>
+                    <h3 class="step-title">启动 TCommander，创建多类型会话</h3>
+                </div>
+                <div class="feature-grid">
+                    <div class="feature-card" style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.2);">
+                        <div class="feature-card-title" style="color:#38bdf8;">📦 本地 PTY 会话</div>
+                        <div class="feature-card-desc" style="font-family:'JetBrains Mono',monospace;font-size:0.8rem;">新建 → 选 Shell → bash/zsh/PowerShell</div>
+                    </div>
+                    <div class="feature-card" style="background:rgba(167,139,250,0.08);border:1px solid rgba(167,139,250,0.2);">
+                        <div class="feature-card-title" style="color:#a78bfa;">🌐 SSH 远程会话</div>
+                        <div class="feature-card-desc" style="font-family:'JetBrains Mono',monospace;font-size:0.8rem;">新建 → SSH → user@host:port + 认证</div>
+                    </div>
+                    <div class="feature-card" style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);">
+                        <div class="feature-card-title" style="color:#22c55e;">🤖 AI 助手会话</div>
+                        <div class="feature-card-desc" style="font-family:'JetBrains Mono',monospace;font-size:0.8rem;">预设 → claude-code / codex-wrapper</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 步骤2: Hook 集成配置 -->
+            <div class="step-block glass reveal" data-delay="1" style="border-color: rgba(167,139,250,0.18);">
+                <div class="step-header">
+                    <div class="step-num violet">2</div>
+                    <h3 class="step-title">配置 Hook 集成，AI 助手主动汇报状态</h3>
+                </div>
+
+                <!-- 数据流图 -->
+                <div class="flow-diagram">
+                    <div class="flow-node" style="background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.3);">
+                        <div style="font-size:24px;">🤖</div>
+                        <div style="font-size:12px;font-weight:600;color:#38bdf8;margin-top:4px;">Claude Code</div>
+                        <div style="font-size:10px;color:#64748b;">调用 MCP 工具</div>
+                    </div>
+                    <div class="flow-arrow">→</div>
+                    <div class="flow-node" style="background:rgba(167,139,250,0.1);border:1px solid rgba(167,139,250,0.3);">
+                        <div style="font-size:24px;">🔌</div>
+                        <div style="font-size:12px;font-weight:600;color:#a78bfa;margin-top:4px;">MCP Server</div>
+                        <div style="font-size:10px;color:#64748b;">stdio 传输</div>
+                    </div>
+                    <div class="flow-arrow" style="color:#a78bfa;">→</div>
+                    <div class="flow-node" style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);">
+                        <div style="font-size:24px;">📡</div>
+                        <div style="font-size:12px;font-weight:600;color:#22c55e;margin-top:4px;">Hook API</div>
+                        <div style="font-size:10px;color:#64748b;">HTTP POST</div>
+                    </div>
+                    <div class="flow-arrow" style="color:#22c55e;">→</div>
+                    <div class="flow-node" style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);">
+                        <div style="font-size:24px;">🎯</div>
+                        <div style="font-size:12px;font-weight:600;color:#fbbf24;margin-top:4px;">TCommander</div>
+                        <div style="font-size:10px;color:#64748b;">卡片状态更新</div>
+                    </div>
+                </div>
+
+                <!-- 配置代码 -->
+                <div class="code-block">
+                    <div style="color:#64748b;"># Claude Code 配置 (~/.claude/config.json)</div>
+                    <div style="color:#94a3b8;">{</div>
+                    <div style="color:#94a3b8;padding-left:16px;"><span style="color:#38bdf8;">"mcpServers"</span>: {</div>
+                    <div style="color:#94a3b8;padding-left:32px;"><span style="color:#a78bfa;">"tcommander"</span>: {</div>
+                    <div style="color:#94a3b8;padding-left:48px;"><span style="color:#38bdf8;">"command"</span>: <span style="color:#22c55e;">"node"</span>,</div>
+                    <div style="color:#94a3b8;padding-left:48px;"><span style="color:#38bdf8;">"args"</span>: [<span style="color:#22c55e;">"hooks/claude-code/mcp-server.js"</span>],</div>
+                    <div style="color:#94a3b8;padding-left:48px;"><span style="color:#38bdf8;">"env"</span>: { <span style="color:#fbbf24;">"TCOMMANDER_SESSION_ID"</span>: <span style="color:#22c55e;">"session-xxx"</span> }</div>
+                    <div style="color:#94a3b8;padding-left:32px;">}</div>
+                    <div style="color:#94a3b8;padding-left:16px;">}</div>
+                    <div style="color:#94a3b8;">}</div>
+                </div>
+
+                <!-- MCP 工具列表 -->
+                <div class="feature-grid" style="margin-top:1rem;">
+                    <div class="feature-card" style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.2);">
+                        <div class="feature-card-title" style="color:#38bdf8;font-family:'JetBrains Mono',monospace;font-size:0.82rem;">tcommander_update_status</div>
+                        <div class="feature-card-desc">更新会话状态 (running/idle/needs-input/needs-confirm/error)</div>
+                    </div>
+                    <div class="feature-card" style="background:rgba(167,139,250,0.08);border:1px solid rgba(167,139,250,0.2);">
+                        <div class="feature-card-title" style="color:#a78bfa;font-family:'JetBrains Mono',monospace;font-size:0.82rem;">tcommander_list_sessions</div>
+                        <div class="feature-card-desc">列出所有会话及状态（含 emoji 标记）</div>
+                    </div>
+                    <div class="feature-card" style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);">
+                        <div class="feature-card-title" style="color:#22c55e;font-family:'JetBrains Mono',monospace;font-size:0.82rem;">tcommander_get_session</div>
+                        <div class="feature-card-desc">获取单个会话详情（名称/状态/规则匹配）</div>
+                    </div>
+                </div>
+
+                <!-- HTTP API 路由 -->
+                <div class="api-block" style="margin-top:1rem;">
+                    <div class="api-note">HTTP Hook API — 监听 127.0.0.1:19527（仅本地，安全隔离）</div>
+                    <div class="api-route">
+                        <div><span style="color:#22c55e;font-weight:600;">POST</span> <span style="color:#94a3b8;">/api/session/:id/status</span> <span style="color:#475569;">→ 更新状态</span></div>
+                        <div><span style="color:#38bdf8;font-weight:600;">GET</span>&nbsp;&nbsp; <span style="color:#94a3b8;">/api/session/:id/status</span> <span style="color:#475569;">→ 查询单个会话</span></div>
+                        <div><span style="color:#38bdf8;font-weight:600;">GET</span>&nbsp;&nbsp; <span style="color:#94a3b8;">/api/sessions</span> <span style="color:#475569;">→ 列出所有会话</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 步骤3: 状态实时流转 -->
+            <div class="step-block glass reveal" data-delay="1" style="border-color: rgba(34,197,94,0.18);">
+                <div class="step-header">
+                    <div class="step-num green">3</div>
+                    <h3 class="step-title">状态实时流转，卡片自动排序</h3>
+                </div>
+
+                <!-- 时间线 -->
+                <div class="timeline">
+                    <div class="timeline-line"></div>
+
+                    <div class="timeline-node">
+                        <div class="timeline-dot" style="background:#22c55e;"></div>
+                        <div class="timeline-time">T+0s</div>
+                        <div class="timeline-text">用户输入指令 → 状态变为 <span style="color:#22c55e;font-weight:600;">running</span></div>
+                        <div class="timeline-code">MCP: tcommander_update_status(status="running")</div>
+                    </div>
+
+                    <div class="timeline-node">
+                        <div class="timeline-dot" style="background:#38bdf8;"></div>
+                        <div class="timeline-time">T+3s</div>
+                        <div class="timeline-text">AI 开始输出 → PTY 数据流持续写入 xterm buffer，卡片实时预览</div>
+                        <div class="timeline-code">terminalPool: onSessionOutput → xterm.write()</div>
+                    </div>
+
+                    <div class="timeline-node">
+                        <div class="timeline-dot" style="background:#fbbf24;"></div>
+                        <div class="timeline-time">T+12s</div>
+                        <div class="timeline-text">AI 请求确认修改 → <span style="color:#fbbf24;font-weight:600;">needs-confirm</span>，卡片自动置顶 + Y/N 按钮出现</div>
+                        <div class="timeline-code">规则匹配: sys-confirm-yn (contains "y/n") → needs-confirm</div>
+                    </div>
+
+                    <div class="timeline-node">
+                        <div class="timeline-dot" style="background:#22c55e;"></div>
+                        <div class="timeline-time">T+13s</div>
+                        <div class="timeline-text">用户点击 Y → 发送 <span style="color:#22c55e;font-family:monospace;">'y\r'</span>，状态回到 <span style="color:#22c55e;font-weight:600;">running</span></div>
+                        <div class="timeline-code">sendInput(sessionId, 'y\r') → handleDismissStatus → running</div>
+                    </div>
+
+                    <div class="timeline-node">
+                        <div class="timeline-dot" style="background:#94a3b8;"></div>
+                        <div class="timeline-time">T+30s</div>
+                        <div class="timeline-text">任务完成，10s 无活动 → <span style="color:#94a3b8;font-weight:600;">idle</span>，卡片回到普通位置</div>
+                        <div class="timeline-code">IDLE_THRESHOLD_MS = 10000 → sortSessions 降级排序</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 步骤 3.5: 终端实例池架构 -->
+            <div class="step-block glass reveal" data-delay="1" style="border-color: rgba(34,211,238,0.18);">
+                <div class="step-header">
+                    <div class="step-num cyan">⚙</div>
+                    <h3 class="step-title">终端实例池：卡片即终端</h3>
+                </div>
+
+                <div class="feature-grid">
+                    <div class="feature-card" style="background:rgba(34,211,238,0.08);border:1px solid rgba(34,211,238,0.2);">
+                        <div class="feature-card-title" style="color:#22d3ee;">一会话一 xterm</div>
+                        <div class="feature-card-desc">每个会话独立 Terminal 实例 + containerDiv，动态 import xterm.js</div>
+                    </div>
+                    <div class="feature-card" style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.2);">
+                        <div class="feature-card-title" style="color:#38bdf8;">DOM 转移</div>
+                        <div class="feature-card-desc">双击进全屏 = appendChild 转移 containerDiv，不销毁不重建</div>
+                    </div>
+                    <div class="feature-card" style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);">
+                        <div class="feature-card-title" style="color:#22c55e;">零 CPU 休眠</div>
+                        <div class="feature-card-desc">不可见时 detach，buffer 持续 write 但不渲染</div>
+                    </div>
+                    <div class="feature-card" style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);">
+                        <div class="feature-card-title" style="color:#fbbf24;">异步安全</div>
+                        <div class="feature-card-desc">pendingData 缓存(256KB) + destroyed Set 防竞态 + 双 rAF 延迟 open</div>
+                    </div>
+                </div>
+
+                <!-- 关键参数 -->
+                <div class="code-block" style="margin-top:1rem;">
+                    <div><span style="color:#64748b;">CARD_FONT_SIZE</span>       = <span style="color:#22c55e;">10</span>          <span style="color:#475569;">// 卡片预览字体</span></div>
+                    <div><span style="color:#64748b;">FULLSCREEN_FONT_SIZE</span> = <span style="color:#22c55e;">13</span>          <span style="color:#475569;">// 全屏终端字体</span></div>
+                    <div><span style="color:#64748b;">SCROLLBACK</span>           = <span style="color:#22c55e;">10000</span>      <span style="color:#475569;">// 滚动缓冲行数</span></div>
+                    <div><span style="color:#64748b;">PENDING_BYTE_LIMIT</span>  = <span style="color:#22c55e;">256KB</span>       <span style="color:#475569;">// 异步缓存上限（防 OOM）</span></div>
+                </div>
+            </div>
+
+            <!-- 步骤4: 多会话协同 -->
+            <div class="step-block glass reveal" data-delay="1" style="border-color: rgba(251,191,36,0.18);">
+                <div class="step-header">
+                    <div class="step-num yellow">4</div>
+                    <h3 class="step-title">多会话协同，一键响应</h3>
+                </div>
+
+                <div class="feature-grid">
+                    <div class="feature-card" style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);">
+                        <div class="feature-card-title" style="color:#fbbf24;">⚠ 智能排序</div>
+                        <div class="feature-card-desc">error(0) > needs-confirm(1) > needs-input(2) 自动置顶，基于 stableActivityAt 防抖</div>
+                    </div>
+                    <div class="feature-card" style="background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.2);">
+                        <div class="feature-card-title" style="color:#38bdf8;">⚡ 快捷操作</div>
+                        <div class="feature-card-desc">Y/N（仅需确认时）、⌘C 中断、↑↓ 历史命令、Copy 复制、Enter 确认</div>
+                    </div>
+                    <div class="feature-card" style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);">
+                        <div class="feature-card-title" style="color:#22c55e;">📺 全屏切换</div>
+                        <div class="feature-card-desc">双击进入全屏，DOM 转移保留完整 buffer，Ctrl+Alt+←→切换会话</div>
+                    </div>
+                    <div class="feature-card" style="background:rgba(167,139,250,0.08);border:1px solid rgba(167,139,250,0.2);">
+                        <div class="feature-card-title" style="color:#a78bfa;">💾 环境恢复</div>
+                        <div class="feature-card-desc">快照保存所有会话配置，重启后一键恢复完整工作环境</div>
+                    </div>
+                </div>
+
+                <!-- 系统状态检测规则 -->
+                <div class="api-block" style="margin-top:1rem;">
+                    <div style="font-size:0.85rem;font-weight:600;color:#e2e8f0;margin-bottom:0.75rem;font-family:var(--font-display);">🛡 6 条系统默认状态检测规则</div>
+                    <div class="rule-grid">
+                        <div class="rule-chip" style="background:rgba(239,68,68,0.08);border-color:rgba(239,68,68,0.2);">
+                            <span style="color:#ef4444;">sys-error</span> → error
+                        </div>
+                        <div class="rule-chip" style="background:rgba(251,191,36,0.08);border-color:rgba(251,191,36,0.2);">
+                            <span style="color:#fbbf24;">sys-confirm-yn</span> → needs-confirm
+                        </div>
+                        <div class="rule-chip" style="background:rgba(251,191,36,0.08);border-color:rgba(251,191,36,0.2);">
+                            <span style="color:#fbbf24;">sys-confirm-question</span> → needs-confirm
+                        </div>
+                        <div class="rule-chip" style="background:rgba(251,191,36,0.08);border-color:rgba(251,191,36,0.2);">
+                            <span style="color:#fbbf24;">sys-confirm-choice</span> → needs-confirm
+                        </div>
+                        <div class="rule-chip" style="background:rgba(251,191,36,0.08);border-color:rgba(251,191,36,0.2);">
+                            <span style="color:#fbbf24;">sys-trust-folder</span> → needs-confirm
+                        </div>
+                        <div class="rule-chip" style="background:rgba(56,189,248,0.08);border-color:rgba(56,189,248,0.2);">
+                            <span style="color:#38bdf8;">sys-needs-input</span> → needs-input
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 终端主题展示 -->
+            <div class="step-block glass reveal" data-delay="1" style="border-color: rgba(56,189,248,0.18);">
+                <h3 style="font-family:var(--font-display);font-size:1.2rem;font-weight:600;color:#e2e8f0;margin-bottom:1.25rem;">🎨 终端主题系统（9 套内置主题，6 暗 + 3 亮）</h3>
+                <div class="theme-grid">
+                    <!-- 暗色组 -->
+                    <div class="theme-card">
+                        <div class="theme-preview" style="background:#0d1117;color:#c9d1d9;">$ <span style="animation:blink 1s step-end infinite;">|</span></div>
+                        <div class="theme-label">GitHub Dark</div>
+                    </div>
+                    <div class="theme-card">
+                        <div class="theme-preview" style="background:#282a36;color:#f8f8f2;">$ <span style="animation:blink 1s step-end infinite;">|</span></div>
+                        <div class="theme-label">Dracula</div>
+                    </div>
+                    <div class="theme-card">
+                        <div class="theme-preview" style="background:#2E2E2E;color:#FCFCFA;">$ <span style="animation:blink 1s step-end infinite;">|</span></div>
+                        <div class="theme-label">Monokai Pro</div>
+                    </div>
+                    <div class="theme-card">
+                        <div class="theme-preview" style="background:#282c34;color:#abb2bf;">$ <span style="animation:blink 1s step-end infinite;">|</span></div>
+                        <div class="theme-label">One Dark</div>
+                    </div>
+                    <div class="theme-card">
+                        <div class="theme-preview" style="background:#2E3440;color:#D8DEE9;">$ <span style="animation:blink 1s step-end infinite;">|</span></div>
+                        <div class="theme-label">Nord</div>
+                    </div>
+                    <div class="theme-card">
+                        <div class="theme-preview" style="background:#1e1e2e;color:#cdd6f4;">$ <span style="animation:blink 1s step-end infinite;">|</span></div>
+                        <div class="theme-label">Catppuccin Mocha</div>
+                    </div>
+                    <!-- 亮色组 -->
+                    <div class="theme-card">
+                        <div class="theme-preview" style="background:#ffffff;color:#24292f;">$ <span style="animation:blink 1s step-end infinite;">|</span></div>
+                        <div class="theme-label">GitHub Light</div>
+                    </div>
+                    <div class="theme-card">
+                        <div class="theme-preview" style="background:#fdf6e3;color:#657b83;">$ <span style="animation:blink 1s step-end infinite;">|</span></div>
+                        <div class="theme-label">Solarized Light</div>
+                    </div>
+                    <div class="theme-card">
+                        <div class="theme-preview" style="background:#eff1f5;color:#4c4f69;">$ <span style="animation:blink 1s step-end infinite;">|</span></div>
+                        <div class="theme-label">Catppuccin Latte</div>
+                    </div>
+                </div>
+                <div style="margin-top:1rem;font-size:0.85rem;color:#64748b;">全屏终端可实时切换主题，卡片与全屏视觉保持一致</div>
             </div>
         </div>
     </section>
+
+    <!-- ============ FOOTER ============ -->
+    <footer class="footer">
+        <div class="container">
+            <p class="footer-text">TCommander — 让 AI 时代的终端管理更智能、更高效</p>
+            <a href="https://github.com/Egbert-Liu/TCommander" target="_blank" class="footer-link">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                </svg>
+                github.com/Egbert-Liu/TCommander
+            </a>
+        </div>
+    </footer>
+
+    <script>
+        // === 粒子背景 ===
+        (function() {
+            const field = document.getElementById('particles');
+            const count = 36;
+            for (let i = 0; i < count; i++) {
+                const p = document.createElement('span');
+                p.className = 'particle';
+                p.style.left = Math.random() * 100 + '%';
+                p.style.top = (100 + Math.random() * 20) + '%';
+                p.style.animationDelay = (Math.random() * 12) + 's';
+                p.style.animationDuration = (10 + Math.random() * 14) + 's';
+                const size = 1 + Math.random() * 2;
+                p.style.width = size + 'px';
+                p.style.height = size + 'px';
+                p.style.opacity = 0.2 + Math.random() * 0.4;
+                if (Math.random() > 0.7) {
+                    p.style.background = '#a78bfa';
+                    p.style.boxShadow = '0 0 6px rgba(167,139,250,0.5)';
+                }
+                field.appendChild(p);
+            }
+        })();
+
+        // === 滚动渐入动画 ===
+        (function() {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible');
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+
+            document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+        })();
+    </script>
 </body>
 </html>

@@ -1,11 +1,22 @@
 import { app, BrowserWindow, ipcMain, Menu } from 'electron'
 import path from 'path'
+import os from 'os'
+import fs from 'fs'
 import { createPtyManager } from './pty'
 import { createStorageManager } from './storage'
 import { secretStorage } from './secretStorage'
+import { createHookServer, HookRequestHandler, HookPayload, HookResponse } from './hookServer'
+import { createTranscriptManager, TranscriptManager } from './transcriptManager'
 
 const ptyManager = createPtyManager()
 const storageManager = createStorageManager()
+
+// Hook server 实例（延迟到 app.whenReady 后初始化）
+let hookServer: ReturnType<typeof createHookServer> | null = null
+const HOOK_PORT = 19527
+
+// Claude Code transcript 管理器：watch transcript JSONL 并增量推送渲染进程
+let transcriptManager: TranscriptManager | null = null
 
 let mainWindow: BrowserWindow | null = null
 // 标记：用户已确认关闭后置 true，跳过后续的确认弹窗
@@ -30,6 +41,129 @@ function getIconPath(): string {
     return path.join(process.resourcesPath, 'app.asar.unpacked', 'build', 'icon.ico')
   }
   return path.join(__dirname, '..', '..', 'build', 'icon.ico')
+}
+
+// ========== Claude Code 集成：transcript hook 一键配置 ==========
+// 写入 ~/.claude/settings.json 的 hooks，让 Claude Code 在事件触发时执行
+// transcript-hook.js 报告 transcript 路径（MD 渲染层的数据源）
+
+/** 识别「我们写入的 hook 条目」的标记（command 中包含脚本文件名） */
+const TRANSCRIPT_HOOK_MARKER = 'transcript-hook.js'
+/** 需要挂 hook 的 Claude Code 事件：首条输入报告路径 + 每轮结束触发增量读 */
+const CLAUDE_HOOK_EVENTS = ['UserPromptSubmit', 'PostToolUse', 'Stop']
+
+function getTranscriptHookPath(): string {
+  if (app.isPackaged) {
+    // extraResources 把 hooks/ 复制到 resources/hooks
+    return path.join(process.resourcesPath, 'hooks', 'claude-code', 'transcript-hook.js')
+  }
+  return path.join(__dirname, '..', '..', 'hooks', 'claude-code', 'transcript-hook.js')
+}
+
+function getClaudeSettingsPath(): string {
+  return path.join(os.homedir(), '.claude', 'settings.json')
+}
+
+function readClaudeSettings(): Record<string, any> {
+  try {
+    const raw = fs.readFileSync(getClaudeSettingsPath(), 'utf8')
+    return JSON.parse(raw)
+  } catch {
+    return {} // 不存在或损坏：视为空配置
+  }
+}
+
+function isOurHookEntry(hookEntry: any): boolean {
+  return (
+    hookEntry &&
+    typeof hookEntry === 'object' &&
+    hookEntry.type === 'command' &&
+    typeof hookEntry.command === 'string' &&
+    hookEntry.command.includes(TRANSCRIPT_HOOK_MARKER)
+  )
+}
+
+function claudeIntegrationConfigured(): boolean {
+  const settings = readClaudeSettings()
+  const hooks = settings?.hooks
+  if (!hooks || typeof hooks !== 'object') return false
+  for (const event of Object.values(hooks)) {
+    if (!Array.isArray(event)) continue
+    for (const group of event) {
+      if (group && Array.isArray(group.hooks) && group.hooks.some(isOurHookEntry)) {
+        return true
+      }
+    }
+  }
+  return false
+}
+
+function claudeIntegrationEnable(): { success: boolean; error?: string } {
+  try {
+    const settingsPath = getClaudeSettingsPath()
+    const settings = readClaudeSettings()
+
+    // 首次写入前备份原配置（存在才备份）
+    if (!fs.existsSync(settingsPath + '.tcommander-bak')) {
+      try {
+        fs.copyFileSync(settingsPath, settingsPath + '.tcommander-bak')
+      } catch { /* 原文件不存在（首次配置）无需备份 */ }
+    }
+
+    const command = `node "${getTranscriptHookPath()}"`
+    if (!settings.hooks || typeof settings.hooks !== 'object') settings.hooks = {}
+
+    for (const eventName of CLAUDE_HOOK_EVENTS) {
+      if (!Array.isArray(settings.hooks[eventName])) settings.hooks[eventName] = []
+      // 去重：已存在则跳过
+      const exists = settings.hooks[eventName].some(
+        (group: any) => group && Array.isArray(group.hooks) && group.hooks.some(isOurHookEntry)
+      )
+      if (!exists) {
+        settings.hooks[eventName].push({
+          hooks: [{ type: 'command', command }]
+        })
+      }
+    }
+
+    fs.mkdirSync(path.dirname(settingsPath), { recursive: true })
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8')
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
+}
+
+function claudeIntegrationDisable(): { success: boolean; error?: string } {
+  try {
+    const settingsPath = getClaudeSettingsPath()
+    const settings = readClaudeSettings()
+    const hooks = settings?.hooks
+    if (hooks && typeof hooks === 'object') {
+      for (const eventName of Object.keys(hooks)) {
+        const event = hooks[eventName]
+        if (!Array.isArray(event)) continue
+        // 移除组内我们的 hook 条目；组空则移除组；事件空则移除事件
+        const filtered = event
+          .map((group: any) => {
+            if (!group || !Array.isArray(group.hooks)) return group
+            const kept = group.hooks.filter((h: any) => !isOurHookEntry(h))
+            return kept.length > 0 ? { ...group, hooks: kept } : null
+          })
+          .filter((g: any) => g != null)
+        if (filtered.length > 0) {
+          hooks[eventName] = filtered
+        } else {
+          delete hooks[eventName]
+        }
+      }
+      if (Object.keys(hooks).length === 0) delete settings.hooks
+      fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf8')
+    }
+    return { success: true }
+  } catch (e) {
+    return { success: false, error: (e as Error).message }
+  }
 }
 
 function createWindow() {
@@ -152,7 +286,10 @@ app.whenReady().then(() => {
 
   ipcMain.handle('create-session', (_, config) => ptyManager.createSession(config))
   ipcMain.handle('send-input', (_, sessionId, data) => ptyManager.sendInput(sessionId, data))
-  ipcMain.handle('close-session', (_, sessionId) => ptyManager.closeSession(sessionId))
+  ipcMain.handle('close-session', (_, sessionId) => {
+    transcriptManager?.cleanup(sessionId)
+    return ptyManager.closeSession(sessionId)
+  })
   ipcMain.handle('resize-session', (_, sessionId, cols, rows) => 
     ptyManager.resizeSession(sessionId, cols, rows)
   )
@@ -242,6 +379,86 @@ app.whenReady().then(() => {
     }
   })
 
+  // ========== 启动 Hook 服务器（Claude Code 等工具回调） ==========
+  const hookHandler: HookRequestHandler = async (
+    sessionId: string,
+    payload: HookPayload
+  ): Promise<HookResponse> => {
+    if (payload.action === 'get') {
+      // 查询会话状态
+      if (sessionId) {
+        const session = ptyManager.listSessions().find(id => id === sessionId)
+        if (!session) {
+          return { success: false, error: 'Session not found' }
+        }
+        // 从渲染进程 store 获取会话详情（通过 IPC 回传）
+        if (!isWindowValid()) {
+          return { success: false, error: 'Renderer not ready' }
+        }
+        const sessionData = await mainWindow!.webContents.executeJavaScript(
+          `window.__getHookSessionData?.('${sessionId}')`
+        )
+        return { success: true, sessionId, data: sessionData }
+      } else {
+        // 列出所有会话
+        if (!isWindowValid()) {
+          return { success: false, error: 'Renderer not ready' }
+        }
+        const allSessions = await mainWindow!.webContents.executeJavaScript(
+          `window.__getHookAllSessions?.()`
+        )
+        return { success: true, data: allSessions }
+      }
+    }
+
+    if (payload.action === 'claude-transcript') {
+      // Claude Code hook 报告 transcript 路径：绑定 watch，后续增量推送到渲染进程
+      if (!sessionId || !payload.transcriptPath) {
+        return { success: false, error: 'Missing sessionId or transcriptPath' }
+      }
+      transcriptManager?.bind(sessionId, payload.claudeSessionId || '', payload.transcriptPath)
+      return { success: true, sessionId }
+    }
+
+    if (payload.action === 'update') {
+      // 更新会话状态（推送到渲染进程）
+      if (!sessionId) {
+        return { success: false, error: 'Missing sessionId' }
+      }
+      if (!isWindowValid()) {
+        return { success: false, error: 'Renderer not ready' }
+      }
+      try {
+        mainWindow!.webContents.send('hook-status-update', sessionId, payload)
+        return { success: true, sessionId, newStatus: payload.status }
+      } catch (e) {
+        return { success: false, error: (e as Error).message }
+      }
+    }
+
+    return { success: false, error: 'Unknown action' }
+  }
+
+  hookServer = createHookServer(HOOK_PORT, hookHandler)
+
+  // Transcript 管理器：增量解析结果经 IPC 推送渲染进程（全屏 MD 对话流数据源）
+  transcriptManager = createTranscriptManager((sessionId, appended) => {
+    if (!isWindowValid()) return
+    try {
+      mainWindow!.webContents.send('claude-transcript', sessionId, appended)
+    } catch {
+      // 窗口已被销毁
+    }
+  })
+
+  // Claude Code 集成配置（读写 ~/.claude/settings.json 的 hooks）
+  ipcMain.handle('claude-integration-status', () => ({
+    configured: claudeIntegrationConfigured(),
+    hookPath: getTranscriptHookPath()
+  }))
+  ipcMain.handle('claude-integration-enable', () => claudeIntegrationEnable())
+  ipcMain.handle('claude-integration-disable', () => claudeIntegrationDisable())
+
   createWindow()
 
   app.on('activate', () => {
@@ -252,6 +469,9 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
+  // 所有平台先释放 PTY：darwin 关窗后应用常驻，避免留下无头 PTY 孤儿进程；
+  // 其余平台随后 app.quit() → before-quit 里会再次 dispose（dispose 对空 Map 无害、幂等）
+  ptyManager.dispose()
   if (process.platform !== 'darwin') {
     app.quit()
   }
@@ -259,4 +479,15 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   ptyManager.dispose()
+  // 释放 transcript watcher
+  transcriptManager?.dispose()
+  transcriptManager = null
+  // 关闭 Hook 服务器
+  if (hookServer) {
+    // 先主动断开所有保持中的连接（http.Server 的 Node ≥18.2 API，
+    // 可选调用保证低版本运行时静默跳过），再 close 更利于 close 回调完成
+    hookServer.closeAllConnections?.()
+    hookServer.close()
+    hookServer = null
+  }
 })

@@ -34,6 +34,7 @@ export interface LocalPtyOptions {
   cwd?: string
   cols?: number
   rows?: number
+  sessionId?: string
 }
 
 export class LocalPtyBackend implements TerminalBackend {
@@ -49,16 +50,25 @@ export class LocalPtyBackend implements TerminalBackend {
       ? opts.cwd
       : os.homedir()
 
+    // 构建环境变量，注入 TCommander Hook API 信息
+    const env: Record<string, string> = {
+      ...process.env as Record<string, string>,
+      TERM: 'xterm-256color',
+      LANG: 'en_US.UTF-8',
+    }
+
+    // 注入 Hook API 环境变量，供 Claude Code 等工具回调
+    if (opts.sessionId) {
+      env.TCOMMANDER_SESSION_ID = opts.sessionId
+      env.TCOMMANDER_API_URL = 'http://127.0.0.1:19527'
+    }
+
     this.proc = pty.spawn(shell, [], {
       name: 'xterm-256color',
       cols: opts.cols || 160,
       rows: opts.rows || 40,
       cwd,
-      env: {
-        ...process.env,
-        TERM: 'xterm-256color',
-        LANG: 'en_US.UTF-8',
-      },
+      env,
     })
 
     this.proc.onData((data) => {

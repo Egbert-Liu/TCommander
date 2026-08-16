@@ -1,16 +1,16 @@
-import { useState, useRef, useMemo, memo } from 'react'
-import { Tag, Button, Input, Checkbox, Tooltip, Dropdown, Modal } from 'antd'
+import { useState, useRef, useEffect, memo } from 'react'
+import { Tag, Button, Input, Checkbox, Tooltip, Dropdown, Modal, message } from 'antd'
 import {
   DeleteFilled, EditFilled,
   MoreOutlined, CheckOutlined,
-  ArrowUpOutlined, ArrowDownOutlined, SendOutlined, EnterOutlined,
-  ReloadOutlined, SafetyCertificateFilled, ExpandAltOutlined
+  ArrowUpOutlined, ArrowDownOutlined, EnterOutlined,
+  ReloadOutlined, SafetyCertificateFilled, ExpandAltOutlined, CopyOutlined
 } from '@ant-design/icons'
 import { Session } from '../types'
 import { useAppStore } from '../store'
 import { STATUS_COLORS } from '../utils/statusColors'
-import { ansiToHtml } from '../utils/ansiToHtml'
 import { getTerminalTheme } from '../utils/terminalThemes'
+import { terminalPool } from '../utils/terminalPool'
 
 interface SessionCardProps {
   session: Session
@@ -18,6 +18,8 @@ interface SessionCardProps {
   selectable?: boolean
   selected?: boolean
   onSelect?: (id: string, selected: boolean) => void
+  /** 侧边栏会话节点导航定位时的 2s 主色描边高亮 */
+  highlight?: boolean
 }
 
 const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string; glow: boolean }> = {
@@ -31,6 +33,11 @@ const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string; 
 // 已从 UI 移除（用户要求"代码保留"）
 // const ALL_QUICK_ACTIONS = ['Y', 'N', 'CtrlC', 'Up', 'Down', 'Input', 'Send', 'Enter']
 
+/**
+ * 卡片 Markdown 渲染层已按需求移除：Markdown 实时渲染仅在全屏终端生效，
+ * 开关移至 Toolbar 设置菜单（markdownEnabled）。
+ */
+
 // const ACTION_LABELS: Record<string, string> = {
 //   'Y': 'Y',
 //   'N': 'N',
@@ -43,7 +50,7 @@ const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string; 
 // }
 
 function SessionCardImpl(props: SessionCardProps) {
-  const { session, onResetSession, selectable, selected, onSelect } = props
+  const { session, onResetSession, selectable, selected, onSelect, highlight } = props
   const removeSession = useAppStore((s) => s.removeSession)
   const updateSession = useAppStore((s) => s.updateSession)
   const setActiveSession = useAppStore((s) => s.setActiveSession)
@@ -51,53 +58,42 @@ function SessionCardImpl(props: SessionCardProps) {
   const groups = useAppStore((s) => s.groups)
   const previewLineCount = useAppStore((s) => s.previewLineCount)
   const terminalThemeId = useAppStore((s) => s.terminalTheme)
+  const isFullscreen = useAppStore((s) => s.isFullscreen)
 
-  const [input, setInput] = useState('')
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState(session.name)
   const nameInputRef = useRef<any>(null)
 
+  // xterm 容器 ref：terminalPool.attach 时把 containerDiv 挂到这里
+  const termHostRef = useRef<HTMLDivElement>(null)
+
   const quickActions = session.quickActions
 
-  const preview = useMemo(() => {
-    if (!session.previewText) return '等待输出...'
-    const lines = session.previewText.split('\n')
-    return lines.slice(-previewLineCount).join('\n')
-  }, [session.previewText, previewLineCount])
+  // 终端主题色：仅用于容器 div 的背景兜底（xterm 自身也渲染主题背景）
+  const themeBg = getTerminalTheme(terminalThemeId).colors.background
 
-  // 终端主题：预览区背景/前景直接取自当前终端主题，使卡片预览与 xterm.js
-  // 全屏终端视觉完全一致（深色主题→深色预览，亮色主题→亮色预览）。
-  const terminalTheme = useMemo(() => getTerminalTheme(terminalThemeId), [terminalThemeId])
-  const themeBg = terminalTheme.colors.background
-  const themeFg = terminalTheme.colors.foreground
-
-  // 将带 ANSI SGR 转义的预览文本渲染为带内联颜色的 HTML，使用当前终端主题调色板，
-  // 让卡片预览的配色与 xterm.js 全屏终端完全一致（解决用户反馈「外面看没有颜色」）。
-  // ansiToHtml 内部已对纯文本做 escapeHtml，再通过 dangerouslySetInnerHTML 注入是安全的。
-  const previewHtml = useMemo(() => {
-    if (!session.previewText) return ''
-    return ansiToHtml(preview, terminalTheme)
-  }, [preview, terminalTheme, session.previewText])
-
-  const handleSendInput = async () => {
-    if (input.trim()) {
-      // 多行文本：把 textarea 内的换行转为 PTY 的回车，整体一次性发送
-      await window.electronAPI.sendInput(session.id, input + '\r')
-      setInput('')
-    }
-  }
-
-  // 回车 = 发送；Shift+回车 = 换行（不换行则不会阻止默认行为）
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter') {
-      if (e.shiftKey) {
-        // 让 textarea 正常插入换行，不做其它处理
-        return
+  // 挂载 xterm 实例到卡片预览区
+  // - 非全屏模式：attach 到卡片；全屏模式：不抢占（FullscreenTerminal 自己 attach）
+  // - 全屏退出时：重新 attach 回卡片
+  // - 卡片卸载时：仅当 xterm 当前挂在 card 上才 detach
+  useEffect(() => {
+    const el = termHostRef.current
+    if (!el) return
+    // 全屏模式下不抢占 xterm
+    if (isFullscreen) return
+    terminalPool.attach(session.id, el, 'card')
+    return () => {
+      const inst = terminalPool.get(session.id)
+      if (inst && inst.attachedTo === 'card') {
+        terminalPool.detach(session.id)
       }
-      e.preventDefault()
-      handleSendInput()
     }
-  }
+  }, [session.id, isFullscreen])
+
+  // 预览行数变化时重新 fit（高度变化 → cols/rows 变化 → 通知 PTY）
+  useEffect(() => {
+    terminalPool.fit(session.id)
+  }, [previewLineCount, session.id])
 
   const handleQuickConfirm = async () => {
     await window.electronAPI.sendInput(session.id, 'y\r')
@@ -128,6 +124,7 @@ function SessionCardImpl(props: SessionCardProps) {
     setGlobalLoading(true, '正在关闭会话并清理 PTY 资源...')
     try {
       await window.electronAPI.closeSession(session.id)
+      terminalPool.destroy(session.id)
       removeSession(session.id)
     } finally {
       setGlobalLoading(false)
@@ -150,6 +147,55 @@ function SessionCardImpl(props: SessionCardProps) {
   const handleFullscreen = () => {
     setActiveSession(session.id)
     setIsFullscreen(true)
+  }
+
+  const handleContextMenu = async (e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const terminal = terminalPool.getTerminal(session.id)
+    if (!terminal) return
+    try {
+      if (terminal.hasSelection()) {
+        const selection = terminal.getSelection()
+        if (selection) {
+          await navigator.clipboard.writeText(selection)
+          terminal.clearSelection()
+          message.success('已复制')
+        }
+      } else {
+        const text = await navigator.clipboard.readText()
+        if (text) {
+          terminal.paste(text)
+        }
+      }
+    } catch {
+      message.error('剪贴板操作失败')
+    }
+  }
+
+  const handleCopy = async () => {
+    const terminal = terminalPool.getTerminal(session.id)
+    try {
+      if (terminal && terminal.hasSelection()) {
+        const selection = terminal.getSelection()
+        if (selection) {
+          await navigator.clipboard.writeText(selection)
+          terminal.clearSelection()
+          message.success('已复制')
+          return
+        }
+      }
+      // 无选中：复制尾部内容
+      const tail = terminalPool.readTailLines(session.id, 20)
+      if (tail) {
+        await navigator.clipboard.writeText(tail)
+        message.success('已复制尾部内容')
+      } else {
+        message.info('暂无内容可复制')
+      }
+    } catch {
+      message.error('复制失败')
+    }
   }
 
   const handleSaveName = () => {
@@ -254,11 +300,11 @@ function SessionCardImpl(props: SessionCardProps) {
 
   return (
     <div
-      className={`session-card flex flex-col ${statusClass}`}
+      className={`session-card flex flex-col ${statusClass}${highlight ? ' card-navigate-highlight' : ''}`}
       style={{
         background: 'var(--ant-color-bg-container)',
         border: '1px solid var(--ant-color-border)',
-        borderRadius: 10,
+        borderRadius: 12,
         overflow: 'hidden',
       }}
     >
@@ -526,74 +572,52 @@ function SessionCardImpl(props: SessionCardProps) {
       */}
       <div
         className="session-card-preview"
-          style={{
-            // 高度按行数自适应：每行 14px（字号 10 行高 1.3 = 13，按 14 给足）
-            // 上下 padding 12 = 12 + N * 14
-            // 5 行 = 82px, 10 行 = 152px, 15 行 = 222px, 20 行 = 292px
-            minHeight: 82,
-            height: 12 + previewLineCount * 14,
-            padding: '6px 8px',
-            // 背景跟随终端主题：预览区视觉与全屏终端保持一致
-            background: themeBg,
-            // CSS 变量供 ::after 底部淡出遮罩使用（渐变到主题背景，而非固定黑色）
-            ['--preview-bg' as any]: themeBg,
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: 10,
-            lineHeight: 1.3,
-            // 前景跟随终端主题：未带 SGR 的纯文本用主题前景色
-            color: themeFg,
-            cursor: 'text',
-            userSelect: 'text',
-            // 横向滚动 + 保持格式：超宽终端内容不自动换行，保持原始格式
-            // 横向滚动更符合终端用户的阅读习惯，避免自动换行导致的视觉混乱
-            overflowX: 'auto',
-            overflowY: 'hidden',
-            borderTop: '1px solid var(--ant-color-border)',
-            borderBottom: '1px solid var(--ant-color-border)',
-            position: 'relative',
-          }}
-          // 单击不再触发全屏（与文本选择 + 双击复制冲突）。
-          // 改为：双击进入全屏（更符合终端类应用的「展开」直觉）。
-          // 右上角悬浮按钮提供更明显的「全屏」入口（ExpandAltOutlined）。
-          onDoubleClick={handleFullscreen}
-        >
-          {session.previewText ? (
-            <pre
-              className="whitespace-pre m-0"
-              // whitespace-pre：保持空白符，不自动换行
-              // 让终端内容保持原始格式，超宽内容通过横向滚动查看
-              dangerouslySetInnerHTML={{ __html: previewHtml }}
-            />
-          ) : (
-            <pre className="whitespace-pre m-0" style={{ color: themeFg, opacity: 0.4 }}>等待输出...</pre>
-          )}
-          {/* 悬浮的「全屏」入口按钮：默认隐藏，hover 时显示，避免抢占文本选择 */}
-          <Tooltip title="双击或点击全屏查看">
-            <Button
-              type="text"
-              size="small"
-              onClick={handleFullscreen}
-              icon={<ExpandAltOutlined style={{ fontSize: 12 }} />}
-              aria-label="全屏查看"
-              style={{
-                position: 'absolute',
-                top: 6,
-                right: 6,
-                width: 22,
-                height: 22,
-                minWidth: 22,
-                padding: 0,
-                background: 'rgba(0, 0, 0, 0.45)',
-                color: 'var(--ant-color-text-secondary)',
-                borderRadius: 4,
-                opacity: 0,
-                transition: 'opacity 0.15s ease',
-                zIndex: 2,
-              }}
-              className="session-card-preview-expand"
-            />
-          </Tooltip>
-        </div>
+        ref={termHostRef}
+        style={{
+          // 高度按行数自适应：与 xterm 字号 10 / 行高 1.25 匹配
+          // 每行约 13px + 上下 padding，5 行 ≈ 82px, 10 行 ≈ 152px
+          minHeight: 82,
+          height: 12 + previewLineCount * 14,
+          padding: 0,
+          // 背景跟随终端主题（xterm 自身也渲染，这里做 attach 前的兜底）
+          background: themeBg,
+          borderTop: '1px solid var(--ant-color-border)',
+          borderBottom: '1px solid var(--ant-color-border)',
+          position: 'relative',
+          overflow: 'hidden',
+          cursor: 'text',
+        }}
+        onDoubleClick={handleFullscreen}
+        onContextMenu={handleContextMenu}
+      >
+        {/* 悬浮的「全屏」入口按钮：hover 时显示，避免抢占终端交互 */}
+        <Tooltip title="双击或点击全屏查看">
+          <Button
+            type="text"
+            size="small"
+            onClick={handleFullscreen}
+            icon={<ExpandAltOutlined style={{ fontSize: 12 }} />}
+            aria-label="全屏查看"
+            style={{
+              position: 'absolute',
+              top: 4,
+              right: 4,
+              width: 22,
+              height: 22,
+              minWidth: 22,
+              padding: 0,
+              background: 'rgba(0, 0, 0, 0.45)',
+              color: 'var(--ant-color-text-secondary)',
+              borderRadius: 4,
+              opacity: 0,
+              transition: 'opacity 0.15s ease',
+              zIndex: 10,
+            }}
+            className="session-card-preview-expand"
+          />
+        </Tooltip>
+
+      </div>
       {/* </Dropdown> — 右键菜单已从 UI 移除（用户要求"代码保留"） */}
 
       <div
@@ -678,21 +702,15 @@ function SessionCardImpl(props: SessionCardProps) {
           </Tooltip>
         )}
 
-        {quickActions.includes('Input') && (
-          <Input.TextArea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="输入… Enter发送"
-            autoSize={{ minRows: 1, maxRows: 2 }}
-            style={{ flex: 1, fontSize: 10, lineHeight: '20px', height: 22, maxHeight: 44, padding: '1px 6px', borderRadius: 4, resize: 'none', overflow: 'hidden' }}
+        <Tooltip title="复制">
+          <Button
+            aria-label="复制"
+            icon={<CopyOutlined style={{ fontSize: 11 }} />}
+            onClick={handleCopy}
+            size="small"
+            style={{ width: 24, height: 22, minWidth: 24, padding: 0, borderRadius: 4 }}
           />
-        )}
-        {quickActions.includes('Send') && (
-          <Tooltip title="发送">
-            <Button type="primary" aria-label="发送" icon={<SendOutlined style={{ fontSize: 11 }} />} onClick={handleSendInput} size="small" style={{ width: 24, height: 22, minWidth: 24, padding: 0, borderRadius: 4 }} />
-          </Tooltip>
-        )}
+        </Tooltip>
         {quickActions.includes('Enter') && (
           <Tooltip title="Enter">
             <Button size="small" aria-label="Enter" icon={<EnterOutlined style={{ fontSize: 11 }} />} onClick={handleEnter} style={{ width: 22, height: 22, minWidth: 22, padding: 0, borderRadius: 4 }} />

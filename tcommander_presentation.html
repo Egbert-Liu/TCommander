@@ -441,9 +441,10 @@
             <div class="badges">
                 <span class="badge">🚀 多会话管理</span>
                 <span class="badge">🧠 智能状态感知</span>
-                <span class="badge">⚡ 快捷操作</span>
+                <span class="badge">🔗 Hook 生态集成</span>
+                <span class="badge">🌐 SSH 远程终端</span>
+                <span class="badge">🎨 8+ 终端主题</span>
                 <span class="badge">💾 快照恢复</span>
-                <span class="badge">🌐 跨平台支持</span>
             </div>
         </div>
     </section>
@@ -496,15 +497,33 @@
                 </div>
                 
                 <div class="feature-card">
+                    <div class="feature-icon">🔗</div>
+                    <h3 class="feature-title">Hook 生态集成</h3>
+                    <p class="feature-desc">MCP Server + HTTP Hook API + CLI 工具，Claude Code/Codex 可主动推送状态更新</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">🌐</div>
+                    <h3 class="feature-title">SSH 远程终端</h3>
+                    <p class="feature-desc">支持密码/私钥/keyboard-interactive认证，safeStorage加密存储，断线自动重连</p>
+                </div>
+                
+                <div class="feature-card">
                     <div class="feature-icon">⚡</div>
                     <h3 class="feature-title">快捷操作</h3>
                     <p class="feature-desc">一键确认(Y)/拒绝(N)、快速输入命令，大幅提升与AI助手的交互效率</p>
                 </div>
                 
                 <div class="feature-card">
-                    <div class="feature-icon">📺</div>
-                    <h3 class="feature-title">全屏终端</h3>
-                    <p class="feature-desc">基于xterm.js的完整终端视图，支持ESC快速退出，沉浸式操作体验</p>
+                    <div class="feature-icon">🎨</div>
+                    <h3 class="feature-title">终端主题系统</h3>
+                    <p class="feature-desc">8+ 内置主题（GitHub Dark/Dracula/Monokai/Nord等），卡片预览与全屏终端视觉一致</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">📦</div>
+                    <h3 class="feature-title">终端实例池</h3>
+                    <p class="feature-desc">一会话一xterm实例+DOM转移，卡片与全屏共享buffer，不可见时零CPU开销</p>
                 </div>
                 
                 <div class="feature-card">
@@ -516,25 +535,7 @@
                 <div class="feature-card">
                     <div class="feature-icon">📋</div>
                     <h3 class="feature-title">预设系统</h3>
-                    <p class="feature-desc">创建预设模板，新建会话时一键填充配置，支持保存为预设</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">💾</div>
-                    <h3 class="feature-title">快照管理</h3>
-                    <p class="feature-desc">一键保存/恢复工作环境，中断工作后可快速回到之前的状态</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">🔍</div>
-                    <h3 class="feature-title">智能筛选</h3>
-                    <p class="feature-desc">按状态、分组、关键词快速筛选，状态优先级自动排序</p>
-                </div>
-                
-                <div class="feature-card">
-                    <div class="feature-icon">🎨</div>
-                    <h3 class="feature-title">深色主题</h3>
-                    <p class="feature-desc">Cyber-Terminal深色科技风UI，长时间使用不伤眼</p>
+                    <p class="feature-desc">创建预设模板，按优先级和使用次数智能排序，新建会话一键填充</p>
                 </div>
             </div>
         </div>
@@ -632,6 +633,134 @@
         </div>
     </section>
 
+    <!-- Hook 生态集成 -->
+    <section class="section">
+        <div class="container">
+            <h2 class="section-title">Hook 生态集成</h2>
+            <p class="section-subtitle">让 AI 助手主动汇报状态 —— TCommander 的核心差异化能力</p>
+            
+            <!-- 架构图 -->
+            <div style="
+                background: linear-gradient(135deg, rgba(15,23,42,0.8), rgba(30,41,59,0.6));
+                border: 1px solid rgba(56,189,248,0.2);
+                border-radius: 12px;
+                padding: 32px;
+                margin: 24px 0;
+            ">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+                    <!-- AI 助手 -->
+                    <div style="flex:1;min-width:160px;text-align:center;">
+                        <div style="
+                            display:inline-flex;flex-direction:column;align-items:center;gap:8px;
+                            padding:16px 20px;border-radius:12px;
+                            background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.3);
+                        ">
+                            <div style="font-size:32px;">🤖</div>
+                            <div style="font-size:14px;font-weight:600;color:#38bdf8;">Claude Code</div>
+                            <div style="font-size:11px;color:#64748b;">MCP 协议</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 箭头 -->
+                    <div style="font-size:24px;color:#38bdf8;">→</div>
+                    
+                    <!-- MCP Server -->
+                    <div style="flex:1;min-width:160px;text-align:center;">
+                        <div style="
+                            display:inline-flex;flex-direction:column;align-items:center;gap:8px;
+                            padding:16px 20px;border-radius:12px;
+                            background:rgba(167,139,250,0.1);border:1px solid rgba(167,139,250,0.3);
+                        ">
+                            <div style="font-size:32px;">🔌</div>
+                            <div style="font-size:14px;font-weight:600;color:#a78bfa;">MCP Server</div>
+                            <div style="font-size:11px;color:#64748b;">Stdio 传输</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 箭头 -->
+                    <div style="font-size:24px;color:#a78bfa;">→</div>
+                    
+                    <!-- Hook HTTP API -->
+                    <div style="flex:1;min-width:160px;text-align:center;">
+                        <div style="
+                            display:inline-flex;flex-direction:column;align-items:center;gap:8px;
+                            padding:16px 20px;border-radius:12px;
+                            background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);
+                        ">
+                            <div style="font-size:32px;">📡</div>
+                            <div style="font-size:14px;font-weight:600;color:#22c55e;">HTTP Hook API</div>
+                            <div style="font-size:11px;color:#64748b;">127.0.0.1:19527</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 箭头 -->
+                    <div style="font-size:24px;color:#22c55e;">→</div>
+                    
+                    <!-- TCommander -->
+                    <div style="flex:1;min-width:160px;text-align:center;">
+                        <div style="
+                            display:inline-flex;flex-direction:column;align-items:center;gap:8px;
+                            padding:16px 20px;border-radius:12px;
+                            background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);
+                        ">
+                            <div style="font-size:32px;">🎯</div>
+                            <div style="font-size:14px;font-weight:600;color:#fbbf24;">TCommander</div>
+                            <div style="font-size:11px;color:#64748b;">状态卡片实时更新</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 三种集成方式 -->
+            <div class="features-grid" style="margin-top:24px;">
+                <div class="feature-card">
+                    <div class="feature-icon">🤖</div>
+                    <h3 class="feature-title">MCP Server</h3>
+                    <p class="feature-desc">基于 Model Context Protocol，Claude Code 可调用 tcommander_update_status 等工具主动更新会话状态</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">📡</div>
+                    <h3 class="feature-title">HTTP Hook API</h3>
+                    <p class="feature-desc">REST API (POST /api/session/:id/status)，任何脚本/工具都能通过 HTTP 调用更新状态</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">⌨️</div>
+                    <h3 class="feature-title">CLI 工具</h3>
+                    <p class="feature-desc">tcommander-cli 命令行工具，支持 status/get/list 命令，方便集成到 Shell 脚本</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">📦</div>
+                    <h3 class="feature-title">Codex Wrapper</h3>
+                    <p class="feature-desc">包装 Codex CLI，自动检测输出中的错误/确认/输入提示，实时更新状态</p>
+                </div>
+            </div>
+            
+            <!-- 状态流转说明 -->
+            <div style="
+                margin-top:24px;padding:24px;
+                background:rgba(15,23,42,0.5);border:1px solid #334155;border-radius:12px;
+            ">
+                <h3 style="font-size:16px;font-weight:600;color:#e2e8f0;margin-bottom:16px;">🔄 状态自动流转</h3>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;">
+                    <span style="padding:6px 14px;border-radius:6px;background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.4);color:#22c55e;font-weight:600;">running</span>
+                    <span style="color:#475569;">AI 输出数据 →</span>
+                    <span style="padding:6px 14px;border-radius:6px;background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.4);color:#38bdf8;font-weight:600;">streaming</span>
+                    <span style="color:#475569;">等待输入 →</span>
+                    <span style="padding:6px 14px;border-radius:6px;background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.4);color:#38bdf8;font-weight:600;">needs-input</span>
+                    <span style="color:#475569;">请求确认 →</span>
+                    <span style="padding:6px 14px;border-radius:6px;background:rgba(251,191,36,0.15);border:1px solid rgba(251,191,36,0.4);color:#fbbf24;font-weight:600;">needs-confirm</span>
+                    <span style="color:#475569;">出错 →</span>
+                    <span style="padding:6px 14px;border-radius:6px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.4);color:#ef4444;font-weight:600;">error</span>
+                    <span style="color:#475569;">完成 →</span>
+                    <span style="padding:6px 14px;border-radius:6px;background:rgba(148,163,184,0.15);border:1px solid rgba(148,163,184,0.4);color:#94a3b8;font-weight:600;">idle</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- 技术架构 -->
     <section class="section">
         <div class="container">
@@ -649,6 +778,48 @@
                 <span class="tech-item">xterm.js</span>
                 <span class="tech-item">node-pty</span>
                 <span class="tech-item">SSH2</span>
+                <span class="tech-item">MCP SDK</span>
+                <span class="tech-item">safeStorage</span>
+            </div>
+
+            <!-- 后端抽象层架构 -->
+            <div style="
+                margin-top:24px;padding:24px;
+                background:linear-gradient(135deg, rgba(15,23,42,0.8), rgba(30,41,59,0.6));
+                border:1px solid rgba(56,189,248,0.2);border-radius:12px;
+            ">
+                <h3 style="font-size:16px;font-weight:600;color:#e2e8f0;margin-bottom:16px;">🏗️ 终端后端抽象层</h3>
+                <div style="font-family:'JetBrains Mono','Fira Code',monospace;font-size:13px;line-height:1.8;color:#94a3b8;">
+                    <div style="color:#38bdf8;">TerminalBackend { onData, onExit, write, resize, kill }</div>
+                    <div style="padding-left:24px;color:#64748b;">├── <span style="color:#22c55e;">LocalPtyBackend</span> &nbsp; (node-pty)</div>
+                    <div style="padding-left:24px;color:#64748b;">└── <span style="color:#a78bfa;">SshBackend</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (ssh2 Client.shell)</div>
+                </div>
+                <div style="margin-top:16px;padding-top:16px;border-top:1px solid #334155;font-size:13px;color:#64748b;">
+                    <span style="color:#fbbf24;">安全链路：</span>明文密码 → Electron safeStorage 加密 → base64 密文存储，配置中仅保留 passwordRef 引用
+                </div>
+            </div>
+
+            <!-- 终端实例池架构 -->
+            <div style="
+                margin-top:16px;padding:24px;
+                background:linear-gradient(135deg, rgba(15,23,42,0.8), rgba(30,41,59,0.6));
+                border:1px solid rgba(56,189,248,0.2);border-radius:12px;
+            ">
+                <h3 style="font-size:16px;font-weight:600;color:#e2e8f0;margin-bottom:16px;">📦 终端实例池（TerminalPool）</h3>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">
+                    <div style="padding:12px;background:rgba(56,189,248,0.08);border-radius:8px;">
+                        <div style="font-size:13px;font-weight:600;color:#38bdf8;margin-bottom:4px;">一会话一实例</div>
+                        <div style="font-size:12px;color:#94a3b8;">每个会话独立 xterm Terminal，挂载独立 containerDiv</div>
+                    </div>
+                    <div style="padding:12px;background:rgba(34,197,94,0.08);border-radius:8px;">
+                        <div style="font-size:13px;font-weight:600;color:#22c55e;margin-bottom:4px;">DOM 转移</div>
+                        <div style="font-size:12px;color:#94a3b8;">卡片与全屏通过 appendChild 共享 buffer，不重建不销毁</div>
+                    </div>
+                    <div style="padding:12px;background:rgba(167,139,250,0.08);border-radius:8px;">
+                        <div style="font-size:13px;font-weight:600;color:#a78bfa;margin-bottom:4px;">零 CPU 休眠</div>
+                        <div style="font-size:12px;color:#94a3b8;">不可见时 detach，buffer 持续接收 write 但不渲染</div>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
@@ -685,7 +856,7 @@
     <section class="footer">
         <div class="container">
             <p class="footer-text">TCommander - 让AI时代的终端管理更智能、更高效</p>
-            <a href="#" class="cta-button">开始使用</a>
+            <a href="https://github.com/Egbert-Liu/TCommander" target="_blank" class="cta-button">GitHub 仓库</a>
         </div>
     </section>
 </body>
