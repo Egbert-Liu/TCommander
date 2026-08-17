@@ -21,6 +21,9 @@ interface AppState {
   markdownEnabled: boolean  // 终端实时 Markdown 渲染层开关（卡片/全屏共用）
   /** Claude Code transcript 对话流（sessionId → 条目数组，全屏 MD 模式数据源） */
   claudeTranscripts: Record<string, TranscriptEntry[]>
+  /** 系统通知设置 */
+  notificationEnabled: boolean
+  notificationSoundEnabled: boolean
 
   addSession: (session: Session) => void
   updateSession: (id: string, updates: Partial<Session>) => void
@@ -57,6 +60,8 @@ interface AppState {
   setPresets: (presets: Preset[]) => void
   setGroups: (groups: Group[]) => void
   setSnapshots: (snapshots: Snapshot[]) => void
+  setNotificationEnabled: (enabled: boolean) => void
+  setNotificationSoundEnabled: (enabled: boolean) => void
 
   // 全局 loading 蒙板：用于关闭应用/关闭会话等需要等待 PTY 资源释放的场景
   globalLoading: { open: boolean; text: string }
@@ -92,6 +97,8 @@ export const useAppStore = create<AppState>((set) => ({
   defaultQuickActions: ['Y', 'N', 'CtrlC', 'Up', 'Down', 'Input', 'Send', 'Enter'],
   markdownEnabled: false,
   claudeTranscripts: {},
+  notificationEnabled: true,
+  notificationSoundEnabled: true,
 
   addSession: (session) => set((state) => ({
     sessions: [...state.sessions, { ...session, stableActivityAt: session.stableActivityAt ?? session.lastActivityAt ?? Date.now() }]
@@ -255,6 +262,8 @@ export const useAppStore = create<AppState>((set) => ({
   setPresets: (presets) => set({ presets }),
   setGroups: (groups) => set({ groups }),
   setSnapshots: (snapshots) => set({ snapshots }),
+  setNotificationEnabled: (enabled) => set({ notificationEnabled: enabled }),
+  setNotificationSoundEnabled: (enabled) => set({ notificationSoundEnabled: enabled }),
   globalLoading: { open: false, text: '' },
   setGlobalLoading: (open, text = '') => set({ globalLoading: { open, text } }),
 }))

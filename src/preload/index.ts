@@ -145,4 +145,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('claude-integration-enable') as Promise<{ success: boolean; error?: string }>,
   claudeIntegrationDisable: () =>
     ipcRenderer.invoke('claude-integration-disable') as Promise<{ success: boolean; error?: string }>,
+
+  // 系统通知
+  showNotification: (title: string, body: string, sound?: boolean) =>
+    ipcRenderer.invoke('show-notification', title, body, sound),
 })

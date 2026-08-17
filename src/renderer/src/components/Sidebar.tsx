@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { Tooltip, Popconfirm } from 'antd'
-import { AppstoreFilled, PlusCircleFilled, FolderFilled, MenuFoldOutlined, MenuUnfoldOutlined, DeleteOutlined, EditOutlined, CaretRightOutlined, SearchOutlined } from '@ant-design/icons'
+import { PlusCircleFilled, FolderFilled, MenuFoldOutlined, MenuUnfoldOutlined, DeleteOutlined, EditOutlined, CaretRightOutlined, SearchOutlined } from '@ant-design/icons'
 import { useAppStore } from '../store'
 import { STATUS_COLORS } from '../utils/statusColors'
 import { sortSessions } from '../utils/sessionSort'
@@ -13,8 +13,10 @@ const PRESET_COLORS = [
   '#34d399', '#4ade80', '#2dd4bf', '#22d3ee',
 ]
 
-// 「全部会话」节点在展开/收起集合中的特殊 key
-const ALL_SESSIONS_KEY = '__all__'
+// 默认分组（虚拟分组）：用于容纳未分组会话
+const DEFAULT_GROUP_ID = '__default__'
+const DEFAULT_GROUP_NAME = '默认分组'
+const DEFAULT_GROUP_COLOR = '#6b7280'
 
 // 树重排防抖：状态/活跃度变化延迟应用的毫秒数。
 // 会话增删仍即时生效；期间状态若持续翻转，计时器重置，顺序保持稳定
@@ -81,8 +83,11 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigateSession
   const [duplicateError, setDuplicateError] = useState(false)
   // 树内搜索关键词
   const [treeSearch, setTreeSearch] = useState('')
-  // 收起集合（默认空 = 全部展开；后加的新分组天然默认展开）
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  // 收起集合（默认全部折叠：包含所有分组 ID + 默认分组）
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
+    const allIds = groups.map(g => g.id)
+    return new Set([...allIds, DEFAULT_GROUP_ID])
+  })
 
   const searchKeyword = treeSearch.trim().toLowerCase()
 
@@ -153,12 +158,15 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigateSession
       setDuplicateError(true)
       return
     }
+    const newId = `group-${Date.now()}`
     addGroup({
-      id: `group-${Date.now()}`,
+      id: newId,
       name: trimmed,
       color: newGroupColor,
       order: groups.length
     })
+    // 新分组默认折叠
+    setCollapsedGroups(prev => new Set([...prev, newId]))
     setNewGroupName('')
     setNewGroupColor(PRESET_COLORS[(groups.length + 1) % PRESET_COLORS.length])
     setShowAddGroup(false)
@@ -231,37 +239,39 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigateSession
     if (dist > 0) outer.style.setProperty('--marquee-dist', `-${dist}px`)
   }
 
-  // 分组会话数：一次遍历统计全部分组计数（替代每个分组各自 filter 的 O(G×N)）
+  // 分组会话数：一次遍历统计全部分组计数（含默认分组）
   const groupCounts = useMemo(() => {
     const counts = new Map<string, number>()
+    counts.set(DEFAULT_GROUP_ID, 0) // 默认分组初始化为 0
     for (const s of sessions) {
-      if (s.groupId) counts.set(s.groupId, (counts.get(s.groupId) ?? 0) + 1)
+      const gid = s.groupId ?? DEFAULT_GROUP_ID
+      counts.set(gid, (counts.get(gid) ?? 0) + 1)
     }
     return counts
   }, [sessions])
 
   // ===== 树数据：搜索过滤 + 会话排序（防抖后的顺序，与卡片列表规则一致） =====
-  // 过滤规则：关键词匹配分组名 → 保留整组全部会话；匹配会话名 → 保留该会话及其所属分组节点。
-  // 「全部会话」节点在搜索时同样按会话名过滤；清空关键词恢复完整树。
+  // 未分组会话归入「默认分组」虚拟分组；移除「全部会话」节点
   const treeData = useMemo(() => {
-    // 一次遍历按组分流（组内保持 orderedSessions 相对顺序），替代每分组一次 filter
+    // 一次遍历按组分流（组内保持 orderedSessions 相对顺序），未分组归入默认分组
     const byGroup = new Map<string, Session[]>()
     for (const g of groups) byGroup.set(g.id, [])
+    byGroup.set(DEFAULT_GROUP_ID, []) // 默认分组
     for (const s of orderedSessions) {
-      const arr = s.groupId ? byGroup.get(s.groupId) : undefined
+      const gid = s.groupId ?? DEFAULT_GROUP_ID
+      const arr = byGroup.get(gid)
       if (arr) arr.push(s)
     }
     if (!searchKeyword) {
       return {
-        allSessions: orderedSessions,
         groupEntries: groups.map(g => ({
           group: g,
           nameMatched: false,
           sessions: byGroup.get(g.id) ?? [],
         })),
+        defaultGroupSessions: byGroup.get(DEFAULT_GROUP_ID) ?? [],
       }
     }
-    const allSessions = orderedSessions.filter(s => s.name.toLowerCase().includes(searchKeyword))
     const groupEntries = groups
       .map(g => {
         const nameMatched = g.name.toLowerCase().includes(searchKeyword)
@@ -277,7 +287,10 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigateSession
       })
       // 分组名命中（即使 0 会话也保留分组节点）或组内有命中会话
       .filter(e => e.nameMatched || e.sessions.length > 0)
-    return { allSessions, groupEntries }
+    // 默认分组也按搜索过滤
+    const defaultGroupSessions = (byGroup.get(DEFAULT_GROUP_ID) ?? [])
+      .filter(s => s.name.toLowerCase().includes(searchKeyword))
+    return { groupEntries, defaultGroupSessions }
   }, [orderedSessions, groups, searchKeyword])
 
   const renderCollapsedItem = (icon: React.ReactNode, label: string, groupId: string | null, isActive: boolean) => (
@@ -451,11 +464,12 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigateSession
       <div className="flex-1 overflow-y-auto overflow-x-hidden py-0.5" style={{ padding: collapsed ? '2px 4px' : '2px 6px' }}>
         {collapsed ? (
           <div className="flex flex-col gap-1">
-            {renderCollapsedItem(
-              <AppstoreFilled />,
-              '全部会话',
-              null,
-              !selectedGroupId
+            {/* 默认分组（有未分组会话时才显示） */}
+            {(groupCounts.get(DEFAULT_GROUP_ID) ?? 0) > 0 && renderCollapsedItem(
+              <FolderFilled style={{ color: DEFAULT_GROUP_COLOR }} />,
+              DEFAULT_GROUP_NAME,
+              DEFAULT_GROUP_ID,
+              selectedGroupId === DEFAULT_GROUP_ID
             )}
             {groups.map(group => (
               renderCollapsedItem(
@@ -468,17 +482,24 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigateSession
           </div>
         ) : (
           <div className="flex flex-col gap-0.5">
-            {/* 全部会话节点：子节点为所有会话（含未分组），搜索时同样过滤 */}
-            <div>
-              {renderExpandedItem(
-                ALL_SESSIONS_KEY,
-                <AppstoreFilled />,
-                '全部会话',
-                null,
-                !selectedGroupId
-              )}
-              {isNodeExpanded(ALL_SESSIONS_KEY) && treeData.allSessions.map(renderSessionNode)}
-            </div>
+            {/* 默认分组（虚拟分组，不可编辑/删除） */}
+            {(treeData.defaultGroupSessions.length > 0 || searchKeyword) && (
+              <div>
+                {renderExpandedItem(
+                  DEFAULT_GROUP_ID,
+                  <FolderFilled style={{ color: DEFAULT_GROUP_COLOR }} />,
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0, overflow: 'hidden' }}>
+                    <span>{DEFAULT_GROUP_NAME}</span>
+                    <span style={{ fontSize: 10, color: 'var(--ant-color-text-tertiary)', fontWeight: 400, flexShrink: 0 }}>
+                      {groupCounts.get(DEFAULT_GROUP_ID) ?? 0}
+                    </span>
+                  </span>,
+                  DEFAULT_GROUP_ID,
+                  selectedGroupId === DEFAULT_GROUP_ID
+                )}
+                {isNodeExpanded(DEFAULT_GROUP_ID) && treeData.defaultGroupSessions.map(renderSessionNode)}
+              </div>
+            )}
             {treeData.groupEntries.map(({ group, sessions: groupSessions }) => (
               <div key={group.id}>
                 {editingGroupId === group.id ? (
@@ -586,7 +607,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigateSession
               </div>
             )}
             {/* 搜索无结果提示 */}
-            {searchKeyword && treeData.allSessions.length === 0 && treeData.groupEntries.length === 0 && (
+            {searchKeyword && treeData.defaultGroupSessions.length === 0 && treeData.groupEntries.length === 0 && (
               <div style={{ color: 'var(--ant-color-text-quaternary)', fontSize: 10, padding: '4px 10px' }}>
                 无匹配会话
               </div>

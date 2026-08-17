@@ -459,6 +459,20 @@ app.whenReady().then(() => {
   ipcMain.handle('claude-integration-enable', () => claudeIntegrationEnable())
   ipcMain.handle('claude-integration-disable', () => claudeIntegrationDisable())
 
+  // 系统通知
+  ipcMain.handle('show-notification', (event, title: string, body: string, sound?: boolean) => {
+    const { Notification } = require('electron')
+    if (Notification.isSupported()) {
+      const notification = new Notification({
+        title,
+        body,
+        silent: !sound,
+        icon: getIconPath()
+      })
+      notification.show()
+    }
+  })
+
   createWindow()
 
   app.on('activate', () => {

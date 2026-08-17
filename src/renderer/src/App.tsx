@@ -14,6 +14,7 @@ import EmptyState from './components/EmptyState'
 import LoadingMask from './components/LoadingMask'
 import CloseConfirmDialog from './components/CloseConfirmDialog'
 import SshAuthDialog from './components/SshAuthDialog'
+import SettingsDialog from './components/SettingsDialog'
 import { detectStatusWithRules, truncateHistory, joinTail, hasStatus, IDLE_THRESHOLD_MS } from './utils/statusDetector'
 import { STATUS_COLORS } from './utils/statusColors'
 import { sortSessions } from './utils/sessionSort'
@@ -86,6 +87,7 @@ function App() {
   const [showPresets, setShowPresets] = useState(false)
   const [showSnapshots, setShowSnapshots] = useState(false)
   const [showRules, setShowRules] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [resetTarget, setResetTarget] = useState<import('./types').Session | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -357,6 +359,22 @@ function App() {
         lastActivityAt: Date.now(),
         ...(statusChanged ? { stableActivityAt: Date.now() } : {})
       })
+      // 状态变为需要用户交互时发送系统通知
+      if (statusChanged && state.notificationEnabled) {
+        const statusLabels: Record<string, string> = {
+          'needs-input': '需要输入',
+          'needs-confirm': '需要确认',
+          'error': '发生错误'
+        }
+        const label = statusLabels[detectResult.status]
+        if (label) {
+          window.electronAPI.showNotification(
+            `${session.name} - ${label}`,
+            detectResult.matchedRuleName || '会话需要您的关注',
+            state.notificationSoundEnabled
+          )
+        }
+      }
     } else {
       // 未命中但有新输出：会话在活动。
       // 关键：若之前处于「有状态」(error/needs-confirm/needs-input)，新输出已不再匹配，
@@ -721,14 +739,11 @@ function App() {
       <div className="h-screen flex flex-col" style={{ background: 'var(--ant-color-bg-layout)' }}>
         <Toolbar
           onNewSession={() => setShowNewSession(true)}
-          onOpenPresets={() => setShowPresets(true)}
+          onOpenSettings={() => setShowSettings(true)}
           onOpenSnapshots={() => setShowSnapshots(true)}
-          onOpenRules={() => setShowRules(true)}
           statusCounts={statusCounts}
           statusFilter={statusFilter}
           onStatusFilterChange={handleStatusFilterChange}
-          previewLineCount={previewLineCount}
-          onPreviewLineCountChange={setPreviewLineCount}
         />
         
         <div className="flex flex-1 overflow-hidden">
@@ -960,6 +975,23 @@ function App() {
         <RulesDialog
           open={showRules}
           onClose={() => setShowRules(false)}
+        />
+
+        <SettingsDialog
+          open={showSettings}
+          onClose={() => setShowSettings(false)}
+          onOpenPresets={() => {
+            setShowSettings(false)
+            setShowPresets(true)
+          }}
+          onOpenSnapshots={() => {
+            setShowSettings(false)
+            setShowSnapshots(true)
+          }}
+          onOpenRules={() => {
+            setShowSettings(false)
+            setShowRules(true)
+          }}
         />
 
         <LoadingMask />
