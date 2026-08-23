@@ -47,6 +47,27 @@ function normalizeCwd(cwd?: string): string | undefined {
 }
 
 /**
+ * 卡片改名 → 终端会话名（名称双向绑定之卡片→终端）。
+ *
+ * 仅对「已确认是 Claude Code 的会话」发送 /rename：
+ * - 判据：claudeTranscripts 中已有该会话条目（hook 上报过 transcript 路径）。
+ *   普通 shell / SSH / Codex 会话不发（/rename 会被当作命令执行而报错）。
+ * - 状态保护：仅 idle（Claude Code 等待输入）时发送。运行中/待确认时输入
+ *   会混入任务交互，宁可不同步也不干扰终端。
+ *
+ * 终端侧 /rename 生效后 transcript 写入 summary → 主进程回推
+ * claude-session-name → 卡片名更新（同名则跳过），闭环无回环风险。
+ */
+export function syncNameToTerminal(sessionId: string, name: string): void {
+  const state = useAppStore.getState()
+  const session = state.sessions.find(s => s.id === sessionId)
+  if (!session || session.status !== 'idle') return
+  const transcript = state.claudeTranscripts[sessionId]
+  if (!transcript || transcript.length === 0) return
+  void window.electronAPI.sendInput(sessionId, `/rename ${name}\r`)
+}
+
+/**
  * 创建底层 PTY / SSH 会话并写入 store 的单点入口（消除多处创建会话样板）。
  * 成功返回新 Session；失败（无 sessionId 或异常）返回 null，由调用方决定提示。
  *

@@ -11,6 +11,7 @@ import { useAppStore } from '../store'
 import { STATUS_COLORS } from '../utils/statusColors'
 import { getTerminalTheme } from '../utils/terminalThemes'
 import { terminalPool } from '../utils/terminalPool'
+import { syncNameToTerminal } from '../utils/sessionActions'
 
 interface SessionCardProps {
   session: Session
@@ -199,8 +200,13 @@ function SessionCardImpl(props: SessionCardProps) {
   }
 
   const handleSaveName = () => {
-    if (nameValue.trim()) {
-      updateSession(session.id, { name: nameValue.trim() })
+    const trimmed = nameValue.trim()
+    if (trimmed) {
+      updateSession(session.id, { name: trimmed })
+      // 名称双向绑定：卡片改名 → 终端 /rename（仅 Claude Code 会话且空闲时生效）
+      if (trimmed !== session.name) {
+        syncNameToTerminal(session.id, trimmed)
+      }
     } else {
       setNameValue(session.name)
     }

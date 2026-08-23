@@ -8,6 +8,7 @@ let sshAuthPromptCallbacks: Array<(sessionId: string, prompt: string) => void> =
 let connStatusCallbacks: Array<(sessionId: string, status: string) => void> = []
 let hookStatusUpdateCallbacks: Array<(sessionId: string, payload: any) => void> = []
 let claudeTranscriptCallbacks: Array<(sessionId: string, appended: any[]) => void> = []
+let claudeSessionNameCallbacks: Array<(sessionId: string, name: string) => void> = []
 
 ipcRenderer.on('session-output', (_, sessionId, data) => {
   outputCallbacks.forEach(cb => cb(sessionId, data))
@@ -44,6 +45,11 @@ ipcRenderer.on('hook-status-update', (_, sessionId: string, payload: any) => {
 // Claude Code transcript 增量推送（全屏 MD 对话流数据源）
 ipcRenderer.on('claude-transcript', (_, sessionId: string, appended: any[]) => {
   claudeTranscriptCallbacks.forEach(cb => cb(sessionId, appended))
+})
+
+// Claude Code 会话名变更推送（/rename 后卡片名双向绑定）
+ipcRenderer.on('claude-session-name', (_, sessionId: string, name: string) => {
+  claudeSessionNameCallbacks.forEach(cb => cb(sessionId, name))
 })
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -135,6 +141,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     claudeTranscriptCallbacks.push(callback)
     return () => {
       claudeTranscriptCallbacks = claudeTranscriptCallbacks.filter(cb => cb !== callback)
+    }
+  },
+
+  // Claude Code 会话名变更订阅（/rename 后 transcript 追加 summary 条目时推送）
+  onClaudeSessionName: (callback: (sessionId: string, name: string) => void) => {
+    claudeSessionNameCallbacks.push(callback)
+    return () => {
+      claudeSessionNameCallbacks = claudeSessionNameCallbacks.filter(cb => cb !== callback)
     }
   },
 

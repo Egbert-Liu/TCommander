@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react'
-import { Button, Dropdown, Tooltip, message, Input } from 'antd'
+import { Button, Dropdown, Tooltip, message, Input, Select } from 'antd'
 import type { MenuProps } from 'antd'
-import { ArrowLeftOutlined, CopyOutlined, SunFilled, MoonFilled, CheckOutlined, ReadOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, CopyOutlined, SunFilled, MoonFilled, CheckOutlined, ReadOutlined, FontSizeOutlined } from '@ant-design/icons'
 import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -12,6 +12,7 @@ import { Session, TranscriptEntry } from '../types'
 import { getTerminalTheme, TERMINAL_THEMES } from '../utils/terminalThemes'
 import { terminalPool } from '../utils/terminalPool'
 import { useThrottledMarkdown } from '../utils/markdownView'
+import { syncNameToTerminal } from '../utils/sessionActions'
 
 /** 递归提取 React 元素树内的纯文本（代码块复制用，rehype-highlight 后 code 内是多层 span） */
 function extractText(node: React.ReactNode): string {
@@ -95,6 +96,21 @@ const MD_REHYPE_PLUGINS = [rehypeHighlight]
 /** transcript 模式激活时传给 useThrottledMarkdown 的空 history：
  * 空数组引用稳定且 cleanMarkdownSource([]) 立即返回，完全跳过字节流清洗计算 */
 const EMPTY_HISTORY: string[] = []
+
+/** 字体族选项（value 即 xterm fontFamily 用的 CSS 字符串） */
+const FONT_FAMILY_OPTIONS = [
+  { value: "'JetBrains Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace", label: 'JetBrains Mono' },
+  { value: "'Cascadia Code', 'JetBrains Mono', Consolas, monospace", label: 'Cascadia Code' },
+  { value: "'Fira Code', 'JetBrains Mono', Consolas, monospace", label: 'Fira Code' },
+  { value: "'Source Code Pro', 'JetBrains Mono', Consolas, monospace", label: 'Source Code Pro' },
+  { value: "Consolas, 'Courier New', monospace", label: 'Consolas' },
+  { value: "'Courier New', Consolas, monospace", label: 'Courier New' },
+  { value: "monospace", label: '系统等宽字体' },
+]
+
+/** 字号边界与步长 */
+const FONT_SIZE_MIN = 8
+const FONT_SIZE_MAX = 28
 
 /** 取文本首行（工具调用摘要单行展示） */
 function firstLine(text: string): string {
@@ -277,9 +293,19 @@ export default function FullscreenTerminal() {
   const updateSession = useAppStore((s) => s.updateSession)
   const markdownEnabled = useAppStore((s) => s.markdownEnabled)
   const setMarkdownEnabled = useAppStore((s) => s.setMarkdownEnabled)
+  const terminalFontSize = useAppStore((s) => s.terminalFontSize)
+  const setTerminalFontSize = useAppStore((s) => s.setTerminalFontSize)
+  const terminalFontFamily = useAppStore((s) => s.terminalFontFamily)
+  const setTerminalFontFamily = useAppStore((s) => s.setTerminalFontFamily)
 
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState('')
+
+  // 字号调节（store setter 内部 clamp + 热更新 terminalPool + 持久化）
+  const changeFontSize = useCallback((delta: number) => {
+    const cur = useAppStore.getState().terminalFontSize
+    setTerminalFontSize(cur + delta)
+  }, [setTerminalFontSize])
 
   const termRef = useRef<HTMLDivElement>(null)
   const resizeTimerRef = useRef<number | null>(null)
@@ -377,6 +403,31 @@ export default function FullscreenTerminal() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [activeSessionId, setActiveSession])
 
+  // ========== Ctrl+= / Ctrl+- / Ctrl+0 调节终端字号 ==========
+  // capture 阶段监听：先于 xterm 内部 keydown 处理，避免 '='/'-' 被写进终端。
+  // Ctrl+= 在部分键盘布局上报为 '+'，一并兼容
+  useEffect(() => {
+    const handleFontKey = (e: KeyboardEvent) => {
+      if (!e.ctrlKey || e.altKey || e.metaKey) return
+      const key = e.key.toLowerCase()
+      if (key === '=' || key === '+') {
+        e.preventDefault()
+        e.stopPropagation()
+        changeFontSize(1)
+      } else if (key === '-' || key === '_') {
+        e.preventDefault()
+        e.stopPropagation()
+        changeFontSize(-1)
+      } else if (key === '0') {
+        e.preventDefault()
+        e.stopPropagation()
+        setTerminalFontSize(13) // 默认字号
+      }
+    }
+    window.addEventListener('keydown', handleFontKey, true)
+    return () => window.removeEventListener('keydown', handleFontKey, true)
+  }, [changeFontSize, setTerminalFontSize])
+
   const themeItems: MenuProps['items'] = [
     {
       type: 'group',
@@ -433,6 +484,10 @@ export default function FullscreenTerminal() {
     const trimmed = nameValue.trim()
     if (trimmed && currentSession) {
       updateSession(currentSession.id, { name: trimmed })
+      // 名称双向绑定：卡片改名 → 终端 /rename（仅 Claude Code 会话且空闲时生效）
+      if (trimmed !== currentSession.name) {
+        syncNameToTerminal(currentSession.id, trimmed)
+      }
     }
     setEditingName(false)
   }
@@ -558,6 +613,63 @@ export default function FullscreenTerminal() {
             WebkitAppRegion: 'no-drag',
           }}
         >
+          {/* 字体控制：A- / A+ / 字号 / 字体族（Ctrl+= / Ctrl+- / Ctrl+0 快捷键同步支持） */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Tooltip title="减小字号（Ctrl+-）">
+              <Button
+                type="text"
+                icon={<FontSizeOutlined />}
+                onClick={() => changeFontSize(-1)}
+                disabled={terminalFontSize <= FONT_SIZE_MIN}
+                aria-label="减小字号"
+                style={{ color: 'var(--ant-color-text-secondary)' }}
+              />
+            </Tooltip>
+            <Tooltip title="增大字号（Ctrl+=）">
+              <Button
+                type="text"
+                onClick={() => changeFontSize(1)}
+                disabled={terminalFontSize >= FONT_SIZE_MAX}
+                aria-label="增大字号"
+                style={{
+                  color: 'var(--ant-color-text-secondary)',
+                  fontSize: 14,
+                  fontWeight: 700,
+                  fontFamily: "'JetBrains Mono', monospace",
+                  padding: '0 8px',
+                }}
+              >
+                A
+              </Button>
+            </Tooltip>
+            <Tooltip title="重置字号（Ctrl+0）">
+              <span
+                style={{
+                  fontSize: 12,
+                  color: 'var(--ant-color-text-secondary)',
+                  fontFamily: "'JetBrains Mono', monospace",
+                  minWidth: 22,
+                  textAlign: 'center',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+                onClick={() => setTerminalFontSize(13)}
+              >
+                {terminalFontSize}
+              </span>
+            </Tooltip>
+            <Select
+              size="small"
+              value={terminalFontFamily}
+              options={FONT_FAMILY_OPTIONS}
+              onChange={setTerminalFontFamily}
+              style={{ width: 132 }}
+              popupMatchSelectWidth={false}
+              getPopupContainer={getNoDragPopupContainer}
+              aria-label="字体族"
+            />
+          </div>
+
           <Dropdown
             menu={{ items: themeItems, style: { minWidth: 220 } }}
             placement="bottomRight"

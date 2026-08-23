@@ -1,14 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Modal, Tabs, Switch, Select, Slider, message, Tooltip } from 'antd'
+import { Modal, Tabs, Switch, Select, message } from 'antd'
 import {
   SettingOutlined,
   BellOutlined,
   SoundOutlined,
-  CameraFilled,
   CodeOutlined,
   RobotFilled,
-  SafetyCertificateFilled,
-  CheckOutlined,
 } from '@ant-design/icons'
 import { useAppStore } from '../store'
 

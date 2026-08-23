@@ -42,6 +42,10 @@ interface WatchState {
   partialLine: string
   /** change 事件防抖定时器 */
   debounce: NodeJS.Timeout | null
+  /** bind 后的首次全量扫描是否完成（初始 summary 是继承的历史摘要，不触发改名） */
+  initialScanDone: boolean
+  /** 最近推送过的会话名（去重：/rename 后 compact 重扫不会重复推送） */
+  lastName?: string
 }
 
 /**
@@ -56,14 +60,43 @@ interface DirWatchState {
 }
 
 export type TranscriptPushFn = (sessionId: string, appended: TranscriptEntry[]) => void
+/** 会话名推送（Claude Code /rename 在 transcript 追加 summary 条目时触发） */
+export type TranscriptNamePushFn = (sessionId: string, name: string) => void
 
 const CHANGE_DEBOUNCE_MS = 200
 /** 单条 entry 文本上限：防止超长 tool_result（如 base64）撑爆 IPC/渲染 */
 const ENTRY_TEXT_LIMIT = 20_000
+/** 会话名长度上限：超过视为自动摘要（compact 会写 summary），不当作 rename */
+const SESSION_NAME_LIMIT = 100
 
 function clampText(text: string): string {
   if (text.length <= ENTRY_TEXT_LIMIT) return text
   return text.slice(0, ENTRY_TEXT_LIMIT) + '\n…(已截断)'
+}
+
+/**
+ * 名称行 → 会话名（Claude Code /rename 在 transcript 追加的元数据行）：
+ *   新版：{type:"custom-title",customTitle:"新名字"} + {type:"agent-name",agentName:"新名字"}
+ *        （两条连写、值相同，lastName 去重后只推送一次）
+ *   旧版：{type:"summary",summary:"新名字"}（compact 自动摘要也用此格式，靠长度上限区分）
+ */
+function parseNameRecord(line: string): string | null {
+  let record: any
+  try {
+    record = JSON.parse(line)
+  } catch {
+    return null
+  }
+  if (!record || typeof record !== 'object') return null
+  const raw =
+    record.type === 'custom-title' && typeof record.customTitle === 'string' ? record.customTitle :
+    record.type === 'agent-name' && typeof record.agentName === 'string' ? record.agentName :
+    record.type === 'summary' && typeof record.summary === 'string' ? record.summary :
+    null
+  if (raw == null) return null
+  const name = raw.trim()
+  if (!name || name.length > SESSION_NAME_LIMIT) return null
+  return name
 }
 
 /** JSONL 单行 → 0..n 条对话条目 */
@@ -168,7 +201,7 @@ function summarizeToolInput(input: any): string {
   return String(input)
 }
 
-export function createTranscriptManager(push: TranscriptPushFn) {
+export function createTranscriptManager(push: TranscriptPushFn, onName?: TranscriptNamePushFn) {
   /** ourSessionId → watch 状态 */
   const states = new Map<string, WatchState>()
   /** 目录路径 → 共享 watcher（多会话同目录时复用） */
@@ -211,11 +244,21 @@ export function createTranscriptManager(push: TranscriptPushFn) {
     for (const line of lines) {
       const trimmed = line.trim()
       if (!trimmed) continue
+      // 会话名推送：仅初始全量扫描完成后的增量名称行视为 /rename
+      // （bind 首扫里的名称是继承的历史名称，不能当本会话新改名）
+      if (onName && state.initialScanDone) {
+        const name = parseNameRecord(trimmed)
+        if (name && name !== state.lastName) {
+          state.lastName = name
+          onName(sessionId, name)
+        }
+      }
       appended.push(...parseRecordLine(trimmed))
     }
     if (appended.length > 0) {
       push(sessionId, appended)
     }
+    state.initialScanDone = true
   }
 
   /** 获取（或创建）目录共享 watcher；目录暂不可用时返回 null（bind 重试时再来） */
@@ -319,7 +362,8 @@ export function createTranscriptManager(push: TranscriptPushFn) {
         fileName: path.basename(normalized),
         lastOffset: 0,
         partialLine: '',
-        debounce: null
+        debounce: null,
+        initialScanDone: false
       })
       attachWatcher(sessionId)
       readIncrement(sessionId)

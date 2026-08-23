@@ -34,9 +34,13 @@ interface ElectronAPI {
   onSessionConnStatus: (callback: (sessionId: string, status: string) => void) => () => void
   onHookStatusUpdate: (callback: (sessionId: string, payload: any) => void) => () => void
   onClaudeTranscript: (callback: (sessionId: string, appended: TranscriptEntry[]) => void) => () => void
+  /** Claude Code 会话名变更（/rename 后 transcript 写入 summary）→ 卡片名双向绑定 */
+  onClaudeSessionName: (callback: (sessionId: string, name: string) => void) => () => void
   claudeIntegrationStatus: () => Promise<{ configured: boolean; hookPath: string }>
   claudeIntegrationEnable: () => Promise<{ success: boolean; error?: string }>
   claudeIntegrationDisable: () => Promise<{ success: boolean; error?: string }>
+  /** 系统通知（title/body/sound），音效由设置控制 */
+  showNotification: (title: string, body: string, sound?: boolean) => Promise<void>
 }
 
 // Electron 专用 CSS 属性扩展：-webkit-app-region 用于自定义标题栏拖拽区域

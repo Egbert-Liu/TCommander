@@ -57,7 +57,11 @@ docs/release-local.ps1
 .env.local
 .env.*.local
 
-# 文档（仅保留 README.md，忽略其余文档）
+# 本地打包发布脚本（不进 Git）
+docs/release-scripts.md
+docs/release-local.ps1
+
+# 文档（全部集中存放于本地 docs/，保持忽略，GitHub 不展示）
 ARCHITECTURE.md
 CLAUDE.md
 PRD.md

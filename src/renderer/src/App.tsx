@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback, useDeferredValue } from 'react'
 import { ConfigProvider, theme, Button, Checkbox, Space, Popconfirm, Input, Tooltip } from 'antd'
 import { PlusCircleFilled, CodeFilled, DeleteOutlined, CloseOutlined, SettingFilled, SearchOutlined, ArrowUpOutlined, ArrowDownOutlined, EnterOutlined } from '@ant-design/icons'
-import { useAppStore } from './store'
+import { useAppStore, SIDEBAR_SORT_OPTIONS, type SidebarSortMode } from './store'
 import Sidebar from './components/Sidebar'
 import Toolbar from './components/Toolbar'
 import SessionCard from './components/SessionCard'
@@ -80,8 +80,6 @@ function App() {
   const setRules = useAppStore((s) => s.setRules)
   const removeSession = useAppStore((s) => s.removeSession)
   const terminalThemeId = useAppStore((s) => s.terminalTheme)
-  const previewLineCount = useAppStore((s) => s.previewLineCount)
-  const setPreviewLineCount = useAppStore((s) => s.setPreviewLineCount)
 
   const [showNewSession, setShowNewSession] = useState(false)
   const [showPresets, setShowPresets] = useState(false)
@@ -153,6 +151,21 @@ function App() {
   useEffect(() => {
     const unsub = window.electronAPI.onClaudeTranscript((sessionId, appended) => {
       useAppStore.getState().appendClaudeTranscript(sessionId, appended)
+    })
+    return () => {
+      unsub()
+    }
+  }, [])
+
+  // Claude Code 会话名变更（终端 /rename）→ 同步更新卡片名（名称双向绑定之终端→卡片）
+  useEffect(() => {
+    const unsub = window.electronAPI.onClaudeSessionName((sessionId, name) => {
+      const state = useAppStore.getState()
+      // 同名跳过：避免 /rename 回显或 compact 重写触发的无意义更新
+      const session = state.sessions.find(s => s.id === sessionId)
+      if (session && session.name !== name) {
+        state.updateSession(sessionId, { name })
+      }
     })
     return () => {
       unsub()
@@ -252,7 +265,7 @@ function App() {
   useEffect(() => {
     const loadPersistedData = async () => {
       try {
-        const [savedPresets, savedGroups, savedSnapshots, savedDarkMode, savedRules, savedTerminalTheme, savedMarkdownEnabled] = await Promise.all([
+        const [savedPresets, savedGroups, savedSnapshots, savedDarkMode, savedRules, savedTerminalTheme, savedMarkdownEnabled, savedFontSize, savedFontFamily] = await Promise.all([
           window.electronAPI.storageGet('presets'),
           window.electronAPI.storageGet('groups'),
           window.electronAPI.storageGet('snapshots'),
@@ -260,6 +273,8 @@ function App() {
           window.electronAPI.storageGet('rules'),
           window.electronAPI.storageGet('terminalTheme'),
           window.electronAPI.storageGet('markdownEnabled'),
+          window.electronAPI.storageGet('terminalFontSize'),
+          window.electronAPI.storageGet('terminalFontFamily'),
         ])
         if (savedPresets && Array.isArray(savedPresets)) setPresets(savedPresets)
         if (savedGroups && Array.isArray(savedGroups)) setGroups(savedGroups)
@@ -272,6 +287,18 @@ function App() {
         // Markdown 渲染层开关：仅在有持久化值时恢复（未存过则保持默认 false）
         if (typeof savedMarkdownEnabled === 'boolean') {
           useAppStore.getState().setMarkdownEnabled(!!savedMarkdownEnabled)
+        }
+        // 终端字号/字体恢复（setter 内部会同步 terminalPool + 持久化）
+        if (typeof savedFontSize === 'number' && savedFontSize >= 8 && savedFontSize <= 28) {
+          useAppStore.getState().setTerminalFontSize(savedFontSize)
+        }
+        if (typeof savedFontFamily === 'string' && savedFontFamily) {
+          useAppStore.getState().setTerminalFontFamily(savedFontFamily)
+        }
+        // 侧边栏排序方式恢复（非法值忽略，保持默认 status）
+        const savedSortMode = await window.electronAPI.storageGet('sidebarSortMode')
+        if (typeof savedSortMode === 'string' && SIDEBAR_SORT_OPTIONS.some(o => o.value === savedSortMode)) {
+          useAppStore.getState().setSidebarSortMode(savedSortMode as SidebarSortMode)
         }
       } catch (e) {
         console.error('加载持久化数据失败:', e)
@@ -527,17 +554,22 @@ function App() {
     const interval = setInterval(() => {
       const state = useAppStore.getState()
       const now = Date.now()
-      let changed = false
       for (const s of state.sessions) {
         // 只对「无状态且正在运行」的会话做空闲回落
         if (s.status === 'running' && now - s.lastActivityAt > IDLE_THRESHOLD_MS) {
           // running→idle 是状态转换，更新 stableActivityAt（排序防抖）
           state.updateSession(s.id, { status: 'idle', stableActivityAt: now })
-          changed = true
+          // 输出停止（running→idle）时发送系统通知：
+          // 用户下发指令后终端输出了一阵并停下来，此时需要提醒
+          if (state.notificationEnabled) {
+            window.electronAPI.showNotification(
+              `${s.name} - 输出已停止`,
+              '终端已停止输出，可以查看结果了',
+              state.notificationSoundEnabled
+            )
+          }
         }
       }
-      // updateSession 已触发 store 通知，无需额外动作
-      void changed
     }, IDLE_CHECK_INTERVAL)
     return () => clearInterval(interval)
   }, [])

@@ -442,14 +442,25 @@ app.whenReady().then(() => {
   hookServer = createHookServer(HOOK_PORT, hookHandler)
 
   // Transcript 管理器：增量解析结果经 IPC 推送渲染进程（全屏 MD 对话流数据源）
-  transcriptManager = createTranscriptManager((sessionId, appended) => {
-    if (!isWindowValid()) return
-    try {
-      mainWindow!.webContents.send('claude-transcript', sessionId, appended)
-    } catch {
-      // 窗口已被销毁
+  transcriptManager = createTranscriptManager(
+    (sessionId, appended) => {
+      if (!isWindowValid()) return
+      try {
+        mainWindow!.webContents.send('claude-transcript', sessionId, appended)
+      } catch {
+        // 窗口已被销毁
+      }
+    },
+    // Claude Code /rename → transcript 追加 summary 条目 → 推送新会话名（卡片名双向绑定）
+    (sessionId, name) => {
+      if (!isWindowValid()) return
+      try {
+        mainWindow!.webContents.send('claude-session-name', sessionId, name)
+      } catch {
+        // 窗口已被销毁
+      }
     }
-  })
+  )
 
   // Claude Code 集成配置（读写 ~/.claude/settings.json 的 hooks）
   ipcMain.handle('claude-integration-status', () => ({
@@ -460,7 +471,7 @@ app.whenReady().then(() => {
   ipcMain.handle('claude-integration-disable', () => claudeIntegrationDisable())
 
   // 系统通知
-  ipcMain.handle('show-notification', (event, title: string, body: string, sound?: boolean) => {
+  ipcMain.handle('show-notification', (_event, title: string, body: string, sound?: boolean) => {
     const { Notification } = require('electron')
     if (Notification.isSupported()) {
       const notification = new Notification({

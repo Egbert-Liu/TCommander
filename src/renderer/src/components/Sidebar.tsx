@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { Tooltip, Popconfirm } from 'antd'
-import { PlusCircleFilled, FolderFilled, MenuFoldOutlined, MenuUnfoldOutlined, DeleteOutlined, EditOutlined, CaretRightOutlined, SearchOutlined } from '@ant-design/icons'
-import { useAppStore } from '../store'
+import { Tooltip, Popconfirm, Dropdown } from 'antd'
+import type { MenuProps } from 'antd'
+import { PlusCircleFilled, FolderFilled, MenuFoldOutlined, MenuUnfoldOutlined, DeleteOutlined, EditOutlined, CaretRightOutlined, SearchOutlined, OrderedListOutlined, CheckOutlined } from '@ant-design/icons'
+import { useAppStore, SIDEBAR_SORT_OPTIONS, sortSessionsForSidebar } from '../store'
 import { STATUS_COLORS } from '../utils/statusColors'
-import { sortSessions } from '../utils/sessionSort'
 import type { Session } from '../types'
 
 const PRESET_COLORS = [
@@ -83,6 +83,11 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigateSession
   const [duplicateError, setDuplicateError] = useState(false)
   // 树内搜索关键词
   const [treeSearch, setTreeSearch] = useState('')
+  // 搜索框折叠态：默认收起，点击搜索按钮展开（节省侧边栏纵向空间）
+  const [searchOpen, setSearchOpen] = useState(false)
+  // 侧边栏树排序方式（store 持久化）
+  const sidebarSortMode = useAppStore((s) => s.sidebarSortMode)
+  const setSidebarSortMode = useAppStore((s) => s.setSidebarSortMode)
   // 收起集合（默认全部折叠：包含所有分组 ID + 默认分组）
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
     const allIds = groups.map(g => g.id)
@@ -139,17 +144,18 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigateSession
     return () => clearTimeout(timer)
   }, [sessions])
 
-  // 用延迟键排序得到 id 顺序，再映射回实时会话对象（展示实时、顺序延迟）
+  // 排序结果：status 模式用防抖键（状态翻转不跳序），其余模式实时直排
+  // （recent/created/name 的键稳定或半静态，无抖动问题，不需要延迟应用）
   const orderedSessions = useMemo(() => {
-    const liveById = new Map(sessions.map(s => [s.id, s]))
+    if (sidebarSortMode !== 'status') {
+      return sortSessionsForSidebar(sessions, sidebarSortMode)
+    }
     const withDelayedKeys = sessions.map(s => {
       const k = orderKeys[s.id]
       return k ? { ...s, status: k.status, stableActivityAt: k.stableAt } : s
     })
-    return sortSessions(withDelayedKeys)
-      .map(s => liveById.get(s.id))
-      .filter((s): s is Session => !!s)
-  }, [sessions, orderKeys])
+    return sortSessionsForSidebar(withDelayedKeys, 'status')
+  }, [sessions, orderKeys, sidebarSortMode])
 
   const handleAddGroup = async () => {
     const trimmed = newGroupName.trim()
@@ -228,6 +234,18 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigateSession
     setActiveSession(sessionId)
     if (!isFullscreen) setIsFullscreen(true)
   }
+
+  // 排序下拉菜单项：当前模式打勾标记
+  const sortMenuItems: MenuProps['items'] = SIDEBAR_SORT_OPTIONS.map(o => ({
+    key: o.value,
+    label: (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, minWidth: 76, justifyContent: 'space-between' }}>
+        <span>{o.label}</span>
+        {sidebarSortMode === o.value && <CheckOutlined style={{ fontSize: 11, color: 'var(--primary)' }} />}
+      </span>
+    ),
+    onClick: () => setSidebarSortMode(o.value),
+  }))
 
   // 溢出检测：hover 时计算内容超出容器的距离写入 CSS 变量，驱动 CSS 跑马灯动画；未溢出不滚动
   const handleMarqueeEnter = (e: React.MouseEvent<HTMLSpanElement>) => {
@@ -407,28 +425,107 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigateSession
             分组
           </span>
         )}
-        <button
-          onClick={onToggleCollapse}
-          aria-label={collapsed ? '展开侧边栏' : '收起侧边栏'}
-          className="flex items-center justify-center sb-icon-btn"
-          style={{
-            width: 24,
-            height: 24,
-            borderRadius: 4,
-            border: 'none',
-            cursor: 'pointer',
-            marginLeft: collapsed ? 'auto' : undefined,
-            marginRight: collapsed ? 'auto' : undefined,
-            fontSize: 12,
-            transition: 'all 0.15s ease',
-          }}
-        >
-          {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-        </button>
+        {!collapsed ? (
+          <div className="flex items-center gap-0.5">
+            {/* 搜索按钮：点击展开/收起搜索框；有关键词或展开时高亮 */}
+            <Tooltip title={searchOpen ? '收起搜索' : '搜索会话'} mouseEnterDelay={0.4}>
+              <button
+                onClick={() => {
+                  if (searchOpen) {
+                    setTreeSearch('')
+                    setSearchOpen(false)
+                  } else {
+                    setSearchOpen(true)
+                  }
+                }}
+                aria-label="搜索会话"
+                className="sb-icon-btn"
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: 4,
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease',
+                  color: searchOpen || treeSearch ? 'var(--primary)' : 'var(--ant-color-text-tertiary)',
+                }}
+              >
+                <SearchOutlined />
+              </button>
+            </Tooltip>
+            {/* 排序按钮：下拉选择树内会话排序方式（store 持久化） */}
+            <Dropdown
+              menu={{ items: sortMenuItems }}
+              placement="bottomRight"
+              trigger={['click']}
+            >
+              <Tooltip title="排序方式" mouseEnterDelay={0.4}>
+                <button
+                  aria-label="排序方式"
+                  className="sb-icon-btn"
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: 4,
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: 11,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.15s ease',
+                    color: sidebarSortMode !== 'status' ? 'var(--primary)' : 'var(--ant-color-text-tertiary)',
+                  }}
+                >
+                  <OrderedListOutlined />
+                </button>
+              </Tooltip>
+            </Dropdown>
+            <button
+              onClick={onToggleCollapse}
+              aria-label="收起侧边栏"
+              className="flex items-center justify-center sb-icon-btn"
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: 4,
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: 12,
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <MenuFoldOutlined />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={onToggleCollapse}
+            aria-label="展开侧边栏"
+            className="flex items-center justify-center sb-icon-btn"
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: 4,
+              border: 'none',
+              cursor: 'pointer',
+              marginLeft: 'auto',
+              marginRight: 'auto',
+              fontSize: 12,
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <MenuUnfoldOutlined />
+          </button>
+        )}
       </div>
 
-      {/* 树内搜索框：展开态、标题下方，过滤分组/会话名 */}
-      {!collapsed && (
+      {/* 树内搜索框：点击搜索按钮展开；Escape 或再次点击按钮收起并清空 */}
+      {!collapsed && searchOpen && (
         <div className="flex-shrink-0" style={{ padding: '4px 6px 2px' }}>
           <div
             className="flex items-center gap-1"
@@ -444,7 +541,14 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigateSession
             <input
               value={treeSearch}
               onChange={(e) => setTreeSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  setTreeSearch('')
+                  setSearchOpen(false)
+                }
+              }}
               placeholder="搜索会话"
+              autoFocus
               style={{
                 flex: 1,
                 minWidth: 0,

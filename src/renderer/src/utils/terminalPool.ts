@@ -50,9 +50,13 @@ class TerminalPoolImpl {
   private unsubExit: (() => void) | null = null
   private initialized = false
 
-  // 卡片模式字体小，全屏模式字体大
-  private static CARD_FONT_SIZE = 10
-  private static FULLSCREEN_FONT_SIZE = 13
+  // 卡片模式字体小，全屏模式字体大（全屏字号用户可调，卡片按比例跟随）
+  private userFontSize = 13
+  private userFontFamily = "'JetBrains Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace"
+  /** 卡片字号 = 全屏字号 - 3（下限 8），保持卡片预览紧凑 */
+  private cardFontSize(): number {
+    return Math.max(8, this.userFontSize - 3)
+  }
   private static SCROLLBACK = 10000
   /** pendingData 单会话字节上限：防止异步 create 期间 OOM */
   private static PENDING_BYTE_LIMIT = 256 * 1024
@@ -115,6 +119,46 @@ class TerminalPoolImpl {
   }
 
   /**
+   * 用户调节全屏字号：更新用户值并热更新所有实例。
+   * 卡片实例按比例（-3）跟随；已挂载的实例更新 options 后重新 fit + 同步 PTY 尺寸。
+   * detach 状态的实例只在 options 上更新，下次 attach 时自然生效。
+   */
+  setFontSize(size: number): void {
+    this.userFontSize = size
+    this.instances.forEach((instance, sessionId) => {
+      try {
+        const target = instance.attachedTo === 'card' ? this.cardFontSize() : this.userFontSize
+        instance.terminal.options.fontSize = target
+        // 已 open 且已挂载：立即 fit 让 cols/rows 适配新字号
+        if (instance.opened && instance.attachedTo) {
+          instance.fitAddon.fit()
+          this.syncResize(sessionId)
+        }
+      } catch {
+        // 实例可能已被销毁，忽略
+      }
+    })
+  }
+
+  /**
+   * 用户切换终端字体族：热更新所有实例并重新 fit
+   */
+  setFontFamily(family: string): void {
+    this.userFontFamily = family
+    this.instances.forEach((instance, sessionId) => {
+      try {
+        instance.terminal.options.fontFamily = family
+        if (instance.opened && instance.attachedTo) {
+          instance.fitAddon.fit()
+          this.syncResize(sessionId)
+        }
+      } catch {
+        // 实例可能已被销毁，忽略
+      }
+    })
+  }
+
+  /**
    * 创建终端实例（会话创建时调用）
    *
    * 注意：此处只创建 Terminal 对象，不调用 terminal.open()。
@@ -147,8 +191,8 @@ class TerminalPoolImpl {
       rows: 10,
       cursorBlink: true,
       cursorStyle: 'bar',
-      fontSize: TerminalPoolImpl.CARD_FONT_SIZE,
-      fontFamily: "'JetBrains Mono', 'Cascadia Code', 'Fira Code', 'Consolas', monospace",
+      fontSize: this.cardFontSize(),
+      fontFamily: this.userFontFamily,
       lineHeight: 1.25,
       scrollback: TerminalPoolImpl.SCROLLBACK,
       convertEol: true,
@@ -158,6 +202,33 @@ class TerminalPoolImpl {
 
     const fitAddon = new FitAddon()
     terminal.loadAddon(fitAddon)
+
+    // alt buffer 滚轮限幅：xterm 默认把一次 wheel 的 deltaY 全量换算成方向键
+    // 一次性发出（源码中 for 循环拼接 N 个 ESC[A/B 后一次 triggerDataEvent），
+    // 触摸板 / 高分辨率滚轮的单帧大 delta 会一次发出几十上百个 ArrowUp，
+    // Claude Code / Codex 等 TUI 直接连跳到对话历史最前面，而非局部滚动。
+    // 这里把单次 wheel 事件的滚动量限幅为最多 3 行：
+    // - normal buffer → 返回 true，走 xterm 原生 viewport 滚动（体验不变）；
+    // - 应用开启鼠标滚轮上报（SGR mouse mode）时 xterm 不调用本 handler，
+    //   由应用自己消费滚轮事件，互不干扰。
+    terminal.attachCustomWheelEventHandler((ev: WheelEvent): boolean => {
+      if (terminal.buffer.active.type !== 'alternate') return true
+      if (ev.deltaY === 0 || ev.shiftKey) return true
+
+      const abs = Math.abs(ev.deltaY)
+      // PIXEL：行高未知，按 delta 分档 1-3 行；LINE/PAGE：deltaY 即行数/页数，直接 clamp
+      const lines = ev.deltaMode === WheelEvent.DOM_DELTA_PIXEL
+        ? (abs < 60 ? 1 : abs < 160 ? 2 : 3)
+        : Math.min(3, Math.max(1, Math.round(abs)))
+
+      // 方向键前缀跟随 DECCKM（application cursor keys，vim 等期望 ESC O A）；
+      // 内部字段读取失败时兜底 CSI 序列（大多数 TUI 两种都认）
+      const appCursor = !!(terminal as any)._core?.coreService?.decPrivateModes?.applicationCursorKeys
+      const seq = `${appCursor ? '\x1bO' : '\x1b['}${ev.deltaY < 0 ? 'A' : 'B'}`
+      void window.electronAPI.sendInput(sessionId, seq.repeat(lines))
+      return false
+    })
+
     // 不在此处调用 terminal.open(containerDiv) —— 延迟到首次 attach()
 
     const instance: TerminalInstance = {
@@ -232,10 +303,10 @@ class TerminalPoolImpl {
       return
     }
 
-    // 设置字体大小（卡片 vs 全屏）
+    // 设置字体大小（卡片 vs 全屏：全屏用用户设置值，卡片按比例缩小）
     const targetFontSize = mode === 'card'
-      ? TerminalPoolImpl.CARD_FONT_SIZE
-      : TerminalPoolImpl.FULLSCREEN_FONT_SIZE
+      ? this.cardFontSize()
+      : this.userFontSize
 
     const fontSizeChanged = instance.terminal.options.fontSize !== targetFontSize
 
