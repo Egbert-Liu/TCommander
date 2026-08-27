@@ -29,6 +29,8 @@ interface TerminalInstance {
   attachedTo: AttachMode | null
   /** onData 取消订阅 */
   unsubData: (() => void) | null
+  /** textarea focus 取消订阅（用户聚焦终端的交互标记） */
+  unsubFocus: (() => void) | null
   /** 最后一次 resize 的 cols/rows，用于防抖 */
   lastCols: number
   lastRows: number
@@ -38,6 +40,10 @@ interface TerminalInstance {
 
 class TerminalPoolImpl {
   private instances: Map<string, TerminalInstance> = new Map()
+  /** 用户手动输入时刻（xterm onData → sendInput），用于抑制「输入回显误判」通知 */
+  private userInputAt: Record<string, number> = {}
+  /** 用户聚焦终端时刻（xterm textarea focus），用于抑制「正在查看却收到 idle 通知」 */
+  private userFocusAt: Record<string, number> = {}
   /** 实例异步创建期间的输出缓存：create() 完成后一次性 flush 到 xterm */
   private pendingData: Map<string, string[]> = new Map()
   /** pendingData 的累计字符数（增量维护，超限判断 O(1)，免每次全量累加） */
@@ -203,15 +209,19 @@ class TerminalPoolImpl {
     const fitAddon = new FitAddon()
     terminal.loadAddon(fitAddon)
 
-    // alt buffer 滚轮限幅：xterm 默认把一次 wheel 的 deltaY 全量换算成方向键
-    // 一次性发出（源码中 for 循环拼接 N 个 ESC[A/B 后一次 triggerDataEvent），
-    // 触摸板 / 高分辨率滚轮的单帧大 delta 会一次发出几十上百个 ArrowUp，
-    // Claude Code / Codex 等 TUI 直接连跳到对话历史最前面，而非局部滚动。
-    // 这里把单次 wheel 事件的滚动量限幅为最多 3 行：
-    // - normal buffer → 返回 true，走 xterm 原生 viewport 滚动（体验不变）；
-    // - 应用开启鼠标滚轮上报（SGR mouse mode）时 xterm 不调用本 handler，
-    //   由应用自己消费滚轮事件，互不干扰。
+    // 滚轮分流（与 xterm / WezTerm / renga 等终端的标准行为一致）：
+    // 1. 应用开启鼠标上报（mouseTrackingMode ≠ none）→ 返回 true 放行，
+    //    xterm 自动把滚轮转成 SGR 鼠标序列（1 tick = 1 report）发给应用，
+    //    由应用自己滚动。Claude Code 2.1.110+ fullscreen 模式即此情形：
+    //    滚轮用于滚动会话历史；若在此拦截改发方向键，会被它解释为
+    //    「输入历史上一条」导致一滚跳到最前 + 重绘重叠。
+    // 2. alt buffer 且应用未开鼠标上报（less / 无鼠标 vim 等）→ 限幅转方向键。
+    //    xterm 默认把一次 wheel 的 deltaY 全量换算成方向键（for 循环拼接
+    //    N 个 ESC[A/B 一次性发出），触摸板单帧大 delta 会发出几十上百个
+    //    ArrowUp，TUI 直接连跳多屏；这里限幅单次最多 3 行。
+    // 3. normal buffer（普通 shell）→ 返回 true，xterm 原生 viewport 滚动。
     terminal.attachCustomWheelEventHandler((ev: WheelEvent): boolean => {
+      if (terminal.modes.mouseTrackingMode !== 'none') return true
       if (terminal.buffer.active.type !== 'alternate') return true
       if (ev.deltaY === 0 || ev.shiftKey) return true
 
@@ -237,6 +247,7 @@ class TerminalPoolImpl {
       containerDiv,
       attachedTo: null,
       unsubData: null, // onData 也延迟到 open 后注册
+      unsubFocus: null, // textarea focus 也延迟到 open 后注册
       lastCols: 0,
       lastRows: 0,
       opened: false,
@@ -253,6 +264,30 @@ class TerminalPoolImpl {
       this.pendingAttaches.delete(sessionId)
       this.attach(sessionId, pendingAttach.parent, pendingAttach.mode)
     }
+  }
+
+  /**
+   * 标记用户手动输入（xterm onData 逐字符触发）
+   */
+  markUserInput(sessionId: string): void {
+    this.userInputAt[sessionId] = Date.now()
+  }
+
+  /**
+   * 标记用户聚焦终端（点击终端区域使 xterm textarea 获得焦点）
+   */
+  markUserFocus(sessionId: string): void {
+    this.userFocusAt[sessionId] = Date.now()
+  }
+
+  /** 最近一次用户手动输入时刻（无则为 0），供通知抑制判断 */
+  getUserInputAt(sessionId: string): number {
+    return this.userInputAt[sessionId] ?? 0
+  }
+
+  /** 最近一次用户聚焦时刻（无则为 0），供通知抑制判断 */
+  getUserFocusAt(sessionId: string): number {
+    return this.userFocusAt[sessionId] ?? 0
   }
 
   /**
@@ -276,6 +311,8 @@ class TerminalPoolImpl {
     }
     // 取消 onData 订阅
     instance.unsubData?.()
+    // 取消 textarea focus 订阅
+    instance.unsubFocus?.()
     // 销毁 xterm
     instance.terminal.dispose()
 
@@ -331,11 +368,20 @@ class TerminalPoolImpl {
             inst.terminal.open(inst.containerDiv)
             inst.opened = true
 
-            // 注册 onData（必须在 open 后）
+            // 注册 onData（必须在 open 后）：用户手动输入的入口，同时标记交互时间
             const dataHandler = inst.terminal.onData((data) => {
+              this.markUserInput(sessionId)
               window.electronAPI.sendInput(sessionId, data)
             })
             inst.unsubData = () => dataHandler.dispose()
+
+            // 用户点击终端区域 → textarea 获得焦点，标记为「正在查看」（抑制 idle 通知打扰）
+            const textArea = inst.terminal.textarea
+            if (textArea) {
+              const focusHandler = () => this.markUserFocus(sessionId)
+              textArea.addEventListener('focus', focusHandler)
+              inst.unsubFocus = () => textArea.removeEventListener('focus', focusHandler)
+            }
 
             // flush 异步创建期间缓存的输出
             const pending = this.pendingData.get(sessionId)

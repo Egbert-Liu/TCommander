@@ -39,8 +39,10 @@ interface ElectronAPI {
   claudeIntegrationStatus: () => Promise<{ configured: boolean; hookPath: string }>
   claudeIntegrationEnable: () => Promise<{ success: boolean; error?: string }>
   claudeIntegrationDisable: () => Promise<{ success: boolean; error?: string }>
-  /** 系统通知（title/body/sound），音效由设置控制 */
-  showNotification: (title: string, body: string, sound?: boolean) => Promise<void>
+  /** 系统通知（title/body/sessionId/sound），音效由设置控制；sessionId 用于通知点击跳转 */
+  showNotification: (title: string, body: string, sessionId?: string, sound?: boolean) => Promise<void>
+  /** 系统通知点击：用户点击通知后主进程推送对应会话 id，用于跳转定位 */
+  onNotificationClick: (callback: (sessionId: string) => void) => () => void
 }
 
 // Electron 专用 CSS 属性扩展：-webkit-app-region 用于自定义标题栏拖拽区域

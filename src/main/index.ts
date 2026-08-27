@@ -470,8 +470,8 @@ app.whenReady().then(() => {
   ipcMain.handle('claude-integration-enable', () => claudeIntegrationEnable())
   ipcMain.handle('claude-integration-disable', () => claudeIntegrationDisable())
 
-  // 系统通知
-  ipcMain.handle('show-notification', (_event, title: string, body: string, sound?: boolean) => {
+  // 系统通知（sessionId 用于通知点击后跳转到对应会话）
+  ipcMain.handle('show-notification', (_event, title: string, body: string, sessionId?: string, sound?: boolean) => {
     const { Notification } = require('electron')
     if (Notification.isSupported()) {
       const notification = new Notification({
@@ -479,6 +479,20 @@ app.whenReady().then(() => {
         body,
         silent: !sound,
         icon: getIconPath()
+      })
+      // 点击通知：恢复并聚焦主窗口，通知渲染进程跳转到对应会话（全屏/卡片）
+      notification.on('click', () => {
+        if (!mainWindow) return
+        if (mainWindow.isMinimized()) mainWindow.restore()
+        mainWindow.show()
+        mainWindow.focus()
+        if (sessionId) {
+          try {
+            mainWindow.webContents.send('notification-click', sessionId)
+          } catch {
+            /* 窗口已销毁的竞态 */
+          }
+        }
       })
       notification.show()
     }

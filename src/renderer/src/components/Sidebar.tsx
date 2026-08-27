@@ -1,9 +1,11 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { Tooltip, Popconfirm, Dropdown } from 'antd'
+import { Tooltip, Popconfirm, Dropdown, Modal } from 'antd'
 import type { MenuProps } from 'antd'
-import { PlusCircleFilled, FolderFilled, MenuFoldOutlined, MenuUnfoldOutlined, DeleteOutlined, EditOutlined, CaretRightOutlined, SearchOutlined, OrderedListOutlined, CheckOutlined } from '@ant-design/icons'
+import { PlusCircleFilled, FolderFilled, MenuFoldOutlined, MenuUnfoldOutlined, DeleteOutlined, EditOutlined, CaretRightOutlined, SearchOutlined, OrderedListOutlined, CheckOutlined, EditFilled, ReloadOutlined, DeleteFilled } from '@ant-design/icons'
 import { useAppStore, SIDEBAR_SORT_OPTIONS, sortSessionsForSidebar } from '../store'
 import { STATUS_COLORS } from '../utils/statusColors'
+import { terminalPool } from '../utils/terminalPool'
+import { syncNameToTerminal } from '../utils/sessionActions'
 import type { Session } from '../types'
 
 const PRESET_COLORS = [
@@ -60,9 +62,11 @@ interface SidebarProps {
   onToggleCollapse: () => void
   /** 非全屏模式下单击会话节点：由 App 滚动定位到对应卡片并高亮 */
   onNavigateSession?: (sessionId: string) => void
+  /** 重置会话：打开「重置会话」对话框（与卡片三点菜单一致） */
+  onResetSession?: (session: Session) => void
 }
 
-export default function Sidebar({ collapsed, onToggleCollapse, onNavigateSession }: SidebarProps) {
+export default function Sidebar({ collapsed, onToggleCollapse, onNavigateSession, onResetSession }: SidebarProps) {
   const groups = useAppStore((s) => s.groups)
   const selectedGroupId = useAppStore((s) => s.selectedGroupId)
   const sessions = useAppStore((s) => s.sessions)
@@ -71,6 +75,8 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigateSession
   const addGroup = useAppStore((s) => s.addGroup)
   const updateGroup = useAppStore((s) => s.updateGroup)
   const removeGroup = useAppStore((s) => s.removeGroup)
+  const updateSession = useAppStore((s) => s.updateSession)
+  const removeSession = useAppStore((s) => s.removeSession)
   const isFullscreen = useAppStore((s) => s.isFullscreen)
   const activeSessionId = useAppStore((s) => s.activeSessionId)
   const setActiveSession = useAppStore((s) => s.setActiveSession)
@@ -81,6 +87,9 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigateSession
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
   const [duplicateError, setDuplicateError] = useState(false)
+  // 会话节点右键菜单的内联重命名（与卡片三点菜单一致）
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null)
+  const [editingSessionName, setEditingSessionName] = useState('')
   // 树内搜索关键词
   const [treeSearch, setTreeSearch] = useState('')
   // 搜索框折叠态：默认收起，点击搜索按钮展开（节省侧边栏纵向空间）
@@ -235,6 +244,92 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigateSession
     if (!isFullscreen) setIsFullscreen(true)
   }
 
+  // 删除会话（与卡片三点菜单一致）：确认后关闭 PTY 并清理终端/历史
+  const handleDeleteSession = (session: Session) => {
+    Modal.confirm({
+      title: '删除会话',
+      content: '确定要删除该会话吗？会关闭对应的 PTY 进程并清空所有历史。',
+      okText: '删除',
+      cancelText: '取消',
+      okButtonProps: { danger: true },
+      cancelButtonProps: {},
+      onOk: async () => {
+        const setGlobalLoading = useAppStore.getState().setGlobalLoading
+        setGlobalLoading(true, '正在关闭会话并清理 PTY 资源...')
+        try {
+          await window.electronAPI.closeSession(session.id)
+          terminalPool.destroy(session.id)
+          removeSession(session.id)
+        } finally {
+          setGlobalLoading(false)
+        }
+      },
+    })
+  }
+
+  // 会话内联重命名保存（与卡片一致：名称双向绑定 → 终端 /rename）
+  const handleSaveSessionName = (sessionId: string) => {
+    const trimmed = editingSessionName.trim()
+    const current = sessions.find(s => s.id === sessionId)
+    if (current && trimmed && trimmed !== current.name) {
+      updateSession(sessionId, { name: trimmed })
+      syncNameToTerminal(sessionId, trimmed)
+    }
+    setEditingSessionId(null)
+    setEditingSessionName('')
+  }
+
+  // 会话节点右键菜单：重命名 / 重置会话 / 切换分组 / 删除会话（与卡片三点菜单一致）
+  const buildSessionMenuItems = (session: Session): MenuProps['items'] => [
+    {
+      key: 'rename',
+      icon: <EditFilled style={{ fontSize: 11 }} />,
+      label: '重命名',
+      onClick: () => {
+        setEditingSessionId(session.id)
+        setEditingSessionName(session.name)
+      },
+    },
+    {
+      key: 'reset',
+      icon: <ReloadOutlined style={{ fontSize: 11 }} />,
+      label: '重置会话',
+      onClick: () => onResetSession?.(session),
+    },
+    {
+      key: 'group',
+      icon: <span style={{ fontSize: 11, width: 11, display: 'inline-flex', justifyContent: 'center' }}>📁</span>,
+      label: '切换分组',
+      children: [
+        {
+          key: 'group-none',
+          icon: <CheckOutlined style={{ fontSize: 10, visibility: session.groupId ? 'hidden' : 'visible' }} />,
+          label: '无分组',
+          onClick: () => updateSession(session.id, { groupId: undefined }),
+        },
+        ...groups.map(g => ({
+          key: `group-${g.id}`,
+          icon: <CheckOutlined style={{ fontSize: 10, color: g.color, visibility: session.groupId === g.id ? 'visible' : 'hidden' }} />,
+          label: (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: g.color, display: 'inline-block' }} />
+              {g.name}
+            </span>
+          ),
+          onClick: () => updateSession(session.id, { groupId: g.id }),
+        })),
+      ],
+    },
+    { type: 'divider' },
+    {
+      key: 'delete',
+      icon: <DeleteFilled style={{ fontSize: 11 }} />,
+      label: '删除会话',
+      danger: true,
+      onClick: () => handleDeleteSession(session),
+    },
+  ]
+
   // 排序下拉菜单项：当前模式打勾标记
   const sortMenuItems: MenuProps['items'] = SIDEBAR_SORT_OPTIONS.map(o => ({
     key: o.value,
@@ -367,41 +462,91 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigateSession
     </button>
   )
 
-  // 会话子节点：状态色点 + 会话名（溢出 hover 跑马灯），当前全屏会话左侧主色条高亮
+  // 会话子节点：状态色点 + 会话名（溢出 hover 跑马灯），当前全屏会话左侧主色条高亮；
+  // 右键 = 与卡片三点菜单一致的操作（重命名/重置/切换分组/删除）；右键「重命名」进入内联编辑
   const renderSessionNode = (session: Session) => {
     const isActive = activeSessionId === session.id
+    if (editingSessionId === session.id) {
+      return (
+        <div
+          key={session.id}
+          className="flex items-center gap-1.5"
+          style={{ height: 22, padding: '0 6px 0 18px' }}
+        >
+          <span
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: STATUS_COLORS[session.status]?.color ?? STATUS_COLORS.idle.color,
+              flexShrink: 0,
+            }}
+          />
+          <input
+            value={editingSessionName}
+            onChange={(e) => setEditingSessionName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSaveSessionName(session.id)
+              if (e.key === 'Escape') { setEditingSessionId(null); setEditingSessionName('') }
+            }}
+            onBlur={() => handleSaveSessionName(session.id)}
+            autoFocus
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              fontSize: 11,
+              background: 'var(--ant-color-bg-elevated)',
+              border: '1px solid var(--ant-color-primary)',
+              borderRadius: 3,
+              color: 'var(--ant-color-text)',
+              padding: '0 4px',
+              height: 20,
+              fontFamily: "'DM Sans', sans-serif",
+              outline: 'none',
+            }}
+          />
+        </div>
+      )
+    }
     return (
-      <button
+      <Dropdown
         key={session.id}
-        onClick={() => handleSessionClick(session.id)}
-        onDoubleClick={() => handleSessionDoubleClick(session.id)}
-        className={`w-full flex items-center gap-1.5 sb-nav-item${isActive ? ' sb-nav-item-active' : ''}`}
-        style={{
-          height: 22,
-          borderRadius: 4,
-          padding: '0 6px 0 18px',
-          border: 'none',
-          cursor: 'pointer',
-          transition: 'all 0.15s ease',
-          fontSize: 11,
-          textAlign: 'left',
-          ...(isActive ? { boxShadow: 'inset 2px 0 0 var(--primary)' } : null),
-        }}
-        title={session.name}
+        menu={{ items: buildSessionMenuItems(session) }}
+        trigger={['contextMenu']}
+        placement="bottomLeft"
       >
-        <span
+        <button
+          onClick={() => handleSessionClick(session.id)}
+          onDoubleClick={() => handleSessionDoubleClick(session.id)}
+          className={`w-full flex items-center gap-1.5 sb-nav-item${isActive ? ' sb-nav-item-active' : ''}`}
           style={{
-            width: 6,
-            height: 6,
-            borderRadius: '50%',
-            background: STATUS_COLORS[session.status]?.color ?? STATUS_COLORS.idle.color,
-            flexShrink: 0,
+            height: 22,
+            borderRadius: 4,
+            padding: '0 6px 0 18px',
+            border: 'none',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+            fontSize: 11,
+            textAlign: 'left',
+            ...(isActive ? { boxShadow: 'inset 2px 0 0 var(--primary)' } : null),
           }}
-        />
-        <span className="sb-marquee" style={{ flex: 1 }} onMouseEnter={handleMarqueeEnter}>
-          <span className="sb-marquee-inner">{session.name}</span>
-        </span>
-      </button>
+          title={session.name}
+        >
+          <span
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: STATUS_COLORS[session.status]?.color ?? STATUS_COLORS.idle.color,
+              flexShrink: 0,
+            }}
+          />
+          <span className="sb-marquee" style={{ flex: 1 }} onMouseEnter={handleMarqueeEnter}>
+            <span className="sb-marquee-inner">{session.name}</span>
+          </span>
+        </button>
+      </Dropdown>
     )
   }
 

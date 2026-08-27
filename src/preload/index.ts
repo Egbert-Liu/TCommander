@@ -9,6 +9,7 @@ let connStatusCallbacks: Array<(sessionId: string, status: string) => void> = []
 let hookStatusUpdateCallbacks: Array<(sessionId: string, payload: any) => void> = []
 let claudeTranscriptCallbacks: Array<(sessionId: string, appended: any[]) => void> = []
 let claudeSessionNameCallbacks: Array<(sessionId: string, name: string) => void> = []
+let notificationClickCallbacks: Array<(sessionId: string) => void> = []
 
 ipcRenderer.on('session-output', (_, sessionId, data) => {
   outputCallbacks.forEach(cb => cb(sessionId, data))
@@ -50,6 +51,11 @@ ipcRenderer.on('claude-transcript', (_, sessionId: string, appended: any[]) => {
 // Claude Code 会话名变更推送（/rename 后卡片名双向绑定）
 ipcRenderer.on('claude-session-name', (_, sessionId: string, name: string) => {
   claudeSessionNameCallbacks.forEach(cb => cb(sessionId, name))
+})
+
+// 系统通知点击推送（用户点击通知 → 主进程请求跳转到对应会话）
+ipcRenderer.on('notification-click', (_, sessionId: string) => {
+  notificationClickCallbacks.forEach(cb => cb(sessionId))
 })
 
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -160,7 +166,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   claudeIntegrationDisable: () =>
     ipcRenderer.invoke('claude-integration-disable') as Promise<{ success: boolean; error?: string }>,
 
-  // 系统通知
-  showNotification: (title: string, body: string, sound?: boolean) =>
-    ipcRenderer.invoke('show-notification', title, body, sound),
+  // 系统通知（sessionId 用于通知点击后跳转到对应会话）
+  showNotification: (title: string, body: string, sessionId?: string, sound?: boolean) =>
+    ipcRenderer.invoke('show-notification', title, body, sessionId, sound),
+  // 系统通知点击订阅（返回取消订阅函数）
+  onNotificationClick: (callback: (sessionId: string) => void) => {
+    notificationClickCallbacks.push(callback)
+    return () => {
+      notificationClickCallbacks = notificationClickCallbacks.filter(cb => cb !== callback)
+    }
+  },
 })

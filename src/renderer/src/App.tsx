@@ -27,6 +27,14 @@ import { getTerminalTheme } from './utils/terminalThemes'
  */
 const SHOW_FILTER_BAR = false
 
+// 通知识别抑制阈值：
+// - 用户手动输入后 5s 内检测到 needs-input/needs-confirm → 视为「输入回显误判」，不通知
+const INPUT_ECHO_WINDOW_MS = 5000
+// - 用户聚焦/输入终端后 30s 内 → 视为「正在查看」，不推送 idle（输出已停止）通知
+const USER_ACTIVE_WINDOW_MS = 30000
+// - 同一会话通知最小间隔（节流，避免频繁打扰）
+const NOTIFY_THROTTLE_MS = 60000
+
 /** Sync Ant Design theme tokens to :root CSS variables so var(--ant-*) works in all inline styles */
 function ThemeSync() {
   const { token } = theme.useToken()
@@ -99,6 +107,16 @@ function App() {
   const highlightTimerRef = useRef<number | null>(null)
   // 普通布局的 main 滚动容器：导航时在其中查找目标卡片
   const mainRef = useRef<HTMLElement>(null)
+  // 通知节流：记录每个会话最近一次通知时间
+  const lastNotifyAtRef = useRef<Record<string, number>>({})
+
+  // 同一会话 NOTIFY_THROTTLE_MS 内不重复通知（节流）
+  const canNotifySession = useCallback((sessionId: string) => {
+    const now = Date.now()
+    if (now - (lastNotifyAtRef.current[sessionId] ?? 0) < NOTIFY_THROTTLE_MS) return false
+    lastNotifyAtRef.current[sessionId] = now
+    return true
+  }, [])
 
   // 侧边栏会话节点单击回调：滚动定位到对应卡片（smooth + 居中）并高亮 2s
   const handleNavigateSession = useCallback((sessionId: string) => {
@@ -118,6 +136,22 @@ function App() {
       }
     }
   }, [])
+
+  // 系统通知点击：主进程恢复窗口后推送对应会话 id → 跳转定位
+  useEffect(() => {
+    const unsub = window.electronAPI.onNotificationClick((sessionId) => {
+      const state = useAppStore.getState()
+      if (!state.sessions.some((s) => s.id === sessionId)) return
+      if (state.isFullscreen) {
+        // 全屏：切换全屏终端到对应会话
+        state.setActiveSession(sessionId)
+      } else {
+        // 卡片页：滚动定位 + 2s 高亮该卡片，作为「选中的」
+        handleNavigateSession(sessionId)
+      }
+    })
+    return unsub
+  }, [handleNavigateSession])
 
   // 计算各状态数量
   const statusCounts = useMemo(() => {
@@ -395,11 +429,20 @@ function App() {
         }
         const label = statusLabels[detectResult.status]
         if (label) {
-          window.electronAPI.showNotification(
-            `${session.name} - ${label}`,
-            detectResult.matchedRuleName || '会话需要您的关注',
-            state.notificationSoundEnabled
-          )
+          // 手动输入不作为识别入口：用户刚输入（<5s）且为输入类状态，
+          // 视为「用户输入回显」被规则误判（如输入带问号的文本），不通知。
+          // error 是程序输出，不受此抑制。
+          const isInputLike = detectResult.status === 'needs-input' || detectResult.status === 'needs-confirm'
+          const justTyped = Date.now() - terminalPool.getUserInputAt(sessionId) < INPUT_ECHO_WINDOW_MS
+          const suppressInputEcho = isInputLike && justTyped
+          if (!suppressInputEcho && canNotifySession(sessionId)) {
+            window.electronAPI.showNotification(
+              `${session.name} - ${label}`,
+              detectResult.matchedRuleName || '会话需要您的关注',
+              sessionId,
+              state.notificationSoundEnabled
+            )
+          }
         }
       }
     } else {
@@ -560,11 +603,19 @@ function App() {
           // running→idle 是状态转换，更新 stableActivityAt（排序防抖）
           state.updateSession(s.id, { status: 'idle', stableActivityAt: now })
           // 输出停止（running→idle）时发送系统通知：
-          // 用户下发指令后终端输出了一阵并停下来，此时需要提醒
-          if (state.notificationEnabled) {
+          // 用户下发指令后终端输出了一阵并停下来，此时需要提醒。
+          // 但若用户正在查看该终端（最近聚焦/输入过 <30s），不打扰；
+          // 且同一会话 60s 内节流，避免通知过多。
+          const lastUserActive = Math.max(
+            terminalPool.getUserFocusAt(s.id),
+            terminalPool.getUserInputAt(s.id)
+          )
+          const userWatching = now - lastUserActive < USER_ACTIVE_WINDOW_MS
+          if (state.notificationEnabled && !userWatching && canNotifySession(s.id)) {
             window.electronAPI.showNotification(
               `${s.name} - 输出已停止`,
               '终端已停止输出，可以查看结果了',
+              s.id,
               state.notificationSoundEnabled
             )
           }
@@ -722,6 +773,7 @@ function App() {
             collapsed={sidebarCollapsed}
             onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
             onNavigateSession={handleNavigateSession}
+            onResetSession={handleResetSession}
           />
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             <FullscreenTerminal />
@@ -783,6 +835,7 @@ function App() {
             collapsed={sidebarCollapsed}
             onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
             onNavigateSession={handleNavigateSession}
+            onResetSession={handleResetSession}
           />
 
           <main
